@@ -1,19 +1,17 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-import openai
+from openai import OpenAI
 import os
 from dotenv import load_dotenv
 
-load_dotenv()  # .env dosyasındaki API anahtarını al
-
-openai.api_key = os.getenv("OPENAI_API_KEY")
+load_dotenv()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI()
 
-# CORS ayarları: Vercel'den gelen istekleri kabul et
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Can be restricted to your frontend URL later
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,22 +23,20 @@ async def chat(request: Request):
     question = data.get("question")
 
     if not question:
-        return {"reply": "Lütfen bir soru yazınız."}
+        return {"reply": "Lütfen bir soru yazın."}
 
     try:
-        response = openai.ChatCompletion.create(
+        completion = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "SibelGPT adında bir yapay zeka danışmansın. Kullanıcılara gayrimenkul, numeroloji, finans gibi konularda sıcak, profesyonel ve yardımcı bir tonda yanıt veriyorsun."},
                 {"role": "user", "content": question}
             ]
         )
-        answer = response['choices'][0]['message']['content']
-        return {"reply": answer}
-
+        return {"reply": completion.choices[0].message.content}
     except Exception as e:
         return {"reply": f"Hata oluştu: {str(e)}"}
 
 @app.get("/")
 def root():
-    return {"message": "SibelGPT API aktif."}
+    return {"message": "SibelGPT aktif!"}
