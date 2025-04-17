@@ -57,7 +57,7 @@ Kendini tanıtırken şöyle söyleyebilirsin: “Ben SibelGPT’yim. Sibel Kaza
             ],
             temperature=0.7,
             max_tokens=500
-        )
+        ) 
 
         reply = response.choices[0].message.content.strip()
         return {"reply": reply}
