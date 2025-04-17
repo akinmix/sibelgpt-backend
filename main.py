@@ -1,12 +1,13 @@
 from fastapi import FastAPI, Request
-from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 app = FastAPI()
 
+# CORS ayarları – Tüm kaynaklara izin veriyoruz
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # veya sadece "https://www.sibelgpt.com"
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -17,5 +18,7 @@ class Query(BaseModel):
 
 @app.post("/chat")
 async def chat(query: Query):
-    # Geçici örnek cevap
-    return {"answer": f"Bu örnek cevaptır: {query.question}"}
+    user_question = query.question
+    return {
+        "reply": f"Senin sorun: '{user_question}' — SibelGPT henüz eğitilmediği için örnek cevap döndürüyor."
+    }
