@@ -1,15 +1,15 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-import openai
+from openai import OpenAI
 import os
+
+# .env dosyasından API anahtarını al
 from dotenv import load_dotenv
-
 load_dotenv()
-
-openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = FastAPI()
 
+# CORS ayarları
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,49 +18,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/chat")
-async def chat(request: Request):
-    data = await request.json()
-    user_input = data.get("question")
+# OpenAI istemcisini başlat
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    if not user_input:
-        return {"reply": "Lütfen bir soru yazın."}
-
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[
-                {
-                    "role": "system",
-                    "content": """
+# System Prompt: Kişiselleştirilmiş başlangıç mesajı
+system_message = {
+    "role": "system",
+    "content": """
 Sen SibelGPT adında, deneyimli bir yapay zeka danışmanısın.
-Uzmanlık alanların: gayrimenkul,borsa,kişisel gelişim, numeroloji, astroloji, finans ve yaşam tavsiyeleri.
+Uzmanlık alanların: gayrimenkul, numeroloji, astroloji, finans ve yaşam tavsiyeleri.
 Tarzın sıcak, içten, bilgi dolu ve kullanıcı dostu.
-Cevaplarında kadın sesi gibi samimi bir dil kullan. Teknik terimleri gerektiğinde kullan ama sade ve anlaşılır ol.
-
-Gayrimenkul konusunda İstanbul’un Kadıköy ilçesi, Erenköy Mahallesi, Bağdat Caddesi'nde yer alan Remax Sonuç ofisindesin.
-Kullanıcıya yatırım amacı, lokasyon, bütçe, risk düzeyi gibi bilgiler ışığında bilinçli ve güvenilir öneriler sun.
-
-Numeroloji sorularında, astrolojik etkilerle doğal bağlar kurabilirsin.
-Örnek: “7 sayısı içsel bilgelikle ilişkilidir, Yay burcu etkileriyle de örtüşür.”
+Cevaplarında kadın sesi gibi samimi bir dil kullan. Teknik terimleri gerektiğinde kullan ama sadeleştir.
+İstanbul'un Kadıköy ilçesi, Erenköy Mahallesi, Bağdat Caddesi'nde bir ofistesin.
 
 Kullanıcının yanında olduğunu hissettirecek şekilde yaz.
-Gerekirse “İstersen bunu örneklendirebilirim.” gibi esnek, yardımsever cümleler kullan.
-
-Cümlelerde noktalama ve duraksamalara dikkat et ki sesli yanıtlar da doğal gelsin.
-Resmi anlatımdan kaçın, her zaman anlaşılır, sade ve doğrudan ol.Hayal görme.
-
-Kendini tanıtırken şöyle söyleyebilirsin: “Ben SibelGPT’yim. Sibel Kazan Midilli tarafından geliştirlmiş bir yapay zekayım.”
+Noktalama ve duraksamalara dikkat et. Yanıtların doğal, sade ve doğrudan olsun.
 """
-                },
-                {"role": "user", "content": user_input}
-            ],
-            temperature=0.7,
-            max_tokens=500
-        ) 
+}
 
-        reply = response.choices[0].message.content.strip()
+@app.post("/chat")
+async def chat(request: Request):
+    try:
+        body = await request.json()
+        question = body.get("question")
+
+        if not question:
+            return {"reply": "Lütfen bir soru yazın."}
+
+        messages = [system_message, {"role": "user", "content": question}]
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages
+        )
+
+        reply = response.choices[0].message.content
         return {"reply": reply}
 
     except Exception as e:
-        return {"reply": f"SibelGPT: Hata oluştu: {str(e)}"}
+        return {"reply": f"SibelGPT: Hata oluştu. {str(e)}"}
