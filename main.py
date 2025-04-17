@@ -1,38 +1,46 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 import openai
 import os
+from dotenv import load_dotenv
 
-# API key'i ortam değişkeninden al
+load_dotenv()  # .env dosyasındaki API anahtarını al
+
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = FastAPI()
 
-# CORS ayarları
+# CORS ayarları: Vercel'den gelen istekleri kabul et
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Can be restricted to your frontend URL later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# İstek modeli
-class Query(BaseModel):
-    question: str
-
 @app.post("/chat")
-async def chat(query: Query):
+async def chat(request: Request):
+    data = await request.json()
+    question = data.get("question")
+
+    if not question:
+        return {"reply": "Lütfen bir soru yazınız."}
+
     try:
-        completion = openai.ChatCompletion.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "Sen SibelGPT’sin. İstanbul'da yaşayan, yapay zekadan anlayan, sıcak ve bilgili bir kadın danışmansın. Kullanıcıdan gelen sorulara içtenlikle ve bilgece cevap ver."},
-                {"role": "user", "content": query.question}
+                {"role": "system", "content": "SibelGPT adında bir yapay zeka danışmansın. Kullanıcılara gayrimenkul, numeroloji, finans gibi konularda sıcak, profesyonel ve yardımcı bir tonda yanıt veriyorsun."},
+                {"role": "user", "content": question}
             ]
         )
-        reply = completion.choices[0].message["content"]
-        return {"reply": reply}
+        answer = response['choices'][0]['message']['content']
+        return {"reply": answer}
+
     except Exception as e:
-        return {"error": str(e)}
+        return {"reply": f"Hata oluştu: {str(e)}"}
+
+@app.get("/")
+def root():
+    return {"message": "SibelGPT API aktif."}
