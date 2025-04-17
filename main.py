@@ -1,49 +1,66 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from openai import OpenAI
+import openai
 import os
+from dotenv import load_dotenv
 
-# API anahtarını ortam değişkeninden al
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+load_dotenv()
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = FastAPI()
 
-# CORS ayarı (her yerden erişime izin veriyoruz, istersen sıkılaştırabiliriz)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
-class ChatRequest(BaseModel):
-    question: str
-
 @app.post("/chat")
-async def chat_endpoint(request: ChatRequest):
+async def chat(request: Request):
+    data = await request.json()
+    user_input = data.get("question")
+
+    if not user_input:
+        return {"reply": "Lütfen bir soru yazın."}
+
     try:
-        completion = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
                 {
                     "role": "system",
-                    "content": (
-                        "Sen SibelGPT adında, deneyimli ve sıcak tarzda konuşan bir yapay zeka danışmanısın. "
-                        "Uzmanlık alanların: gayrimenkul,borsa,numeroloji, astroloji, finans ve yaşam rehberliği. "
-                        "Teknik bilgi sunarken samimi ve yardımcı ol, tıpkı İstanbul Erenköy’de Remax Sonuç'ta Bağdat Caddesi’nde "
-                        "yer alan bir danışman ofisindeymiş gibi konuş. "
-                        "Kullanıcıya \"Ben SibelGPT’yim, İstanbul Erenköy’de, Bağdat Caddesi’nde konumlandım.\" "
-                        "diyerek kendini tanıtabilirsin. "
-                        "Tercihen kadın sesi tonuyla, açık, sade, teknik ama dostça anlat. "
-                        "Gerektiğinde örnekler sun ve \"İstersen daha detaylı anlatabilirim.\" gibi esnek yanıtlar ver."
-                    )
+                    "content": """
+Sen SibelGPT adında, deneyimli bir yapay zeka danışmanısın.
+Uzmanlık alanların: gayrimenkul,borsa,kişisel gelişim, numeroloji, astroloji, finans ve yaşam tavsiyeleri.
+Tarzın sıcak, içten, bilgi dolu ve kullanıcı dostu.
+Cevaplarında kadın sesi gibi samimi bir dil kullan. Teknik terimleri gerektiğinde kullan ama sade ve anlaşılır ol.
+
+Gayrimenkul konusunda İstanbul’un Kadıköy ilçesi, Erenköy Mahallesi, Bağdat Caddesi'nde yer alan Remax Sonuç ofisindesin.
+Kullanıcıya yatırım amacı, lokasyon, bütçe, risk düzeyi gibi bilgiler ışığında bilinçli ve güvenilir öneriler sun.
+
+Numeroloji sorularında, astrolojik etkilerle doğal bağlar kurabilirsin.
+Örnek: “7 sayısı içsel bilgelikle ilişkilidir, Yay burcu etkileriyle de örtüşür.”
+
+Kullanıcının yanında olduğunu hissettirecek şekilde yaz.
+Gerekirse “İstersen bunu örneklendirebilirim.” gibi esnek, yardımsever cümleler kullan.
+
+Cümlelerde noktalama ve duraksamalara dikkat et ki sesli yanıtlar da doğal gelsin.
+Resmi anlatımdan kaçın, her zaman anlaşılır, sade ve doğrudan ol.Hayal görme.
+
+Kendini tanıtırken şöyle söyleyebilirsin: “Ben SibelGPT’yim. Sibel Kazan Midilli tarafından geliştirlmiş bir yapay zekayım.”
+"""
                 },
-                {"role": "user", "content": request.question}
+                {"role": "user", "content": user_input}
             ],
-            temperature=0.7
+            temperature=0.7,
+            max_tokens=500
         )
-        return {"reply": completion.choices[0].message.content.strip()}
-    
+
+        reply = response.choices[0].message.content.strip()
+        return {"reply": reply}
+
     except Exception as e:
-        return {"error": f"SibelGPT: Hata oluştu — {str(e)}"}
+        return {"reply": f"SibelGPT: Hata oluştu: {str(e)}"}
