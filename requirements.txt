@@ -1,4 +1,8 @@
-fastapi
-uvicorn
-openai>=1.0.0
+flask
+openai
+langchain
+langchain-community
+chromadb
+tiktoken
 python-dotenv
+unstructured[md]
