@@ -56,3 +56,6 @@ async def chat(request: Request):
 
     except Exception as e:
         return {"reply": f"SibelGPT: Hata oluştu. {str(e)}"}
+        from routes import ilan_detay
+app.include_router(ilan_detay.router)
+
