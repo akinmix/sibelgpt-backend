@@ -1,3 +1,4 @@
+# re-deploy for actual use
 import time
 import json # JSON formatında yazdırmak isterseniz
 from selenium import webdriver
