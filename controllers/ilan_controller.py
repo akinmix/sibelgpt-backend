@@ -1,5 +1,5 @@
-import os
 import csv
+import os
 from controllers.remax_scraper import scrape_remax_listing, save_to_markdown
 from controllers.convert_md_to_pdf import convert_md_to_pdf  # varsa yoksa ekleriz
 
@@ -10,8 +10,9 @@ def get_url_from_csv(ilan_no):
     try:
         with open(CSV_PATH, newline='', encoding="utf-8") as f:
             reader = csv.DictReader(f)
+            print("[DEBUG] CSV Başlıkları:", reader.fieldnames)
             for row in reader:
-                if row["İlan No"] == ilan_no:
+                if row["ilan_no"] == ilan_no:
                     return row["URL"]
     except Exception as e:
         print(f"[HATA][get_url_from_csv] CSV okuma hatası: {e}")
@@ -24,6 +25,7 @@ def prepare_ilan_dosyasi(ilan_no):
             return {"error": "İlan bulunamadı."}
 
         data = scrape_remax_listing(url)
+
         md_file = os.path.join(MARKDOWN_DIR, f"{ilan_no}.md")
         pdf_file = os.path.join(MARKDOWN_DIR, f"{ilan_no}.pdf")
 
@@ -38,5 +40,4 @@ def prepare_ilan_dosyasi(ilan_no):
             "pdf_path": f"/markdowns/{ilan_no}.pdf"
         }
     except Exception as e:
-        print(f"[HATA][prepare_ilan_dosyasi] İşlenemedi: {e}")
-        return {"error": f"İlan verileri hazırlanamadı: {str(e)}"}
+        return {"error": f"Hata oluştu: {str(e)}"}
