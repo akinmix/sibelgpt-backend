@@ -6,3 +6,5 @@ chromadb
 tiktoken
 python-dotenv
 unstructured[md]
+selenium
+webdriver-manager
