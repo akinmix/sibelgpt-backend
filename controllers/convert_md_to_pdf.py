@@ -10,3 +10,4 @@ def convert_md_to_pdf(md_path, pdf_path):
         print(f"PDF başarıyla oluşturuldu: {pdf_path}")
     except Exception as e:
         print(f"PDF oluşturulamadı: {e}")
+
