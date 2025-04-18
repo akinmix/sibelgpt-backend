@@ -1,6 +1,5 @@
-# re-deploy for verification
-import csv
 import os
+import csv
 from controllers.remax_scraper import scrape_remax_listing, save_to_markdown
 from controllers.convert_md_to_pdf import convert_md_to_pdf  # varsa yoksa ekleriz
 
@@ -8,30 +7,36 @@ CSV_PATH = "markdowns/ilanlar.csv"
 MARKDOWN_DIR = "markdowns"
 
 def get_url_from_csv(ilan_no):
-    with open(CSV_PATH, newline='', encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if row['İlan No'] == ilan_no:
-                return row['URL']
+    try:
+        with open(CSV_PATH, newline='', encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row["İlan No"] == ilan_no:
+                    return row["URL"]
+    except Exception as e:
+        print(f"[HATA][get_url_from_csv] CSV okuma hatası: {e}")
     return None
 
 def prepare_ilan_dosyasi(ilan_no):
-    url = get_url_from_csv(ilan_no)
-    if not url:
-        return {"error": "İlan bulunamadı."}
+    try:
+        url = get_url_from_csv(ilan_no)
+        if not url:
+            return {"error": "İlan bulunamadı."}
 
-    data = scrape_remax_listing(url)
+        data = scrape_remax_listing(url)
+        md_file = os.path.join(MARKDOWN_DIR, f"{ilan_no}.md")
+        pdf_file = os.path.join(MARKDOWN_DIR, f"{ilan_no}.pdf")
 
-    md_file = os.path.join(MARKDOWN_DIR, f"{ilan_no}.md")
-    pdf_file = os.path.join(MARKDOWN_DIR, f"{ilan_no}.pdf")
+        save_to_markdown(data, md_file)
+        convert_md_to_pdf(md_file, pdf_file)
 
-    save_to_markdown([data], md_file)
-    convert_md_to_pdf(md_file, pdf_file)
-
-    return {
-        "success": True,
-        "ilan_no": ilan_no,
-        "url": url,
-        "md_path": f"/markdowns/{ilan_no}.md",
-        "pdf_path": f"/markdowns/{ilan_no}.pdf"
-    }
+        return {
+            "success": True,
+            "ilan_no": ilan_no,
+            "url": url,
+            "md_path": f"/markdowns/{ilan_no}.md",
+            "pdf_path": f"/markdowns/{ilan_no}.pdf"
+        }
+    except Exception as e:
+        print(f"[HATA][prepare_ilan_dosyasi] İşlenemedi: {e}")
+        return {"error": f"İlan verileri hazırlanamadı: {str(e)}"}
