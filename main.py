@@ -1,3 +1,4 @@
+from routes import ilan_detay
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
