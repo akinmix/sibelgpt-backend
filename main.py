@@ -1,3 +1,4 @@
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
@@ -32,6 +33,13 @@ qa = RetrievalQA.from_chain_type(llm=ChatOpenAI(openai_api_key=openai_api_key), 
 
 # FastAPI başlat
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # /ask endpoint (SibelGPT bilgi modülü)
 @app.post("/ask")
