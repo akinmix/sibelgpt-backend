@@ -1,62 +1,47 @@
-from routes import ilan_detay
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from openai import OpenAI
+from fastapi.responses import JSONResponse
+from dotenv import load_dotenv
 import os
 
-# .env dosyasından API anahtarını al
-from dotenv import load_dotenv
-load_dotenv()
+from controllers.ilan_controller import prepare_ilan_dosyasi
+from routes import ilan_detay
 
+from langchain_community.document_loaders import DirectoryLoader
+from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain_community.chat_models import ChatOpenAI
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.chains import RetrievalQA
+
+# Ortam değişkenlerini yükle
+load_dotenv()
+openai_api_key = os.getenv("OPENAI_API_KEY")
+
+# LangChain eğitim kısmı (markdown dosyaları ile)
+loader = DirectoryLoader("markdowns", glob="*.md")
+documents = loader.load()
+
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+texts = text_splitter.split_documents(documents)
+
+embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+db = Chroma.from_documents(texts, embeddings, persist_directory="chroma_db")
+retriever = db.as_retriever()
+
+qa = RetrievalQA.from_chain_type(llm=ChatOpenAI(openai_api_key=openai_api_key), retriever=retriever)
+
+# FastAPI başlat
 app = FastAPI()
 
-# CORS ayarları
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# /ask endpoint (SibelGPT bilgi modülü)
+@app.post("/ask")
+async def ask(request: Request):
+    data = await request.json()
+    question = data.get("question")
+    if not question:
+        return JSONResponse(content={"error": "Soru eksik."}, status_code=400)
+    answer = qa.run(question)
+    return {"answer": answer}
 
-# OpenAI istemcisini başlat
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-# System Prompt: Kişiselleştirilmiş başlangıç mesajı
-system_message = {
-    "role": "system",
-    "content": """
-Sen SibelGPT adında, deneyimli bir yapay zeka danışmanısın.
-Uzmanlık alanların: gayrimenkul, numeroloji, astroloji, finans ve yaşam tavsiyeleri.
-Tarzın sıcak, içten, bilgi dolu ve kullanıcı dostu.
-Cevaplarında kadın sesi gibi samimi bir dil kullan. Teknik terimleri gerektiğinde kullan ama sadeleştir.
-İstanbul'un Kadıköy ilçesi, Erenköy Mahallesi, Bağdat Caddesi'nde bir ofistesin.
-
-Kullanıcının yanında olduğunu hissettirecek şekilde yaz.
-Noktalama ve duraksamalara dikkat et. Yanıtların doğal, sade ve doğrudan olsun.
-"""
-}
-
-@app.post("/chat")
-async def chat(request: Request):
-    try:
-        body = await request.json()
-        question = body.get("question")
-
-        if not question:
-            return {"reply": "Lütfen bir soru yazın."}
-
-        messages = [system_message, {"role": "user", "content": question}]
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages
-        )
-
-        reply = response.choices[0].message.content
-        return {"reply": reply}
-
-    except Exception as e:
-        return {"reply": f"SibelGPT: Hata oluştu. {str(e)}"}
-        from routes import ilan_detay
+# /api/ilan-detay endpoint (ilan botu)
 app.include_router(ilan_detay.router)
-
