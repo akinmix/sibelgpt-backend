@@ -7,3 +7,4 @@ chromadb
 python-dotenv
 fastapi
 uvicorn
+unstructured
