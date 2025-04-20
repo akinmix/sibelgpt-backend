@@ -57,6 +57,6 @@ async def chat_endpoint(request: Request):
     if not message:
         return JSONResponse(content={"error": "Soru eksik."}, status_code=400)
 
-    answer = qa.run(message)
+    answer = qa.invoke(message)
     custom_closing = "\n\n👉 Eğer ilginizi çeken bir ilan varsa ilan numarasını sorarak detaylı bilgi alabilirsiniz."
     return {"reply": answer + custom_closing}
