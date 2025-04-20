@@ -23,14 +23,17 @@ documents = loader.load()
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=50)
 texts = text_splitter.split_documents(documents)
 
+# Yüklenen chunk sayısını terminalde göster
+print(f"Yüklenen doküman sayısı: {len(texts)}")
+
 # Vektör veritabanı oluştur
 embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 db = Chroma.from_documents(texts, embeddings, persist_directory="chroma_db")
 
-# Retriever (score_threshold kaldırıldı)
+# Retriever ayarı
 retriever = db.as_retriever(search_kwargs={"k": 5})
 
-# LangChain QA zinciri
+# QA zinciri
 qa = RetrievalQA.from_chain_type(
     llm=ChatOpenAI(openai_api_key=openai_api_key),
     retriever=retriever
@@ -39,7 +42,7 @@ qa = RetrievalQA.from_chain_type(
 # FastAPI başlat
 app = FastAPI()
 
-# CORS izinleri
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
