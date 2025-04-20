@@ -15,26 +15,31 @@ from langchain.chains import RetrievalQA
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
 
-# Eğitim verisini yükle (markdown klasöründen)
+# Markdown dosyalarını yükle
 loader = DirectoryLoader("markdowns", glob="*.md")
 documents = loader.load()
 
-# Metni parçalara ayır
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+# Metinleri parçala – chunk ayarı yükseltildi
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=50)
 texts = text_splitter.split_documents(documents)
 
-# Vektör veri tabanı oluştur
+# Vektör veri tabanı oluştur – Chroma
 embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 db = Chroma.from_documents(texts, embeddings, persist_directory="chroma_db")
-retriever = db.as_retriever()
+
+# Retriever ince ayar: daha iyi eşleşme için k ve skor eşiği
+retriever = db.as_retriever(search_kwargs={"k": 5, "score_threshold": 0.5})
 
 # LangChain QA zinciri
-qa = RetrievalQA.from_chain_type(llm=ChatOpenAI(openai_api_key=openai_api_key), retriever=retriever)
+qa = RetrievalQA.from_chain_type(
+    llm=ChatOpenAI(openai_api_key=openai_api_key),
+    retriever=retriever
+)
 
 # FastAPI başlat
 app = FastAPI()
 
-# CORS izinlerini ayarla
+# CORS izinleri
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,18 +47,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# /ask endpoint (test için)
-@app.post("/ask")
-async def ask_endpoint(request: Request):
-    data = await request.json()
-    question = data.get("question", "")
-
-    if not question:
-        return JSONResponse(content={"error": "Soru eksik."}, status_code=400)
-
-    answer = qa.run(question)
-    return {"answer": answer}
 
 # /chat endpoint (SibelGPT frontend için)
 @app.post("/chat")
@@ -65,5 +58,5 @@ async def chat_endpoint(request: Request):
         return JSONResponse(content={"error": "Soru eksik."}, status_code=400)
 
     answer = qa.run(message)
-    return {"reply": answer}
-
+    custom_closing = "\n\n👉 Eğer ilginizi çeken bir ilan varsa ilan numarasını sorarak detaylı bilgi alabilirsiniz."
+    return {"reply": answer + custom_closing}
