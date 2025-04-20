@@ -1,11 +1,8 @@
-flask
-openai
 langchain
-langchain-community
-chromadb
+langchain-openai
+openai
 tiktoken
+chromadb
 python-dotenv
-unstructured[md]
-selenium
-webdriver-manager
-pdfkit
+fastapi
+uvicorn
