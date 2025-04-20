@@ -59,7 +59,7 @@ async def ask_endpoint(request: Request):
 @app.post("/chat")
 async def chat_endpoint(request: Request):
     data = await request.json()
-    message = data.get("message", "")
+    message = data.get("question", "")
 
     if not message:
         return JSONResponse(content={"error": "Soru eksik."}, status_code=400)
