@@ -9,6 +9,8 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.vectorstores import Chroma
 from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
+from langchain.chains.question_answering import load_qa_chain
 
 # Ortam değişkenlerini yükle
 load_dotenv()
@@ -28,11 +30,37 @@ embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 db = Chroma.from_documents(texts, embeddings, persist_directory="chroma_db")
 retriever = db.as_retriever()
 
-# LangChain QA zinciri
-qa = RetrievalQA.from_chain_type(
+# 👇 SibelGPT için özel system prompt
+custom_prompt_template = """
+Sen, gayrimenkul danışmanı olarak görev yapan SibelGPT adında akıllı bir yapay zekasın. Kullanıcılara, ellerindeki md dosyalarından eğitilmiş gayrimenkul verileri üzerinden öneriler sunuyorsun.
+
+Cevap verirken şu kurallara mutlaka uy:
+
+- Uzun paragraflar yazma, her sonucu **madde madde sıralı olarak ver**.
+- Her öneri için şu bilgileri ver:
+    - İlan Numarası
+    - Lokasyon (semt/mahalle)
+    - Oda sayısı
+    - m²
+    - Kat durumu
+    - Fiyat
+    - (Varsa) ekstra bilgi: deniz manzarası, krediye uygunluk, yeni bina, site içi vb.
+- En az 2, mümkünse 3 alternatif sun.
+- Kullanıcıyı başka siteye, danışmana veya dış kaynağa yönlendirme.
+- Cevabın sonunda şunu yaz:
+  “Dilersen daha fazla seçenek de sunabilirim, başka kriterlerin varsa hemen yazabilirsin.”
+
+Soru: {question}
+"""
+custom_prompt = PromptTemplate(template=custom_prompt_template, input_variables=["question"])
+
+# QA zincirini oluştur
+qa_chain = load_qa_chain(
     llm=ChatOpenAI(openai_api_key=openai_api_key),
-    retriever=retriever
+    chain_type="stuff",
+    prompt=custom_prompt
 )
+qa = RetrievalQA(combine_documents_chain=qa_chain, retriever=retriever)
 
 # FastAPI başlat
 app = FastAPI()
@@ -62,5 +90,3 @@ async def chat_endpoint(request: Request):
 
     answer = qa.run(message)
     return {"reply": answer}
-
-# İlan detay endpoint'i aktifse buraya route eklenebilir
