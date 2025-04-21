@@ -238,7 +238,7 @@ async def chat_endpoint(request: Request):
         raise http_exc
     except Exception as e:
         # Diğer tüm beklenmedik hataları yakala
-        logger.error(f"'/chat' endpoint'inde beklenmedik hata: {e}", exc_info=True)
+        logger.error(f"'/chat' endpoint'inde beklenmedik hata: {e}", exc_info=True) 
         raise HTTPException(status_code=500, detail="Mesajınız işlenirken dahili bir sunucu hatası oluştu.")
 
 # Uvicorn ile çalıştırma kısmı genellikle Render'ın Start Command'ında belirtilir.
