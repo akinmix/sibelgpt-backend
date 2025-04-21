@@ -28,10 +28,8 @@ if not openai_api_key:
     raise ValueError("OPENAI_API_KEY ortam değişkeni ayarlanmalı.")
 
 # Sabitler
-MARKDOWN_DIRECTORY = "markdowns" # Bu hala göreceli olabilir, main.py'nin yanındaki klasör
-# ----- DEĞİŞİKLİK BURADA -----
-PERSIST_DIRECTORY = "/var/data/chroma_db" # Render'daki Mount Path ile aynı olmalı!
-# -----------------------------
+MARKDOWN_DIRECTORY = "markdowns"
+PERSIST_DIRECTORY = "/var/data/chroma_db" # Render'daki Mount Path ile aynı
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 
@@ -46,58 +44,64 @@ except Exception as e:
 db = None
 try:
     # Veritabanı YOLUNU kontrol et (Mutlak yol)
-    if os.path.exists(PERSIST_DIRECTORY) and os.listdir(PERSIST_DIRECTORY):
-        logger.info(f"Mevcut ChromaDB veritabanı yükleniyor: {PERSIST_DIRECTORY}")
-        db = Chroma(persist_directory=PERSIST_DIRECTORY, embedding_function=embeddings)
-        logger.info("✅ ChromaDB başarıyla yüklendi.")
+    # Render diski bu yola bağladığı için, dizinin var olması beklenir.
+    if os.path.exists(PERSIST_DIRECTORY):
+         # Dizin varsa ve boş değilse yükle
+         # Not: Boş dizin kontrolü önemlidir, çünkü Render diski boş olarak bağlayabilir.
+         if os.listdir(PERSIST_DIRECTORY):
+             logger.info(f"Mevcut ChromaDB veritabanı yükleniyor: {PERSIST_DIRECTORY}")
+             db = Chroma(persist_directory=PERSIST_DIRECTORY, embedding_function=embeddings)
+             logger.info("✅ ChromaDB başarıyla yüklendi.")
+         else:
+             # Dizin var ama içi boşsa, yeni oluşturma adımına geç
+             logger.info(f"'{PERSIST_DIRECTORY}' mevcut ancak boş. Yeni veritabanı oluşturulacak.")
+             # db hala None, aşağıdaki blok çalışacak.
     else:
-        # Eğer dizin yoksa, Render'daki disk bağlantısı henüz aktif olmamış olabilir
-        # veya ilk deploy. Dizini oluşturmayı deneyelim.
-        if not os.path.exists(PERSIST_DIRECTORY):
-             logger.warning(f"'{PERSIST_DIRECTORY}' dizini bulunamadı. Kalıcı disk bağlanmamış olabilir veya ilk başlatma. Dizin oluşturuluyor...")
-             try:
-                 os.makedirs(PERSIST_DIRECTORY, exist_ok=True) # Dizini oluştur (varsa hata verme)
-                 logger.info(f"'{PERSIST_DIRECTORY}' dizini başarıyla oluşturuldu veya zaten vardı.")
-             except OSError as e:
-                 logger.error(f"'{PERSIST_DIRECTORY}' dizini oluşturulamadı: {e}. İzinleri kontrol edin.")
-                 raise # Dizini oluşturamazsa devam edemez
+         # Bu durumun olmaması gerekir eğer disk doğru bağlandıysa, ama yine de loglayalım.
+         logger.warning(f"'{PERSIST_DIRECTORY}' bulunamadı! Render disk bağlantısını kontrol edin. Yeni veritabanı oluşturulmaya çalışılacak...")
+         # db hala None, aşağıdaki blok çalışacak.
 
-        # Dizini oluşturduktan veya zaten var olduktan sonra tekrar kontrol et (içeriği boş mu diye)
-        # Not: os.listdir() boş dizinde boş liste döndürür.
-        if not os.path.exists(PERSIST_DIRECTORY) or not os.listdir(PERSIST_DIRECTORY):
-             logger.info(f"'{PERSIST_DIRECTORY}' boş veya yeni oluşturuldu. Yeni veritabanı oluşturuluyor...")
-             if not os.path.exists(MARKDOWN_DIRECTORY):
-                 logger.error(f"Markdown dosyalarının olması beklenen '{MARKDOWN_DIRECTORY}' dizini bulunamadı!")
-                 raise FileNotFoundError(f"'{MARKDOWN_DIRECTORY}' dizini mevcut değil.")
+    # Eğer yukarıdaki yükleme başarılı olmadıysa (db hala None ise), oluşturmayı dene
+    if db is None:
+         logger.info(f"Yeni veritabanı '{PERSIST_DIRECTORY}' içinde oluşturuluyor...")
 
-             logger.info(f"'{MARKDOWN_DIRECTORY}' içindeki .md dosyaları yükleniyor...")
-             loader = DirectoryLoader(MARKDOWN_DIRECTORY, glob="*.md", show_progress=True)
-             documents = loader.load()
+         # ----> os.makedirs çağrısı burada YOK! <----
+         # Render diski bu yola bağladığı için klasör zaten var olmalı.
 
-             if not documents:
-                 logger.warning(f"'{MARKDOWN_DIRECTORY}' içinde işlenecek .md dosyası bulunamadı.")
-                 # Boş veritabanı oluşturmak yerine burada durmak daha mantıklı olabilir
-                 # veya en azından retriever'ı None bırakmak. Şimdilik devam edelim.
-             else:
-                 logger.info(f"{len(documents)} adet döküman yüklendi.")
-                 text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
-                 texts = text_splitter.split_documents(documents)
-                 logger.info(f"Dökümanlar {len(texts)} parçaya (chunk) ayrıldı.")
+         if not os.path.exists(MARKDOWN_DIRECTORY):
+             logger.error(f"Markdown dosyalarının olması beklenen '{MARKDOWN_DIRECTORY}' dizini bulunamadı!")
+             raise FileNotFoundError(f"'{MARKDOWN_DIRECTORY}' dizini mevcut değil.")
 
-                 logger.info("Embedding'ler oluşturuluyor ve ChromaDB'ye kaydediliyor...")
-                 # Kaydederken MUTLAK YOLU kullan
-                 db = Chroma.from_documents(
-                     documents=texts,
-                     embedding=embeddings,
-                     persist_directory=PERSIST_DIRECTORY # Mutlak yolu kullan
-                 )
-                 logger.info(f"✅ ChromaDB oluşturuldu ve '{PERSIST_DIRECTORY}' içine kaydedildi.")
-        # else: Bloku bilerek kapattım, çünkü dizin varsa ve boş değilse zaten en başta yüklenmişti.
+         logger.info(f"'{MARKDOWN_DIRECTORY}' içindeki .md dosyaları yükleniyor...")
+         loader = DirectoryLoader(MARKDOWN_DIRECTORY, glob="*.md", show_progress=True)
+         documents = loader.load()
+
+         if not documents:
+             logger.warning(f"'{MARKDOWN_DIRECTORY}' içinde işlenecek .md dosyası bulunamadı.")
+         else:
+             logger.info(f"{len(documents)} adet döküman yüklendi.")
+             text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
+             texts = text_splitter.split_documents(documents)
+             logger.info(f"Dökümanlar {len(texts)} parçaya (chunk) ayrıldı.")
+
+             logger.info("Embedding'ler oluşturuluyor ve ChromaDB'ye kaydediliyor...")
+             # ChromaDB DOĞRUDAN Render'ın bağladığı bu yola yazacak
+             db = Chroma.from_documents(
+                 documents=texts,
+                 embedding=embeddings,
+                 persist_directory=PERSIST_DIRECTORY # Mutlak yolu kullan
+             )
+             logger.info(f"✅ ChromaDB oluşturuldu ve '{PERSIST_DIRECTORY}' içine kaydedildi.")
 
 except Exception as e:
-    logger.error(f"ChromaDB yüklenirken/oluşturulurken hata oluştu: {e}", exc_info=True)
-    raise
+    # Bu blok hem yükleme hem de oluşturma hatalarını yakalar
+    logger.error(f"ChromaDB yüklenirken/oluşturulurken genel hata: {e}", exc_info=True)
+    # Eğer hata PermissionError ise, muhtemelen disk bağlantısı/izin sorunu vardır.
+    if isinstance(e, PermissionError):
+         logger.error("İzin Hatası (Permission Denied)! Render disk ayarlarını ve Mount Path'i kontrol edin.")
+    raise # Hatayı tekrar yükselt ki uygulama başlamasın
 
+# Retriever oluştur
 if db:
     retriever = db.as_retriever()
     logger.info("Retriever başarıyla oluşturuldu.")
@@ -175,7 +179,7 @@ try:
         )
         logger.info("✅ RetrievalQA zinciri başarıyla oluşturuldu.")
     else:
-        logger.warning("Retriever başlatılamadığı için QA zinciri oluşturulamadı. /chat endpoint çalışmayabilir.")
+        logger.warning("Retriever başlatılamadığı için QA zinciri oluşturulamadı. /chat endpoint cevap veremeyebilir.")
 
 except Exception as e:
     logger.error(f"QA Zinciri oluşturulurken hata: {e}", exc_info=True)
@@ -186,12 +190,12 @@ except Exception as e:
 app = FastAPI(
     title="SibelGPT Gayrimenkul Asistanı API",
     description="LangChain ve OpenAI kullanarak emlak sorularına cevap veren API.",
-    version="1.0.0"
+    version="1.0.1" # Sürümü güncelledim :)
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Production için değiştirin: ["https://www.sibelgpt.com", "https://sibel-landing.vercel.app"]
+    allow_origins=["*"], # Production için değiştirin: z.B. ["https://www.sibelgpt.com", "https://sibel-landing.vercel.app"]
     allow_credentials=True,
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
@@ -205,8 +209,8 @@ async def read_root():
 async def chat_endpoint(request: Request):
     # Zincirin varlığını her istekte kontrol et
     if qa_chain is None:
-         logger.error("/chat endpoint çağrıldı ancak QA zinciri hazır değil.")
-         raise HTTPException(status_code=503, detail="Servis şu anda tam olarak hazır değil (veritabanı veya zincir sorunu), lütfen daha sonra tekrar deneyin.")
+         logger.error("/chat endpoint çağrıldı ancak QA zinciri hazır değil (başlangıçta hata oluşmuş olabilir).")
+         raise HTTPException(status_code=503, detail="Servis şu anda tam olarak hazır değil, lütfen daha sonra tekrar deneyin veya yönetici ile iletişime geçin.")
 
     try:
         data = await request.json()
@@ -224,7 +228,7 @@ async def chat_endpoint(request: Request):
 
         if not answer:
              logger.warning("QA zinciri 'result' anahtarı olmayan bir sonuç döndürdü veya boş cevap verdi.")
-             answer = "Üzgünüm, sorunuza uygun bir cevap bulamadım veya işlerken bir sorun oluştu." # Daha bilgilendirici varsayılan
+             answer = "Üzgünüm, sorunuza uygun bir cevap bulamadım veya işlerken bir sorun oluştu."
 
         logger.info(f"✅ Cevap üretildi (ilk 100 karakter): {answer[:100]}...")
         return {"reply": answer}
@@ -236,3 +240,10 @@ async def chat_endpoint(request: Request):
         # Diğer tüm beklenmedik hataları yakala
         logger.error(f"'/chat' endpoint'inde beklenmedik hata: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Mesajınız işlenirken dahili bir sunucu hatası oluştu.")
+
+# Uvicorn ile çalıştırma kısmı genellikle Render'ın Start Command'ında belirtilir.
+# if __name__ == "__main__":
+#     import uvicorn
+#     port = int(os.getenv("PORT", 8000)) # Render genellikle PORT ortam değişkenini ayarlar
+#     logger.info(f"Uygulama doğrudan çalıştırılıyor (uvicorn) - Port: {port}")
+#     uvicorn.run(app, host="0.0.0.0", port=port)
