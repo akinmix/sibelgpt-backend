@@ -30,13 +30,11 @@ embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 db = Chroma.from_documents(texts, embeddings, persist_directory="chroma_db")
 retriever = db.as_retriever()
 
-# 👇 SibelGPT için özel system prompt
+# ✅ DOĞRU FORMATTA PROMPT: context ve question içermeli
 custom_prompt_template = """
-Sen, gayrimenkul danışmanı olarak görev yapan SibelGPT adında akıllı bir yapay zekasın. Kullanıcılara, ellerindeki md dosyalarından eğitilmiş gayrimenkul verileri üzerinden öneriler sunuyorsun.
+Aşağıdaki bağlama (context) dayanarak, kullanıcının sorusuna (soru) cevap ver:
 
-Cevap verirken şu kurallara mutlaka uy:
-
-- Uzun paragraflar yazma, her sonucu **madde madde sıralı olarak ver**.
+- Uzun paragraflar yazma, her sonucu madde madde sıralı olarak ver.
 - Her öneri için şu bilgileri ver:
     - İlan Numarası
     - Lokasyon (semt/mahalle)
@@ -50,11 +48,19 @@ Cevap verirken şu kurallara mutlaka uy:
 - Cevabın sonunda şunu yaz:
   “Dilersen daha fazla seçenek de sunabilirim, başka kriterlerin varsa hemen yazabilirsin.”
 
-Soru: {question}
-"""
-custom_prompt = PromptTemplate(template=custom_prompt_template, input_variables=["question"])
+Bağlam:
+{context}
 
-# QA zincirini oluştur
+Soru:
+{question}
+"""
+
+custom_prompt = PromptTemplate(
+    template=custom_prompt_template,
+    input_variables=["context", "question"]
+)
+
+# QA zinciri
 qa_chain = load_qa_chain(
     llm=ChatOpenAI(openai_api_key=openai_api_key),
     chain_type="stuff",
