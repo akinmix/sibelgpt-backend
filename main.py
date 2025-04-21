@@ -13,7 +13,7 @@ from langchain_community.vectorstores import Chroma # Chroma'yı community'den a
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 
-# --- Yapılandırma ve Başlangıç ---
+# --- Yapılandırma ve Başlangıç --- 
 
 # Loglama ayarları
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
