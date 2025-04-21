@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import logging
 from fastapi import FastAPI, Request, HTTPException
@@ -13,7 +14,7 @@ from langchain_community.vectorstores import Chroma # Chroma'yı community'den a
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 
-# --- Yapılandırma ve Başlangıç --- 
+# --- Yapılandırma ve Başlangıç ---
 
 # Loglama ayarları
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -53,15 +54,16 @@ try:
         # Eğer dizin yoksa, Render'daki disk bağlantısı henüz aktif olmamış olabilir
         # veya ilk deploy. Dizini oluşturmayı deneyelim.
         if not os.path.exists(PERSIST_DIRECTORY):
-             logger.warning(f"'{PERSIST_DIRECTORY}' dizini bulunamadı. Oluşturuluyor...")
+             logger.warning(f"'{PERSIST_DIRECTORY}' dizini bulunamadı. Kalıcı disk bağlanmamış olabilir veya ilk başlatma. Dizin oluşturuluyor...")
              try:
-                 os.makedirs(PERSIST_DIRECTORY) # Dizini oluştur
-                 logger.info(f"'{PERSIST_DIRECTORY}' dizini başarıyla oluşturuldu.")
+                 os.makedirs(PERSIST_DIRECTORY, exist_ok=True) # Dizini oluştur (varsa hata verme)
+                 logger.info(f"'{PERSIST_DIRECTORY}' dizini başarıyla oluşturuldu veya zaten vardı.")
              except OSError as e:
                  logger.error(f"'{PERSIST_DIRECTORY}' dizini oluşturulamadı: {e}. İzinleri kontrol edin.")
                  raise # Dizini oluşturamazsa devam edemez
 
-        # Dizini oluşturduktan veya zaten var olduktan sonra tekrar kontrol et
+        # Dizini oluşturduktan veya zaten var olduktan sonra tekrar kontrol et (içeriği boş mu diye)
+        # Not: os.listdir() boş dizinde boş liste döndürür.
         if not os.path.exists(PERSIST_DIRECTORY) or not os.listdir(PERSIST_DIRECTORY):
              logger.info(f"'{PERSIST_DIRECTORY}' boş veya yeni oluşturuldu. Yeni veritabanı oluşturuluyor...")
              if not os.path.exists(MARKDOWN_DIRECTORY):
@@ -74,6 +76,8 @@ try:
 
              if not documents:
                  logger.warning(f"'{MARKDOWN_DIRECTORY}' içinde işlenecek .md dosyası bulunamadı.")
+                 # Boş veritabanı oluşturmak yerine burada durmak daha mantıklı olabilir
+                 # veya en azından retriever'ı None bırakmak. Şimdilik devam edelim.
              else:
                  logger.info(f"{len(documents)} adet döküman yüklendi.")
                  text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
@@ -88,6 +92,7 @@ try:
                      persist_directory=PERSIST_DIRECTORY # Mutlak yolu kullan
                  )
                  logger.info(f"✅ ChromaDB oluşturuldu ve '{PERSIST_DIRECTORY}' içine kaydedildi.")
+        # else: Bloku bilerek kapattım, çünkü dizin varsa ve boş değilse zaten en başta yüklenmişti.
 
 except Exception as e:
     logger.error(f"ChromaDB yüklenirken/oluşturulurken hata oluştu: {e}", exc_info=True)
@@ -97,8 +102,8 @@ if db:
     retriever = db.as_retriever()
     logger.info("Retriever başarıyla oluşturuldu.")
 else:
-    logger.error("Veritabanı nesnesi (db) başlatılamadığı için retriever oluşturulamadı.")
-    retriever = None
+    logger.warning("Veritabanı nesnesi (db) başlatılamadı veya boş. Retriever None olarak ayarlandı.")
+    retriever = None # Endpoint'in bunu kontrol etmesi önemli
 
 # --- Prompt ve QA Zinciri ---
 
@@ -156,22 +161,25 @@ prompt = PromptTemplate(
     input_variables=["context", "question"]
 )
 
+# QA Zinciri oluştur
+qa_chain = None # Başlangıçta None
 try:
     llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.7)
-    if retriever is None:
-         raise ValueError("Retriever başlatılamadığı için QA zinciri oluşturulamıyor.")
+    if retriever is not None: # Sadece retriever varsa zinciri oluştur
+        qa_chain = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
+            retriever=retriever,
+            return_source_documents=False,
+            chain_type_kwargs={"prompt": prompt}
+        )
+        logger.info("✅ RetrievalQA zinciri başarıyla oluşturuldu.")
+    else:
+        logger.warning("Retriever başlatılamadığı için QA zinciri oluşturulamadı. /chat endpoint çalışmayabilir.")
 
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=retriever,
-        return_source_documents=False,
-        chain_type_kwargs={"prompt": prompt}
-    )
-    logger.info("✅ RetrievalQA zinciri başarıyla oluşturuldu.")
 except Exception as e:
     logger.error(f"QA Zinciri oluşturulurken hata: {e}", exc_info=True)
-    qa_chain = None
+    # qa_chain zaten None kalacak
 
 # --- FastAPI Uygulaması ---
 
@@ -183,7 +191,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Production için değiştirin: ["https://www.sibelgpt.com"]
+    allow_origins=["*"], # Production için değiştirin: ["https://www.sibelgpt.com", "https://sibel-landing.vercel.app"]
     allow_credentials=True,
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
@@ -195,9 +203,10 @@ async def read_root():
 
 @app.post("/chat")
 async def chat_endpoint(request: Request):
-    if qa_chain is None or retriever is None:
-         logger.error("/chat endpoint çağrıldı ancak QA zinciri veya retriever hazır değil.")
-         raise HTTPException(status_code=503, detail="Servis şu anda hazır değil, lütfen daha sonra tekrar deneyin.")
+    # Zincirin varlığını her istekte kontrol et
+    if qa_chain is None:
+         logger.error("/chat endpoint çağrıldı ancak QA zinciri hazır değil.")
+         raise HTTPException(status_code=503, detail="Servis şu anda tam olarak hazır değil (veritabanı veya zincir sorunu), lütfen daha sonra tekrar deneyin.")
 
     try:
         data = await request.json()
@@ -214,14 +223,16 @@ async def chat_endpoint(request: Request):
         answer = result.get("result")
 
         if not answer:
-             logger.warning("QA zinciri 'result' anahtarı olmayan bir sonuç döndürdü.")
-             answer = "Üzgünüm, sorunuzu işlerken bir sorun oluştu."
+             logger.warning("QA zinciri 'result' anahtarı olmayan bir sonuç döndürdü veya boş cevap verdi.")
+             answer = "Üzgünüm, sorunuza uygun bir cevap bulamadım veya işlerken bir sorun oluştu." # Daha bilgilendirici varsayılan
 
         logger.info(f"✅ Cevap üretildi (ilk 100 karakter): {answer[:100]}...")
         return {"reply": answer}
 
     except HTTPException as http_exc:
+        # FastAPI tarafından oluşturulan bilinen hataları tekrar yükselt
         raise http_exc
     except Exception as e:
+        # Diğer tüm beklenmedik hataları yakala
         logger.error(f"'/chat' endpoint'inde beklenmedik hata: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Mesajınız işlenirken dahili bir sunucu hatası oluştu.")
