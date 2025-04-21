@@ -1,10 +1,6 @@
-langchain
-langchain-openai
-langchain-community
-openai
-tiktoken
-chromadb
-python-dotenv
 fastapi
 uvicorn
-unstructured[md]
+pydantic
+langchain
+openai
+python-dotenv
