@@ -29,7 +29,7 @@ embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 db = Chroma.from_documents(texts, embeddings, persist_directory="chroma_db")
 retriever = db.as_retriever()
 
-# ✅ YENİ PROMPT – GAYRİMENKUL MODU
+# ✅ GÜNCELLENMİŞ DETAYLI PROMPT
 custom_prompt_template = """
 Sen, İstanbul Anadolu Yakası’nda çalışan bir gayrimenkul danışmanı olan Sibel Kazan Midilli adına konuşan dijital asistansın. Kullanıcıdan gelen sorulara, eğitilmiş markdown (.md) dosyalarına dayalı olarak mantıklı ve güvenilir yanıtlar veriyorsun.
 
@@ -72,7 +72,7 @@ Her yanıtında şu kurallara mutlaka uy:
 - Gerektiğinde “istersen farklı filtreyle tekrar sorabilirim” de
 """
 
-# Prompt'u zincire bağla
+# 🔧 Prompt + Zincir Bağlantısı (HATA VERMEYEN)
 prompt = PromptTemplate(
     template=custom_prompt_template,
     input_variables=["context", "question"]
@@ -81,6 +81,8 @@ prompt = PromptTemplate(
 qa = RetrievalQA.from_chain_type(
     llm=ChatOpenAI(openai_api_key=openai_api_key),
     retriever=retriever,
+    chain_type="stuff",
+    return_source_documents=False,
     chain_type_kwargs={"prompt": prompt}
 )
 
@@ -102,10 +104,9 @@ async def chat_endpoint(request: Request):
     if not message:
         return JSONResponse(content={"error": "Soru eksik."}, status_code=400)
 
-    # DEBUG loglar
     print(f"\n📥 Soru alındı: {message}")
     relevant_docs = retriever.get_relevant_documents(message)
-    print(f"🔎 Eşleşen doküman sayısı: {len(relevant_docs)}")
+    print(f"🔎 Eşleşen döküman sayısı: {len(relevant_docs)}")
     for i, doc in enumerate(relevant_docs[:3], 1):
         print(f"--- Döküman {i} ---\n{doc.page_content[:500]}\n...")
 
