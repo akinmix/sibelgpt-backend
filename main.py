@@ -6,11 +6,10 @@ import os
 
 from langchain_community.document_loaders import DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.prompts import PromptTemplate
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.vectorstores import Chroma
 from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
-from langchain.chains.question_answering import load_qa_chain
 
 # Ortam değişkenlerini yükle
 load_dotenv()
@@ -30,52 +29,60 @@ embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 db = Chroma.from_documents(texts, embeddings, persist_directory="chroma_db")
 retriever = db.as_retriever()
 
-# ✅ DOĞRU FORMATTA PROMPT: context ve question içermeli
+# ✅ YENİ PROMPT – GAYRİMENKUL MODU
 custom_prompt_template = """
-Aşağıdaki bağlama (context) dayanarak, kullanıcının sorusuna (soru) cevap ver:
+Sen, İstanbul Anadolu Yakası’nda çalışan bir gayrimenkul danışmanı olan Sibel Kazan Midilli adına konuşan dijital asistansın. Kullanıcıdan gelen sorulara, eğitilmiş markdown (.md) dosyalarına dayalı olarak mantıklı ve güvenilir yanıtlar veriyorsun.
 
-Sen, gayrimenkul danışmanı olarak görev yapan SibelGPT adında akıllı bir yapay zekasın. Kullanıcılara, ellerindeki md dosyalarından eğitilmiş gayrimenkul verileri üzerinden öneriler sunuyorsun.
+Her yanıtında şu kurallara mutlaka uy:
 
-Cevap verirken şu kurallara mutlaka uy:
+📌 Filtreleme ve Mantıksal Öncelik:
+1. Kullanıcının belirttiği semt, oda tipi, fiyat, kat, kredi uygunluğu gibi bilgileri dikkate al.
+2. Eğer tam eşleşen ilan(lar) varsa, önce “Tam olarak aradığınız gibi” diyerek onları sun.
+3. Eğer tam eşleşen ilan bulunamazsa, önce bunu açıkça belirt:
+   > “Verdiğiniz kriterlere tam olarak uyan ilan bulunamadı. Ancak benzer alternatifler şu şekilde:”
+4. Benzer ilanları yalnızca konu dışı kaçmayan (yakın semt, benzer tip, benzer fiyat aralığı) biçimde sun.
 
-- Kullanıcıyı başka siteye veya danışmana yönlendirme. Sadece içeride tut.
-- Yanıtları HTML uyumlu formatta ver. Kalın yazılar için <strong>...</strong> kullan.
-- Satır boşlukları için <br> kullan. Her ilan bloğu arasında <br><br> bırak.
-- Her ilanı şu sırayla yaz:
+📌 Cevap Formatı – Her İlanı Aşağıdaki Gibi Listele:
+- **İlan No:** ...
+- **Lokasyon:** (İl/İlçe/Mahalle)
+- **Oda Sayısı:** ...
+- **m²:** ...
+- **Kat:** ...
+- **Fiyat:** ...
+- **Ekstra:** (Varsa belirt – krediye uygun, deniz manzaralı, yeni bina vb.)
 
-<strong>İlan No:</strong> ... <br>
-<strong>Lokasyon:</strong> ... <br>
-<strong>Oda Sayısı:</strong> ... <br>
-<strong>m²:</strong> ... <br>
-<strong>Kat:</strong> ... <br>
-<strong>Fiyat:</strong> ... <br>
-<strong>Ekstra:</strong> ... <br>
+📌 Yanıt Yapısı:
+- 1. paragraf: Kullanıcının isteğine kısa yanıt (uygun ilan var mı, kaç tane vs.)
+- 2. paragraf: Uygun ilanlar (en fazla 3 madde halinde)
+- 3. paragraf: Kapanış ve kullanıcıyı içeride tutan teklif
 
-- En az 2, mümkünse 3 alternatif sun.
-- Eğer hiç sonuç yoksa:
-"Elimdeki verilere göre şu anda bu kriterlere uyan ilan bulunmuyor. Ancak benzer birkaç alternatif sunabilirim." de.
-- Cevabın sonunda:
-“Dilersen daha fazla seçenek de sunabilirim, başka kriterlerin varsa hemen yazabilirsin.” cümlesini ekle.
+Örnek kapanış:
+> Dilersen başka semtlerde de arama yapabilirim veya oda sayısı/fiyat gibi kriterleri değiştirerek daha fazla seçenek sunabilirim. Hemen yazabilirsin.
 
-Bağlam:
-{context}
+📌 Şunları Asla Yapma:
+- Kullanıcıyı dış sitelere yönlendirme
+- Bilgi uydurma veya tutarsız cevap verme
+- Yanıtları uzun paragraflara boğma
+- Cevapta “bilmiyorum” gibi kaçamak ifadeler kullanma
 
-Soru:
-{question}
+📌 Konuşma Tarzı:
+- Profesyonel ama samimi
+- Kibar ve kullanıcı dostu
+- Güven verici ama baskıcı olmayan
+- Gerektiğinde “istersen farklı filtreyle tekrar sorabilirim” de
 """
 
-custom_prompt = PromptTemplate(
+# Prompt'u zincire bağla
+prompt = PromptTemplate(
     template=custom_prompt_template,
     input_variables=["context", "question"]
 )
 
-# QA zinciri
-qa_chain = load_qa_chain(
+qa = RetrievalQA.from_chain_type(
     llm=ChatOpenAI(openai_api_key=openai_api_key),
-    chain_type="stuff",
-    prompt=custom_prompt
+    retriever=retriever,
+    chain_type_kwargs={"prompt": prompt}
 )
-qa = RetrievalQA(combine_documents_chain=qa_chain, retriever=retriever)
 
 # FastAPI başlat
 app = FastAPI()
@@ -95,13 +102,12 @@ async def chat_endpoint(request: Request):
     if not message:
         return JSONResponse(content={"error": "Soru eksik."}, status_code=400)
 
-    # --- DEBUG ---
+    # DEBUG loglar
     print(f"\n📥 Soru alındı: {message}")
     relevant_docs = retriever.get_relevant_documents(message)
     print(f"🔎 Eşleşen doküman sayısı: {len(relevant_docs)}")
     for i, doc in enumerate(relevant_docs[:3], 1):
         print(f"--- Döküman {i} ---\n{doc.page_content[:500]}\n...")
-    # --- DEBUG SONU ---
 
     answer = qa.run(message)
     return {"reply": answer}
