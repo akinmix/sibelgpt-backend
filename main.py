@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
-from ask_handler import ask
+from ask_handler import answer_question as ask
 
 # LangChain ve ilgili kütüphaneler
 from langchain_community.document_loaders import DirectoryLoader
