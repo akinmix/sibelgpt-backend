@@ -195,7 +195,7 @@ app = FastAPI(
     title="SibelGPT Gayrimenkul Asistanı API",
     description="LangChain ve OpenAI kullanarak emlak sorularına cevap veren API.",
     version="1.0.1" # Sürümü güncelledim :)
-    @app.post("/ask")
+
 async def ask_route(request: Request):
     try:
         data = await request.json()
