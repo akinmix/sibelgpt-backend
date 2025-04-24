@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
+from ask_handler import ask
 
 # LangChain ve ilgili kütüphaneler
 from langchain_community.document_loaders import DirectoryLoader
@@ -194,6 +195,18 @@ app = FastAPI(
     title="SibelGPT Gayrimenkul Asistanı API",
     description="LangChain ve OpenAI kullanarak emlak sorularına cevap veren API.",
     version="1.0.1" # Sürümü güncelledim :)
+    @app.post("/ask")
+async def ask_route(request: Request):
+    try:
+        data = await request.json()
+        question = data.get("question")
+        if not question:
+            raise HTTPException(status_code=400, detail="Soru verilmedi.")
+        response = ask(question)
+        return {"reply": response}
+    except Exception as e:
+        logging.exception("RAG sisteminde hata oluştu")
+        raise HTTPException(status_code=500, detail=str(e))
 )
 
 app.add_middleware(
