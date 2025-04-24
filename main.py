@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
+from image_handler import router as image_router
 
 # LangChain ve ilgili kütüphaneler
 from langchain_community.document_loaders import DirectoryLoader
@@ -216,6 +217,7 @@ app.add_middleware(
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
+app.include_router(image_router)
 
 @app.get("/")
 async def read_root():
