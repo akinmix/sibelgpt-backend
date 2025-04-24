@@ -209,7 +209,6 @@ async def ask_route(request: Request):
     except Exception as e:
         logging.exception("RAG sisteminde hata oluştu")
         raise HTTPException(status_code=500, detail=str(e))
-)
 
 app.add_middleware(
     CORSMiddleware,
