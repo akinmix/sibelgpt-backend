@@ -197,7 +197,7 @@ app = FastAPI(
     description="LangChain ve OpenAI kullanarak emlak sorularına cevap veren API.",
     version="1.0.1"
 )
- app.include_router(ilan_detay.router)
+app.include_router(ilan_detay.router)
 
 @app.post("/ask")
 async def ask_route(request: Request):
