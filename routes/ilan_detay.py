@@ -1,3 +1,4 @@
+from controllers.ilan_controller import prepare_ilan_dosyasi_firecrawl
 import os
 import requests
 from fastapi import APIRouter, HTTPException
