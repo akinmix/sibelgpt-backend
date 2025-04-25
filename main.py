@@ -2,6 +2,7 @@
 import os
 import logging
 from fastapi import FastAPI, Request, HTTPException
+from routes import ilan_detay
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
@@ -196,6 +197,7 @@ app = FastAPI(
     description="LangChain ve OpenAI kullanarak emlak sorularına cevap veren API.",
     version="1.0.1"
 )
+ app.include_router(ilan_detay.router)
 
 @app.post("/ask")
 async def ask_route(request: Request):
