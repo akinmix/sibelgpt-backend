@@ -41,7 +41,7 @@ def prepare_ilan_dosyasi(ilan_no):
         }
     except Exception as e:
         return {"error": f"Hata oluştu: {str(e)}"}
-     import os
+import os
 import requests
 from fastapi import HTTPException
 from dotenv import load_dotenv
