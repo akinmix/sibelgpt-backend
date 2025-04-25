@@ -41,3 +41,48 @@ def prepare_ilan_dosyasi(ilan_no):
         }
     except Exception as e:
         return {"error": f"Hata oluştu: {str(e)}"}
+     import os
+import requests
+from fastapi import HTTPException
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def prepare_ilan_dosyasi_firecrawl(ilan_no):
+    firecrawl_api_key = os.getenv("FIRECRAWL_API_KEY")
+    if not firecrawl_api_key:
+        raise HTTPException(status_code=500, detail="Firecrawl API anahtarı eksik")
+
+    url = f"https://www.remax.com.tr/portfoy/{ilan_no}"
+    payload = {
+        "url": url,
+        "options": {
+            "extractOnlyMainContent": True,
+            "outputFormat": ["markdown"],
+            "excludeTags": ["script", ".ad", "#footer"],
+            "waitFor": 1000,
+            "timeout": 30000
+        }
+    }
+
+    response = requests.post(
+        "https://api.firecrawl.dev/scrape",
+        headers={"Authorization": f"Bearer {firecrawl_api_key}"},
+        json=payload
+    )
+
+    print("🔥 Firecrawl response status:", response.status_code)
+    print("🔥 Firecrawl response body:", response.text)
+
+    if response.status_code != 200:
+        raise HTTPException(status_code=500, detail="Firecrawl'dan veri alınamadı")
+
+    data = response.json()
+    markdown = data.get("markdown", "")
+
+    return {
+        "ilan_no": ilan_no,
+        "veri": {
+            "aciklama": markdown[:1500]
+        }
+    }
