@@ -1,269 +1,266 @@
-# -*- coding: utf-8 -*-
-import os
-import logging
-from fastapi import FastAPI, Request, HTTPException
-from routes import ilan_detay
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from dotenv import load_dotenv
-from image_handler import router as image_router
+// Sohbet geçmişini Local Storage'da tutmak için anahtar
+const HISTORY_STORAGE_KEY = 'sibelgpt_conversations';
 
-# LangChain ve ilgili kütüphaneler
-from langchain_community.document_loaders import DirectoryLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain_community.vectorstores import Chroma # Chroma'yı community'den almak daha güncel olabilir
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
+let currentConversation = [];
+let chatBox, userInput, newChatButton, historyList, splashScreen, mainInterface;
 
-# --- Yapılandırma ve Başlangıç ---
+// ✅ Görsel üretim kontrolü ve işleyici
+async function istekGorselIseYonet(input) {
+  const lower = input.toLowerCase();
+  const anahtarKelimeler = [
+    "çiz", "görsel", "resim", "fotoğraf", "bir şey çiz", "görsel üret", "resmini yap", 
+    "çizimini yap", "şunun görselini", "şunu çiz", "görselini oluştur"
+  ];
+  const istekGorselMi = anahtarKelimeler.some(kelime => lower.includes(kelime));
+  if (!istekGorselMi) return null;
 
-# Loglama ayarları
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+  try {
+    const res = await fetch("https://sibelgpt-backend.onrender.com/image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: input })
+    });
+    const data = await res.json();
 
-# Ortam değişkenlerini yükle
-load_dotenv()
-openai_api_key = os.getenv("OPENAI_API_KEY")
-if not openai_api_key:
-    logger.error("OpenAI API anahtarı .env dosyasında bulunamadı veya ayarlanmadı!")
-    raise ValueError("OPENAI_API_KEY ortam değişkeni ayarlanmalı.")
+    if (data.image_url) {
+      return `
+        <div style="display: flex; flex-direction: column; align-items: flex-start;">
+          <img src="${data.image_url}" alt="Üretilen Görsel" style="max-width: 100%; border-radius: 8px; margin-bottom: 8px;" />
+          <button onclick="indirGorsel('${data.image_url}')" style="padding: 6px 12px; font-size: 14px; border: none; border-radius: 4px; background-color: #6a5acd; color: white; cursor: pointer;">
+            📥 İndir
+          </button>
+        </div>
+      `;
+    } else {
+      return "❗ Görsel üretilemedi, lütfen tekrar deneyin.";
+    }
+  } catch (e) {
+    console.error("Görsel üretim hatası:", e);
+    return "⚠️ Görsel üretim sırasında bir hata oluştu.";
+  }
+}
 
-# Sabitler
-MARKDOWN_DIRECTORY = "markdowns"
-PERSIST_DIRECTORY = "/var/data/chroma_db" # Render'daki Mount Path ile aynı
-CHUNK_SIZE = 500
-CHUNK_OVERLAP = 50
+async function sendMessage() {
+  const message = userInput.value.trim();
+  if (!message) return;
 
-# --- Embedding Modeli ve Vektör Deposu ---
+  appendMessage("Sen", message, "user", true);
+  userInput.value = "";
 
-try:
-    embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
-except Exception as e:
-    logger.error(f"OpenAI Embeddings başlatılamadı: {e}")
-    raise
+  const gorselHTML = await istekGorselIseYonet(message);
+  if (gorselHTML !== null) {
+    appendMessage("SibelGPT", gorselHTML, "bot", true);
+    return;
+  }
 
-db = None
-try:
-    # Veritabanı YOLUNU kontrol et (Mutlak yol)
-    # Render diski bu yola bağladığı için, dizinin var olması beklenir.
-    if os.path.exists(PERSIST_DIRECTORY):
-         # Dizin varsa ve boş değilse yükle
-         # Not: Boş dizin kontrolü önemlidir, çünkü Render diski boş olarak bağlayabilir.
-         if os.listdir(PERSIST_DIRECTORY):
-             logger.info(f"Mevcut ChromaDB veritabanı yükleniyor: {PERSIST_DIRECTORY}")
-             db = Chroma(persist_directory=PERSIST_DIRECTORY, embedding_function=embeddings)
-             logger.info("✅ ChromaDB başarıyla yüklendi.")
-         else:
-             # Dizin var ama içi boşsa, yeni oluşturma adımına geç
-             logger.info(f"'{PERSIST_DIRECTORY}' mevcut ancak boş. Yeni veritabanı oluşturulacak.")
-             # db hala None, aşağıdaki blok çalışacak.
-    else:
-         # Bu durumun olmaması gerekir eğer disk doğru bağlandıysa, ama yine de loglayalım.
-         logger.warning(f"'{PERSIST_DIRECTORY}' bulunamadı! Render disk bağlantısını kontrol edin. Yeni veritabanı oluşturulmaya çalışılacak...")
-         # db hala None, aşağıdaki blok çalışacak.
+  try {
+    const response = await fetch("https://sibelgpt-backend.onrender.com/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: message }),
+    });
 
-    # Eğer yukarıdaki yükleme başarılı olmadıysa (db hala None ise), oluşturmayı dene
-    if db is None:
-         logger.info(f"Yeni veritabanı '{PERSIST_DIRECTORY}' içinde oluşturuluyor...")
+    const data = await response.json();
+    const reply = data.reply || "❌ Bir hata oluştu. Lütfen tekrar deneyin.";
+    appendMessage("SibelGPT", reply, "bot", true);
 
-         # ----> os.makedirs çağrısı burada YOK! <----
-         # Render diski bu yola bağladığı için klasör zaten var olmalı.
+  } catch (error) {
+    appendMessage("SibelGPT", "❌ Bir hata oluştu. Sunucuya ulaşılamıyor.", "bot", true);
+    console.error("Mesaj gönderirken hata:", error);
+  }
+}
 
-         if not os.path.exists(MARKDOWN_DIRECTORY):
-             logger.error(f"Markdown dosyalarının olması beklenen '{MARKDOWN_DIRECTORY}' dizini bulunamadı!")
-             raise FileNotFoundError(f"'{MARKDOWN_DIRECTORY}' dizini mevcut değil.")
+function appendMessage(sender, text, role, addToHistory = false) {
+  const messageElem = document.createElement("div");
+  messageElem.className = "message " + role;
+  messageElem.innerHTML = `<strong>${sender}:</strong> ${text}`;
+  chatBox.appendChild(messageElem);
 
-         logger.info(f"'{MARKDOWN_DIRECTORY}' içindeki .md dosyaları yükleniyor...")
-         loader = DirectoryLoader(MARKDOWN_DIRECTORY, glob="*.md", show_progress=True)
-         documents = loader.load()
+  if (addToHistory) {
+    currentConversation.push({ sender, text, role });
+  }
 
-         if not documents:
-             logger.warning(f"'{MARKDOWN_DIRECTORY}' içinde işlenecek .md dosyası bulunamadı.")
-         else:
-             logger.info(f"{len(documents)} adet döküman yüklendi.")
-             text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
-             texts = text_splitter.split_documents(documents)
-             logger.info(f"Dökümanlar {len(texts)} parçaya (chunk) ayrıldı.")
+  setTimeout(() => {
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }, 100);
+}
 
-             logger.info("Embedding'ler oluşturuluyor ve ChromaDB'ye kaydediliyor...")
-             # ChromaDB DOĞRUDAN Render'ın bağladığı bu yola yazacak
-             db = Chroma.from_documents(
-                 documents=texts,
-                 embedding=embeddings,
-                 persist_directory=PERSIST_DIRECTORY # Mutlak yolu kullan
-             )
-             logger.info(f"✅ ChromaDB oluşturuldu ve '{PERSIST_DIRECTORY}' içine kaydedildi.")
+function indirGorsel(url) {
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'sibelgpt-image.jpg';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 
-except Exception as e:
-    # Bu blok hem yükleme hem de oluşturma hatalarını yakalar
-    logger.error(f"ChromaDB yüklenirken/oluşturulurken genel hata: {e}", exc_info=True)
-    # Eğer hata PermissionError ise, muhtemelen disk bağlantısı/izin sorunu vardır.
-    if isinstance(e, PermissionError):
-         logger.error("İzin Hatası (Permission Denied)! Render disk ayarlarını ve Mount Path'i kontrol edin.")
-    raise # Hatayı tekrar yükselt ki uygulama başlamasın
+function handleInputKeyPress(event) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    sendMessage();
+  }
+}
 
-# Retriever oluştur
-if db:
-    retriever = db.as_retriever()
-    logger.info("Retriever başarıyla oluşturuldu.")
-else:
-    logger.warning("Veritabanı nesnesi (db) başlatılamadı veya boş. Retriever None olarak ayarlandı.")
-    retriever = None # Endpoint'in bunu kontrol etmesi önemli
+function loadConversations() {
+  const conversationsJson = localStorage.getItem(HISTORY_STORAGE_KEY);
+  try {
+    return conversationsJson ? JSON.parse(conversationsJson) : [];
+  } catch (e) {
+    console.error("Sohbet geçmişi yüklenirken hata:", e);
+    return [];
+  }
+}
 
-# --- Prompt ve QA Zinciri ---
+function saveConversations(conversations) {
+  try {
+    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(conversations));
+  } catch (e) {
+    console.error("Sohbet geçmişi kaydedilirken hata:", e);
+  }
+}
 
-custom_prompt_template = """
-Sen SibelGPT'sin. Sibel Kazan Midilli adına konuşan çok yönlü dijital bir asistansın.
+function saveCurrentConversation() {
+  if (currentConversation.length <= 1 && currentConversation[0] && currentConversation[0].role === 'bot' && currentConversation[0].text.includes('Merhaba!')) return;
+  if (currentConversation.length === 0) return;
+  const chatId = Date.now();
+  const title = generateConversationTitle(currentConversation);
+  const conversations = loadConversations();
+  conversations.unshift({ id: chatId, title: title, messages: currentConversation });
+  saveConversations(conversations);
+  displayHistory();
+}
 
-Kullanıcıdan gelen sorulara, konunun içeriğine göre en uygun uzman kimliğinle yanıt verirsin.
-Uzmanlık alanların şunlardır:
-- İstanbul Anadolu Yakası’nda gayrimenkul danışmanlığı (özellikle Kadıköy, Suadiye, Erenköy, Maltepe, Kartal bölgeleri)
-- Numeroloji ve kişisel farkındalık
-- Finansal analiz, borsa ve yatırım
-- Yapay zeka uygulamaları ve teknolojik trendler
-- Genel kültür ve bilgilendirici yanıtlar
+function generateConversationTitle(conversation) {
+  const firstUserMessage = conversation.find(msg => msg.role === 'user');
+  if (firstUserMessage?.text) {
+    const text = firstUserMessage.text.trim();
+    return text.length > 30 ? text.substring(0, text.lastIndexOf(' ', 30)) + '...' : text;
+  }
+  return "Yeni Sohbet";
+}
 
----
+function clearChat() {
+  chatBox.innerHTML = '';
+  currentConversation = [];
+  highlightSelectedChat(null);
+}
 
-🎯 Eğer gelen soru; daire tipi, semt, fiyat, m², oda sayısı, kredi, iskan gibi gayrimenkule özgü veriler içeriyorsa:
-→ Bir emlak danışmanı gibi davran ve aşağıdaki kurallara göre yanıt ver:
+function displayHistory() {
+  const conversations = loadConversations();
+  historyList.innerHTML = '';
+  if (conversations.length === 0) {
+    const placeholder = document.createElement('li');
+    placeholder.textContent = 'Henüz kaydedilmiş sohbet yok.';
+    placeholder.style.cursor = 'default';
+    placeholder.style.opacity = '0.7';
+    historyList.appendChild(placeholder);
+    return;
+  }
+  conversations.forEach(conv => {
+    const listItem = document.createElement('li');
+    listItem.textContent = conv.title;
+    listItem.setAttribute('data-chat-id', conv.id);
+    historyList.appendChild(listItem);
+  });
+}
 
-📌 **Emlak Filtreleme ve Mantıksal Yanıt Kuralları**
-1. Kullanıcının belirttiği semt, oda tipi, fiyat, kat, kredi uygunluğu gibi bilgileri bağlam içinde ara.
-2. Tam eşleşen ilan(lar) varsa: “İstediğiniz özelliklerde şu ilan(lar) mevcut.” diye sun.
-3. Tam eşleşme yoksa: “Verdiğiniz kriterlere tam uyan ilan bulunamadı ama benzerler var.” diyerek yakın öneriler sun.
-4. Bağlam dışına çıkma. Sadece verilerle sınırlı kal.
+function loadConversation(chatId) {
+  saveCurrentConversation();
+  const conversations = loadConversations();
+  const conversationToLoad = conversations.find(conv => conv.id == chatId);
+  if (conversationToLoad) {
+    chatBox.innerHTML = '';
+    currentConversation = [];
+    conversationToLoad.messages.forEach((msg) => {
+      appendMessage(msg.sender, msg.text, msg.role, false);
+    });
+    currentConversation = JSON.parse(JSON.stringify(conversationToLoad.messages));
+    highlightSelectedChat(chatId);
+    userInput.focus();
+  }
+}
 
-📄 **Cevap Formatı – Her ilan için şu şekilde yanıt ver:**
-- **İlan No:** [id]
-- **Lokasyon:** [ilçe / mahalle]
-- **Oda Sayısı:** [örnek: 3+1]
-- **m²:** [brüt metrekare]
-- **Kat:** [örnek: 3. Kat, Yüksek Giriş]
-- **Fiyat:** [örnek: 13.900.000 TL]
-- **Ekstra:** [manzara, yeni bina, krediye uygun vb.]
+function highlightSelectedChat(chatId) {
+  historyList.querySelectorAll('li').forEach(li => li.classList.remove('selected'));
+  if (chatId !== null) {
+    const selectedItem = historyList.querySelector(`li[data-chat-id="${chatId}"]`);
+    if (selectedItem) selectedItem.classList.add('selected');
+  }
+}
 
-✍️ **Yanıt Yapısı:**
-1. Paragraf: Kullanıcıyı selamla ve kısa açıklama yap
-2. Paragraf: Eşleşen veya benzer ilanları listele
-3. Paragraf: Devam etmek ister misiniz? gibi soruyla konuşmayı açık bırak
+window.addEventListener("load", () => {
+  chatBox = document.getElementById("chat-box");
+  userInput = document.getElementById("user-input");
+  newChatButton = document.querySelector(".new-chat-button button");
+  historyList = document.getElementById("history-list");
+  splashScreen = document.getElementById("splash-screen");
+  mainInterface = document.getElementById("main-interface");
 
----
+  splashScreen.addEventListener('animationend', () => {
+    splashScreen.style.opacity = 0;
+    setTimeout(() => {
+      splashScreen.style.display = "none";
+      mainInterface.style.display = "flex";
+      initializeChatInterface();
+      const wrapper = document.getElementById("video-wrapper");
+      if (wrapper) wrapper.style.display = "flex";
+    }, 300);
+  });
 
-📚 Diğer konularda (numeroloji, genel sorular, yapay zeka, borsa) gelen her soruya açık, samimi ve bilgilendirici şekilde yanıt ver.
-Eğer kullanıcı ne hakkında konuşmak istediğini netleştirmediyse, konuyu nazikçe anlamaya çalış.
+  userInput.addEventListener("keypress", handleInputKeyPress);
+  newChatButton.addEventListener("click", handleNewChat);
+  historyList.addEventListener("click", handleHistoryClick);
 
-✨ Samimi ama bilgi dolu konuş. Gereksiz tekrar yapma. Profesyonel ama içten bir danışman gibi davran.
+  const initialBotMessageElement = chatBox.querySelector('.bot-message');
+  if (initialBotMessageElement) {
+    currentConversation.push({
+      sender: 'SibelGPT',
+      text: initialBotMessageElement.textContent.replace('SibelGPT:', '').trim(),
+      role: 'bot'
+    });
+  }
 
-Bağlam (Context):
-{context}
+  setTimeout(() => { userInput.focus(); }, 100);
+});
 
-Soru (Question):
-{question}
+function initializeChatInterface() {
+  displayHistory();
+}
 
-Cevap:
-"""
+function playIntroVideo() {
+  const video = document.getElementById("intro-video");
+  const wrapper = document.getElementById("video-wrapper");
+  if (video && wrapper) {
+    video.muted = false;
+    video.currentTime = 0;
+    wrapper.classList.remove("fade-out");
+    wrapper.style.display = "flex";
+    video.play().catch(e => console.warn("Video oynatılamadı:", e));
+    video.onended = () => {
+      wrapper.classList.add("fade-out");
+      setTimeout(() => {
+        wrapper.style.display = "none";
+        wrapper.classList.remove("fade-out");
+      }, 1500);
+    };
+  }
+}
 
-prompt = PromptTemplate(
-    template=custom_prompt_template,
-    input_variables=["context", "question"]
-)
+function handleNewChat() {
+  saveCurrentConversation();
+  clearChat();
+  userInput.focus();
+}
 
-# QA Zinciri oluştur
-qa_chain = None # Başlangıçta None
-try:
-    llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.7)
-    if retriever is not None: # Sadece retriever varsa zinciri oluştur
-        qa_chain = RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="stuff",
-            retriever=retriever,
-            return_source_documents=False,
-            chain_type_kwargs={"prompt": prompt}
-        )
-        logger.info("✅ RetrievalQA zinciri başarıyla oluşturuldu.")
-    else:
-        logger.warning("Retriever başlatılamadığı için QA zinciri oluşturulamadı. /chat endpoint cevap veremeyebilir.")
+function handleHistoryClick(event) {
+  const clickedElement = event.target;
+  if (clickedElement.tagName === 'LI' && clickedElement.hasAttribute('data-chat-id')) {
+    const chatId = clickedElement.getAttribute('data-chat-id');
+    loadConversation(chatId);
+    userInput.focus();
+  }
+}
 
-except Exception as e:
-    logger.error(f"QA Zinciri oluşturulurken hata: {e}", exc_info=True)
-    # qa_chain zaten None kalacak
-
-# --- FastAPI Uygulaması ---
-
-app = FastAPI(
-    title="SibelGPT Gayrimenkul Asistanı API",
-    description="LangChain ve OpenAI kullanarak emlak sorularına cevap veren API.",
-    version="1.0.1"
-)
-app.include_router(ilan_detay.router)
-
-@app.post("/ask")
-async def ask_route(request: Request):
-    try:
-        data = await request.json()
-        question = data.get("question")
-        if not question:
-            raise HTTPException(status_code=400, detail="Soru verilmedi.")
-        response = ask(question)
-        return {"reply": response}
-    except Exception as e:
-        logging.exception("RAG sisteminde hata oluştu")
-        raise HTTPException(status_code=500, detail=str(e))
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], # Production için değiştirin: z.B. ["https://www.sibelgpt.com", "https://sibel-landing.vercel.app"]
-    allow_credentials=True,
-    allow_methods=["POST", "GET"],
-    allow_headers=["*"],
-)
-app.include_router(image_router)
-
-@app.get("/")
-async def read_root():
-    return {"message": "SibelGPT Backend API çalışıyor!"}
-
-@app.post("/chat")
-async def chat_endpoint(request: Request):
-    # Zincirin varlığını her istekte kontrol et
-    if qa_chain is None:
-         logger.error("/chat endpoint çağrıldı ancak QA zinciri hazır değil (başlangıçta hata oluşmuş olabilir).")
-         raise HTTPException(status_code=503, detail="Servis şu anda tam olarak hazır değil, lütfen daha sonra tekrar deneyin veya yönetici ile iletişime geçin.")
-
-    try:
-        data = await request.json()
-        message = data.get("question")
-
-        if not message or not isinstance(message, str) or not message.strip():
-            logger.warning(f"Geçersiz veya eksik soru alındı: {message}")
-            raise HTTPException(status_code=400, detail="Lütfen geçerli bir soru (question) gönderin.")
-
-        logger.info(f"📥 Soru alındı: {message}")
-
-        logger.info("QA zinciri çalıştırılıyor...")
-        result = qa_chain.invoke({"query": message})
-        answer = result.get("result")
-
-        if not answer:
-             logger.warning("QA zinciri 'result' anahtarı olmayan bir sonuç döndürdü veya boş cevap verdi.")
-             answer = "Üzgünüm, sorunuza uygun bir cevap bulamadım veya işlerken bir sorun oluştu."
-
-        logger.info(f"✅ Cevap üretildi (ilk 100 karakter): {answer[:100]}...")
-        return {"reply": answer}
-
-    except HTTPException as http_exc:
-        # FastAPI tarafından oluşturulan bilinen hataları tekrar yükselt
-        raise http_exc
-    except Exception as e:
-        # Diğer tüm beklenmedik hataları yakala
-        logger.error(f"'/chat' endpoint'inde beklenmedik hata: {e}", exc_info=True) 
-        raise HTTPException(status_code=500, detail="Mesajınız işlenirken dahili bir sunucu hatası oluştu.")
-
-# Uvicorn ile çalıştırma kısmı genellikle Render'ın Start Command'ında belirtilir.
-# if __name__ == "__main__":
-#     import uvicorn
-#     port = int(os.getenv("PORT", 8000)) # Render genellikle PORT ortam değişkenini ayarlar
-#     logger.info(f"Uygulama doğrudan çalıştırılıyor (uvicorn) - Port: {port}")
-#     uvicorn.run(app, host="0.0.0.0", port=port)
+window.addEventListener('beforeunload', () => {
+  saveCurrentConversation();
+});
