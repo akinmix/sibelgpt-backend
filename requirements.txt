@@ -108,7 +108,6 @@ pydantic-settings==2.8.1
 pydantic_core==2.33.1
 pyee==12.1.1
 Pygments==2.19.1
-pypdf==5.4.0
 PyPika==0.48.9
 pyproject_hooks==1.2.0
 pyreadline3==3.5.4
