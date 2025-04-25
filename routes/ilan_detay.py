@@ -44,9 +44,6 @@ def filtrele_scrape_verisi(firecrawl_json: dict):
 @router.post("/api/ilan-detay")
 def ilan_detay_cek(req: IlanRequest):
     FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
-    if not FIRECRAWL_API_KEY:
-        raise HTTPException(status_code=500, detail="API anahtarı bulunamadı")
-
     headers = {
         "Authorization": f"Bearer {FIRECRAWL_API_KEY}",
         "Content-Type": "application/json"
@@ -56,18 +53,14 @@ def ilan_detay_cek(req: IlanRequest):
     payload = {
         "url": url,
         "options": {
-            "extractOnlyMainContent": True,
+            "render": True,
             "waitFor": 2000,
-            "outputFormat": ["markdown"]
+            "formats": ["markdown", "html", "links", "rawHtml"]
         }
     }
 
     try:
         res = requests.post("https://api.firecrawl.dev/scrape", headers=headers, json=payload)
-
-        print("🔥 Firecrawl Status:", res.status_code)
-        print("🔥 Firecrawl Response:", res.text)
-
         if res.status_code != 200:
             raise HTTPException(status_code=500, detail="Firecrawl'dan veri alınamadı")
 
