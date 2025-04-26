@@ -32,3 +32,10 @@ async def chat(question: str):
     """
     answer = await answer_question(question)
     return {"reply": answer}
+@app.get("/", tags=["meta"])
+async def root():
+    """
+    Render health check ⇒ 200 OK
+    """
+    return {"status": "ok"}
+
