@@ -1,7 +1,7 @@
 import csv
 import os
 from controllers.remax_scraper import scrape_remax_listing, save_to_markdown
-from controllers.convert_md_to_pdf import convert_md_to_pdf  # varsa yoksa ekleriz
+
 
 CSV_PATH = "markdowns/ilanlar.csv"
 MARKDOWN_DIR = "markdowns"
