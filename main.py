@@ -7,6 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from image_handler import router as image_router
 from routes.ilan_detay import router as ilan_router
 from ask_handler import answer_question  # Chat endpoint için
+from pydantic import BaseModel
+
+class ChatRequest(BaseModel):
+    question: str
+
 
 app = FastAPI(
     title="SibelGPT Backend",
@@ -26,12 +31,13 @@ app.include_router(image_router, prefix="/image", tags=["image"])
 app.include_router(ilan_router, prefix="/api", tags=["ilan"])
 
 @app.post("/chat", tags=["chat"])
-async def chat(question: str):
+async def chat(payload: ChatRequest):
     """
-    Frontend'den gelen soruyu RAG (ask_handler) aracılığıyla cevaplar.
+    Frontend'den gelen soruyu cevaplar.
     """
-    answer = await answer_question(question)
+    answer = await answer_question(payload.question)
     return {"reply": answer}
+
 @app.get("/", tags=["meta"])
 async def root():
     """
