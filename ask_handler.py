@@ -1,32 +1,38 @@
 """
-Basit OpenAI sohbet yanıtlayıcısı
-(Şimdilik RAG yok, düz model cevabı.)
+ask_handler.py
+--------------
+Basit OpenAI sohbet yanıtlayıcısı.
+(İleride RAG eklemek istersen bu fonksiyonun içini genişletebilirsin.)
 
-Gereksinimler:
-- requirements.txt içinde openai>=1.0.0 satırı olmalı
-- Render ortam değişkenlerinde OPENAI_API_KEY tanımlı olmalı
+Ön-koşullar
+-----------
+• requirements.txt → openai>=1.0.0 satırı var.  
+• Render ortam değişkenlerinde OPENAI_API_KEY ayarlı.
 """
 
 import os
-import openai
 from openai import AsyncOpenAI
 
-# Async client (OpenAI 1.x)
-openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
-SYSTEM_PROMPT = (
-    "You are SibelGPT, a helpful Turkish AI asistan developed by "
-    "Sibel Kazan Midilli. Answer briefly, clearly and in Turkish unless "
-    "the user asks otherwise."
+# ── OpenAI istemcisi ───────────────────────────────────────────────────────────
+openai_client = AsyncOpenAI(
+    api_key=os.environ.get("OPENAI_API_KEY")  # Render'da tanımlı olmalı
 )
 
+# Sistem talimatı (modelin kişiliği)
+SYSTEM_PROMPT = (
+    "Sen SibelGPT'sin: Sibel Kazan Midilli tarafından geliştirilen, "
+    "Türkçe yanıt veren yardımsever bir yapay zeka asistanısın. "
+    "Yanıtlarını kısa, açık ve anlaşılır tut."
+)
+
+# Ana fonksiyon – backend'de main.py çağırıyor
 async def answer_question(question: str) -> str:
     """
-    Kullanıcı sorusunu OpenAI ChatCompletion ile yanıtla.
+    Kullanıcıdan gelen soruyu OpenAI ChatCompletion ile yanıtla.
     """
     try:
         response = await openai_client.chat.completions.create(
-            model="gpt-4o-mini",   # Plus aboneliğinde limitsiz, istersen gpt-3.5-turbo da olur
+            model="gpt-4o-mini",      # Plus kullanıcıları için limitsiz/ekonomik
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": question},
@@ -35,7 +41,8 @@ async def answer_question(question: str) -> str:
             max_tokens=512,
         )
         return response.choices[0].message.content.strip()
+
     except Exception as e:
-        # Günlüğe yaz; ön yüze güvenli hata dön
+        # Hata olursa logla ve kullanıcıya güvenli mesaj gönder
         print("OpenAI hatası:", e)
         return "❌ Cevap üretilirken bir hata oluştu. Lütfen tekrar deneyin."
