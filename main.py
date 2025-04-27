@@ -5,7 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # ---- Dahili modüller ----
 from image_handler import router as image_router
-from routes.ilan_detay import router as ilan_router
 from ask_handler import answer_question  # Chat endpoint için
 from pydantic import BaseModel
 
@@ -28,7 +27,7 @@ app.add_middleware(
 
 # ---- ROUTE KAYDI ----
 app.include_router(image_router, prefix="", tags=["image"])
-app.include_router(ilan_router, prefix="/api", tags=["ilan"])
+
 
 @app.post("/chat", tags=["chat"])
 async def chat(payload: ChatRequest):
