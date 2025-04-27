@@ -27,7 +27,7 @@ app.add_middleware(
 )
 
 # ---- ROUTE KAYDI ----
-app.include_router(image_router, prefix="/image", tags=["image"])
+app.include_router(image_router, prefix="", tags=["image"])
 app.include_router(ilan_router, prefix="/api", tags=["ilan"])
 
 @app.post("/chat", tags=["chat"])
