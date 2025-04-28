@@ -1,9 +1,37 @@
+# Render Blueprint - SibelGPT Projesi için
+# Hem Web Servisi (Backend API) hem de Cron Job'u (Bot 1) yönetir.
+# İki servis de Starter Plan ve Frankfurt bölgesindedir.
+# Cron Job için Google Chrome tarayıcısını kurar.
+
 services:
+  # --- 1. Mevcut Web Servisi (SibelGPT Backend API) ---
   - type: web
-    name: sibelgpt-backend
+    name: sibelgpt-backend        # Mevcut web servisinin adı
     env: python
+    region: frankfurt             # Bölge (Frankfurt olarak ayarlandı)
+    plan: starter                 # Plan (Starter olarak ayarlandı)
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port 10000
+    startCommand: uvicorn main:app --host 0.0.0.0 --port 10000 # Web servisinin başlatma komutu
     envVars:
-      - key: OPENAI_API_KEY
+      - key: OPENAI_API_KEY         # Backend sadece bunu kullanıyor
+        sync: false                 # Değeri Render dashboard'dan alır
+
+  # --- 2. Yeni Cron Job (Bot 1 - Scraper) ---
+  - type: cron
+    name: sibelgpt-bot1-scraper   # Cron Job adı
+    env: python
+    region: frankfurt             # Bölge (Frankfurt olarak ayarlandı)
+    plan: starter                 # Plan (Starter olarak ayarlandı)
+    schedule: "0 3 * * 1"         # Cron Job zamanlaması (Pazartesi 03:00 UTC)
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python bot1_remax_supabase.py" # Cron Job çalıştırma komutu
+    envVars:
+      - key: SUPABASE_URL
         sync: false
+      - key: SUPABASE_ANON_KEY    # Cron Job Supabase kullanıyor
+        sync: false
+      - key: OPENAI_API_KEY       # Cron Job OpenAI kullanıyor
+        sync: false
+    buildpacks:                   # Cron Job için buildpack'ler (Chrome + Python)
+      - https://github.com/heroku/heroku-buildpack-google-chrome
+      - heroku/python
