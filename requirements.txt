@@ -13,6 +13,7 @@ requests==2.32.3          # Web sayfalarını indirmek için
 beautifulsoup4==4.12.3    # HTML içeriğini ayrıştırmak için
 lxml==5.2.2               # BeautifulSoup için hızlı HTML ayrıştırıcı
 selenium==4.22.0
+webdriver-manager==4.0.1
 
 # --- Supabase (Bot 1 - Veritabanı İşlemleri için) ---
 supabase==2.5.0           # Supabase veritabanına bağlanmak ve işlem yapmak için
