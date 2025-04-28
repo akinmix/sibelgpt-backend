@@ -34,4 +34,4 @@ services:
         sync: false
     buildpacks:                   # Cron Job için buildpack'ler (Chrome + Python)
       - https://github.com/heroku/heroku-buildpack-google-chrome
-      - heroku/python
+      
