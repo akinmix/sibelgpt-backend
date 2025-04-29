@@ -7,6 +7,7 @@ services:
   - type: web
     name: sibelgpt-backend        # Mevcut web servisinin adı
     env: python
+    pythonVersion: "3.11"         # PYTHON VERSİYONU EKLENDİ
     region: frankfurt             # Bölge (Frankfurt olarak ayarlandı)
     plan: starter                 # Plan (Starter olarak ayarlandı)
     buildCommand: pip install -r requirements.txt
@@ -14,7 +15,7 @@ services:
     envVars:
       - key: OPENAI_API_KEY         # OpenAI için
         sync: false                 # Değeri Render dashboard'dan alır
-      - key: SUPABASE_URL           # Supabase URL'si için EKLENDİ
+      - key: SUPABASE_URL           # Supabase URL'si için
         sync: false                 # Değeri Render dashboard'dan alır
-      - key: SUPABASE_KEY           # Supabase anahtarı için EKLENDİ
+      - key: SUPABASE_KEY           # Supabase anahtarı için
         sync: false                 # Değeri Render dashboard'dan alır
