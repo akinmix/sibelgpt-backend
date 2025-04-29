@@ -12,5 +12,9 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port 10000 # Web servisinin başlatma komutu
     envVars:
-      - key: OPENAI_API_KEY         # Backend sadece bunu kullanıyor
+      - key: OPENAI_API_KEY         # OpenAI için
+        sync: false                 # Değeri Render dashboard'dan alır
+      - key: SUPABASE_URL           # Supabase URL'si için EKLENDİ
+        sync: false                 # Değeri Render dashboard'dan alır
+      - key: SUPABASE_KEY           # Supabase anahtarı için EKLENDİ
         sync: false                 # Değeri Render dashboard'dan alır
