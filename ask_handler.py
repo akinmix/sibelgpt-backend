@@ -20,7 +20,7 @@ openai_client = AsyncOpenAI(
 
 # --- Ayarlar ---
 EMBEDDING_MODEL = "text-embedding-3-small"
-MATCH_THRESHOLD = 0.78
+MATCH_THRESHOLD = 0.73
 MATCH_COUNT = 5
 SYSTEM_PROMPT = (
     "Sen SibelGPT'sin: Sibel Kazan Midilli tarafından geliştirilen, "
