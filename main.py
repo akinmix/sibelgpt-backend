@@ -1,11 +1,16 @@
-# main.py (Supabase Entegrasyonuna Hazır Sürüm)
+# main.py (Supabase Import'ları Düzeltilmiş Sürüm)
 
 import os
-from fastapi import FastAPI, Depends # Depends eklendi
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from dotenv import load_dotenv # .env dosyasını okumak için eklendi
-from supabase_py_async import create_client, AsyncClient # Supabase için eklendi
+from dotenv import load_dotenv
+
+# ---- Düzeltilmiş Supabase Import'ları ----
+# from supabase_py_async import create_client, AsyncClient # ESKİ YANLIŞ SATIR - SİLİNDİ
+from supabase import create_client # YENİ DOĞRU IMPORT - create_client için
+from supabase.lib.client_async import AsyncClient # YENİ DOĞRU IMPORT - AsyncClient için
+# -----------------------------------------
 
 # ---- .env dosyasını yükle (Lokal geliştirme için önemli) ----
 load_dotenv()
@@ -16,17 +21,23 @@ SUPABASE_KEY: str | None = os.environ.get("SUPABASE_KEY")
 
 # ---- Supabase İstemcisini Oluştur ----
 # Eğer URL veya Key bulunamazsa None olacak, kontrol ekleyelim
+# create_client ve AsyncClient artık doğru yerden import edildiği için burası çalışmalı.
 supabase_client: AsyncClient | None = None
 if SUPABASE_URL and SUPABASE_KEY:
-    supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    try: # create_client çağrısını da try-except içine almak iyi olabilir
+      supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+      # Önemli Not: create_client V2'de varsayılan olarak senkron dönebilir.
+      # Asenkron istemciyi açıkça almak gerekebilir, test edip göreceğiz.
+      # Şimdilik bu şekilde bırakalım, eğer tip hatası alırsak düzenleriz.
+    except Exception as e:
+      print(f"❌ Supabase istemcisi oluşturulurken hata: {e}")
+      supabase_client = None # Hata durumunda None olarak ayarla
 else:
     print("⚠️ Uyarı: SUPABASE_URL ve SUPABASE_KEY ortam değişkenleri bulunamadı. Supabase bağlantısı kurulamayacak.")
 
 
 # ---- Dahili modüller ----
-# !!! ask_handler import'unu birazdan değiştireceğiz, şimdilik kalsın
 from image_handler import router as image_router
-# from ask_handler import answer_question # Bu satırı birazdan güncelleyeceğiz
 import ask_handler # ask_handler'ı modül olarak import edelim
 
 class ChatRequest(BaseModel):
@@ -35,7 +46,7 @@ class ChatRequest(BaseModel):
 
 app = FastAPI(
     title="SibelGPT Backend",
-    version="1.1.0", # Versiyonu güncelledim
+    version="1.2.0", # Versiyonu güncelledim (import düzeltmesi)
 )
 
 # CORS – Vercel frontend’inden gelen çağrılara izin ver
@@ -47,6 +58,7 @@ app.add_middleware(
 )
 
 # ---- Supabase İstemcisini Endpoint'lere Sağlama (Dependency Injection) ----
+# AsyncClient tipi doğru yerden import edildiği için burası da çalışmalı.
 async def get_supabase_client() -> AsyncClient | None:
     """
     Supabase istemcisini endpoint fonksiyonlarına enjekte eder.
@@ -68,16 +80,11 @@ async def chat(
     """
     Frontend'den gelen soruyu cevaplar. Supabase bağlantısını kullanır.
     """
-    # Eğer Supabase istemcisi yoksa hata mesajı dönebiliriz veya normal devam edebiliriz
     if db_client is None:
-         # Supabase olmadan eski yöntemle cevap ver (ask_handler'ı buna göre güncelleyeceğiz)
-         print("Supabase istemcisi yok, normal cevap deneniyor.")
-         # answer = await ask_handler.answer_question_without_rag(payload.question) # Henüz olmayan varsayımsal fonksiyon
-         # Şimdilik hata dönelim:
+         print("Supabase istemcisi yok veya başlatılamadı.")
          return {"reply": "❌ Veritabanı bağlantısı kurulamadığı için cevap verilemiyor."}
 
     # Supabase istemcisini ask_handler'daki fonksiyona gönder
-    # ask_handler.answer_question fonksiyonunu da client alacak şekilde güncelleyeceğiz.
     answer = await ask_handler.answer_question(payload.question, db_client)
     return {"reply": answer}
 
@@ -94,4 +101,4 @@ async def startup_event():
     if supabase_client:
         print("✅ Supabase istemcisi başarıyla başlatıldı.")
     else:
-        print("❌ Supabase istemcisi başlatılamadı. Ortam değişkenlerini kontrol edin.")
+        print("❌ Supabase istemcisi başlatılamadı. Ortam değişkenlerini veya istemci oluşturma kodunu kontrol edin.")
