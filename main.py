@@ -1,56 +1,22 @@
-# main.py (create_async_client Kullanımı)
+# main.py (Async Client Init in Startup Event - Düzeltilmiş)
 import os
-# from typing import Union # Kaldırıldı
-from fastapi import FastAPI, Depends
+# from typing import Union # Artık gerekmeyebilir
+from fastapi import FastAPI, Depends, Request # Request eklendi (app.state için)
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 # --- create_async_client ve AsyncClient import denemesi ---
 try:
-    # Doğrudan supabase'ten import etmeyi dene
     from supabase import create_async_client, AsyncClient
-    print("DEBUG: create_async_client ve AsyncClient başarıyla supabase'ten import edildi.")
+    print("DEBUG: create_async_client, AsyncClient imported from supabase.")
     SUPABASE_ASYNC_AVAILABLE = True
 except ImportError:
-    try:
-        # Eski yolu dene (düşük ihtimal ama kontrol edelim)
-        from supabase.lib.client_async import AsyncClient
-        # create_async_client'ın yeri farklı olabilir, şimdilik olmadığını varsayalım
-        # Eğer sadece AsyncClient importu çalışırsa, bu da bir ilerlemedir.
-        # Ama create_async_client olmadan nasıl oluşturulur bilmemiz gerekir.
-        # Şimdilik eğer create_async_client üst seviyede yoksa, kullanılamıyor kabul edelim.
-        print("DEBUG: AsyncClient supabase.lib.client_async'ten import edildi, ancak create_async_client bulunamadı.")
-        SUPABASE_ASYNC_AVAILABLE = False # create_async_client yoksa kullanılamaz
-    except ImportError:
-        print("DEBUG: Ne create_async_client ne de AsyncClient bilinen yollardan import edilemedi.")
-        AsyncClient = None # Tip kontrolü için None ata
-        SUPABASE_ASYNC_AVAILABLE = False
+    print("DEBUG: Failed to import async components from supabase.")
+    AsyncClient = None # Tip kontrolü için None ata
+    SUPABASE_ASYNC_AVAILABLE = False
 
 load_dotenv()
-
-# Gerçek tip hintini kullan (eğer import başarılıysa)
-supabase_client: AsyncClient | None = None
-
-supabase_url_from_env = os.environ.get("SUPABASE_URL")
-supabase_key_from_env = os.environ.get("SUPABASE_KEY")
-print(f"DEBUG: Ortam değişkenleri okundu...")
-
-if supabase_url_from_env and supabase_key_from_env and SUPABASE_ASYNC_AVAILABLE:
-    try:
-        # --- create_async_client KULLAN ---
-        supabase_client = create_async_client(supabase_url_from_env, supabase_key_from_env)
-        # ----------------------------------
-        print(f"DEBUG: Supabase async client oluşturuldu. Tipi: {type(supabase_client)}")
-    except Exception as e:
-        print(f"❌ Supabase async client oluşturulurken hata: {e}")
-        supabase_client = None
-elif not SUPABASE_ASYNC_AVAILABLE:
-     print("❌ Hata: Supabase async client oluşturma fonksiyonu/tipi import edilemedi.")
-     supabase_client = None
-else:
-    print("⚠️ Uyarı: SUPABASE_URL veya SUPABASE_KEY ortam değişkenleri bulunamadı...")
-    supabase_client = None
 
 # ---- Dahili modüller ----
 from image_handler import router as image_router
@@ -61,10 +27,12 @@ class ChatRequest(BaseModel):
 
 app = FastAPI(
     title="SibelGPT Backend",
-    version="1.5.0", # Versiyon (create_async_client denemesi)
+    version="1.6.0", # Versiyon (Async init in startup)
+    # Not: Daha modern FastAPI'de lifespan context manager tercih edilir,
+    # ama on_event şimdilik daha basit ve çalışacaktır.
 )
 
-# ---- CORS AYARI ---- (OPTIONS dahil haliyle kalsın)
+# ---- CORS Middleware ----
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://www.sibelgpt.com", "https://sibelgpt.com", "http://localhost:3000"],
@@ -72,9 +40,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---- Supabase İstemcisini Sağlama ----
-async def get_supabase_client() -> AsyncClient | None: # Gerçek tipi kullan
-    return supabase_client
+# ---- Lifespan Event for Async Initialization ----
+@app.on_event("startup")
+async def startup_event():
+    print("DEBUG: Startup event started.")
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_KEY")
+    # app.state üzerine bir attribute tanımlayarak istemciyi sakla
+    app.state.supabase_client = None
+
+    if supabase_url and supabase_key and SUPABASE_ASYNC_AVAILABLE:
+        print("DEBUG: Async Supabase client oluşturulmaya çalışılıyor...")
+        try:
+            # --- ASIL DÜZELTME: await ile çağır ---
+            client: AsyncClient | None = await create_async_client(supabase_url, supabase_key)
+            # --------------------------------------
+            app.state.supabase_client = client # Oluşturulan istemciyi app.state'e ata
+            if app.state.supabase_client:
+                 print(f"✅ Supabase async client oluşturuldu ve app.state'e atandı. Tipi: {type(app.state.supabase_client)}")
+            else:
+                 print("❌ Supabase async client oluşturuldu ama None döndü?") # Beklenmedik durum
+        except Exception as e:
+            print(f"❌ Supabase async client oluşturulurken startup'ta hata: {e}")
+            app.state.supabase_client = None # Hata durumunda None yap
+    elif not SUPABASE_ASYNC_AVAILABLE:
+         print("❌ Hata: Supabase async components import edilemediği için istemci oluşturulamıyor.")
+    else:
+        print("⚠️ Uyarı: SUPABASE_URL veya SUPABASE_KEY ortam değişkenleri bulunamadı...")
+
+# ---- Supabase İstemcisini Sağlama (Retrieve from app.state) ----
+async def get_supabase_client(request: Request) -> AsyncClient | None:
+    # request objesi üzerinden app.state'e erişip istemciyi al
+    # Eğer startup'ta None olarak kaldıysa None dönecektir.
+    if hasattr(request.app.state, 'supabase_client'):
+        return request.app.state.supabase_client
+    return None
 
 # ---- ROUTE KAYDI ----
 app.include_router(image_router, prefix="", tags=["image"])
@@ -82,12 +82,14 @@ app.include_router(image_router, prefix="", tags=["image"])
 @app.post("/chat", tags=["chat"])
 async def chat(
     payload: ChatRequest,
-    db_client: AsyncClient | None = Depends(get_supabase_client) # Gerçek tipi kullan
+    # get_supabase_client şimdi request.app.state'ten alacak
+    db_client: AsyncClient | None = Depends(get_supabase_client)
 ):
-    print(f"DEBUG: /chat endpoint'ine istek alındı. Soru: {payload.question}") # Bu logu koruyalım
+    print(f"DEBUG: /chat endpoint'ine istek alındı. Soru: {payload.question}") # Bu log kalsın
     if db_client is None:
-         print("Supabase istemcisi yok veya başlatılamadı...")
+         print("Supabase istemcisi (app.state üzerinden) alınamadı veya None.")
          return {"reply": "❌ Veritabanı bağlantısı kurulamadığı için cevap verilemiyor."}
+    # Artık db_client GERÇEK AsyncClient objesi olmalı
     answer = await ask_handler.answer_question(payload.question, db_client)
     return {"reply": answer}
 
@@ -95,7 +97,4 @@ async def chat(
 async def root():
     return {"status": "ok"}
 
-@app.on_event("startup")
-async def startup_event():
-    if supabase_client: print(f"✅ Supabase async client startup'ta mevcut. Tipi: {type(supabase_client)}")
-    else: print("❌ Supabase async client startup'ta mevcut değil veya başlatılamadı.")
+# Ayrı startup event'ine gerek kalmadı, print'ler yukarı taşındı.
