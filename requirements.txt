@@ -8,9 +8,10 @@ python-dotenv==1.1.0      # .env dosyasından anahtar okumak için
 openai==1.75.0            # Chat ve DALL·E çağrıları
 tiktoken==0.9.0           # (OpenAI paketinin alt bağımlılığı ama net olarak eklemek iyi)
 
-# --- Supabase (Backend - Veritabanı İşlemleri için - ASENKRON) ---
-# supabase==2.5.0           # ESKİ SENKRON KÜTÜPHANE - BU SATIRI SİLİN veya # ile yorum yapın
-supabase-py-async         # YENİ ASENKRON KÜTÜPHANE - BU SATIRI EKLEYİN
+# --- Supabase (Backend - Veritabanı İşlemleri için) ---
+# supabase==2.5.0           # ESKİ SENKRON KÜTÜPHANE - Bu zaten yorumda veya silinmiş olmalı
+# supabase-py-async         # YANLIŞ İSİM - BU SATIRI SİLİN veya # ile yorum yapın
+supabase-py>=2.0.0        # DOĞRU PAKET ADI - BU SATIRI EKLEYİN (Minimum versiyon 2 varsayımıyla)
 
 # --- İsteğe bağlı: hızlı dosya servis / health (Backend API için) ---
 aiofiles==24.1.0          # FastAPI statik servis ederken dosya okuma (varsayılan bağımlılığı)
