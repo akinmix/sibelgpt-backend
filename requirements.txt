@@ -9,7 +9,8 @@ openai==1.75.0            # Chat ve DALL·E çağrıları
 tiktoken==0.9.0           # (OpenAI paketinin alt bağımlılığı ama net olarak eklemek iyi)
 
 # --- Supabase (Backend - Veritabanı İşlemleri için) ---
-supabase-py               # DOĞRU PAKET ADI - VERSİYON KOŞULU KALDIRILDI
+# supabase-py               # YANLIŞ/ESKİ PAKET ADI - BU SATIRI SİLİN
+supabase                  # DOĞRU GÜNCEL PAKET ADI - BU SATIRI EKLEYİN
 
 # --- İsteğe bağlı: hızlı dosya servis / health (Backend API için) ---
 aiofiles==24.1.0          # FastAPI statik servis ederken dosya okuma (varsayılan bağımlılığı)
