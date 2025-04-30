@@ -83,73 +83,87 @@ async def search_listings_in_supabase(
         return []
 
 # ── İlan listesini prompt bağlamına çevir ───────────────────────────────────
-from typing import List, Dict
 import locale
+from typing import List, Dict
 
-def format_context(listings: List[Dict]) -> str:
+def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     """
-    Formats a list of listing dictionaries into a numbered, detailed string
-    with contact information at the end, suitable for HTML display.
+    İlanları, yeni satır karakterleri (\n) ve Markdown kalın formatını
+    destekleyen ortamlar için (SibelGPT gibi) formatlar.
     """
     if not listings:
-        return "🔍 Uygun ilan bulunamadı."
+        return "Uygun ilan bulunamadı." # Başlangıç mesajını kaldırdık, sadece ilanlar dönecek
 
-    # Türkçe locale ayarlarını kullanarak para birimini formatlamak için
+    # Türkçe locale ayarlarını kullanarak para birimini formatlamak için (opsiyonel)
     try:
-        # İşletim sistemine göre locale isimleri değişebilir
-        # Windows için 'tr_TR' veya 'turkish', Linux için 'tr_TR.UTF-8' deneyin
         locale.setlocale(locale.LC_ALL, 'tr_TR.UTF-8')
     except locale.Error:
         try:
             locale.setlocale(locale.LC_ALL, 'tr_TR')
         except locale.Error:
-            print("Uyarı: Türkçe locale ayarlanamadı. Fiyat formatlaması basit olabilir.")
-            # Fallback locale or skip setting locale if necessary
+            # Locale ayarlanamazsa uyarı vermeden devam edilebilir
+            # print("Uyarı: Türkçe locale ayarlanamadı. Fiyat formatlaması basit olabilir.")
+            pass # Hata durumunda sessizce devam et
 
-    formatted_lines = ["🔍 Aradığınız kriterlere uygun ilanlar:<br><br>"]
+    formatted_listing_parts = [] # Her bir ilanın formatlanmış metnini tutacak liste
     for i, l in enumerate(listings, start=1):
         baslik = l.get("baslik", "(başlık yok)")
         lokasyon = l.get("lokasyon", "?")
         fiyat_raw = l.get("fiyat")
 
-        # Fiyatı formatla (sayısal ise)
-        try:
-            # Noktaları kaldırıp, virgülü nokta ile değiştirerek float'a çevir
-            fiyat_num = float(str(fiyat_raw).replace('.', '').replace(',', '.'))
-            # Locale kullanarak para birimi formatı uygula
-            # Eğer locale çalışmazsa basit formatlama kullanılır
+        # Fiyatı formatla (sayısal ise) - Önceki mantıkla aynı
+        fiyat_formatted = "?" # Varsayılan
+        if fiyat_raw is not None:
             try:
-                fiyat_formatted = locale.currency(fiyat_num, symbol='₺', grouping=True)
-                # Ondalık kısmı .00 ise kaldır
-                if fiyat_formatted.endswith('.00'):
-                   fiyat_formatted = fiyat_formatted[:-3] + ' ₺'
-                elif fiyat_formatted.endswith(',00'):
-                   fiyat_formatted = fiyat_formatted[:-3] + ' ₺'
-                else:
-                    # Ensure space before TL symbol if it's added by locale.currency
-                    fiyat_formatted = fiyat_formatted.replace('₺', ' ₺').strip()
-            except NameError:
-                fiyat_formatted = f"{fiyat_num:,.0f} ₺".replace(',', '#').replace('.', ',').replace('#', '.')
+                fiyat_num = float(str(fiyat_raw).replace('.', '').replace(',', '.'))
+                try:
+                    # Locale kullanarak formatla
+                    fiyat_formatted = locale.currency(fiyat_num, symbol='₺', grouping=True)
+                     # Ondalık kısmı .00 veya ,00 ise kaldır ve boşluk ekle
+                    if fiyat_formatted.endswith('.00') or fiyat_formatted.endswith(',00'):
+                        fiyat_formatted = fiyat_formatted[:-3].strip() + ' ₺'
+                    else:
+                        # Para birimi sembolünden önce boşluk olduğundan emin ol
+                        fiyat_formatted = fiyat_formatted.replace('₺', '').strip() + ' ₺'
 
-        except (ValueError, TypeError):
-            fiyat_formatted = str(fiyat_raw) if fiyat_raw is not None else "?"
+                except (NameError, locale.Error): # locale başarısız olursa veya ayarlanamadıysa
+                    # Basit formatlama (binlik ayraçları ile)
+                    fiyat_formatted = f"{fiyat_num:,.0f} ₺".replace(',', '#').replace('.', ',').replace('#', '.') # Türkçe formatına uygun hale getir
+            except (ValueError, TypeError):
+                fiyat_formatted = str(fiyat_raw) # Sayısal değilse olduğu gibi bırak
+        else:
+             fiyat_formatted = "?" # Fiyat yoksa
 
+
+        # İstenen format: Sıra no, Kalın Başlık, yeni satır, girintili detaylar
+        # Yeni satır için `\n`, girinti için 4 boşluk kullanıldı
         ilan_metni = (
-            f"{i}. **{baslik}**<br>"
-            f"&nbsp;&nbsp;&nbsp;&nbsp;* Lokasyon: {lokasyon}<br>"
-            f"&nbsp;&nbsp;&nbsp;&nbsp;* Fiyat: {fiyat_formatted}<br><br>"
+            f"{i}. **{baslik}**\n"          # 1. **Başlık** ve yeni satır
+            f"    * Lokasyon: {lokasyon}\n" # 4 boşluk + * Lokasyon: ... ve yeni satır
+            f"    * Fiyat: {fiyat_formatted}"   # 4 boşluk + * Fiyat: ... (Son satır olduğu için \n yok)
         )
-        formatted_lines.append(ilan_metni)
+        formatted_listing_parts.append(ilan_metni)
 
-    formatted_lines.append("Detaylı bilgi ve randevu için: 532 687 84 64")
-    return "".join(formatted_lines)
+    # Tüm ilanları aralarına ikişer yeni satır koyarak birleştir
+    listings_str = "\n\n".join(formatted_listing_parts)
 
-# --- Örnek test kullanım ---
-# example_listings = [
-#     {"baslik": "Örnek Daire", "fiyat": "10.000.000", "lokasyon": "Kadıköy / Göztepe"},
-#     ...
-# ]
-# print(format_context(example_listings))
+    # En sona iletişim bilgisini iki yeni satırla ekle
+    final_output = f"{listings_str}\n\nDetaylı bilgi ve randevu için: 532 687 84 64"
+
+    return final_output
+
+# --- Örnek Kullanım (İkinci resimdeki verilerle) ---
+example_listings_from_image2 = [
+    {"baslik": "GÖZTEPE 60. YIL PARKI VE DENİZ MANZARALI GENÇ DAİRE", "fiyat": "15.750.000", "lokasyon": "İstanbul Anadolu / Kadıköy / Göztepe Mah."},
+    {"baslik": "GÖZTEPE'DE YEŞİLLİKLER İÇİNDE SATILIK BOŞ 3+1 DAİRE", "fiyat": "11.000.000", "lokasyon": "İstanbul Anadolu / Kadıköy / Göztepe Mah."},
+    {"baslik": "GÖZTEPE ÖMERPAŞA SOKAK OYUNCAK MÜZESİ YANI 100M2 2+1 SATILIK DAİRE", "fiyat": "10.750.000", "lokasyon": "İstanbul Anadolu / Kadıköy / Göztepe Mah."},
+    {"baslik": "GÖZTEPE TÜTÜNCÜ MEHMET EFENDİ CADDESİNE 1. PARALELDE 5+1 KATTA TEK", "fiyat": "33.500.000", "lokasyon": "İstanbul Anadolu / Kadıköy / Göztepe Mah."}, # Lokasyon Göztepe Mah. olarak düzeltildi
+    {"baslik": "KADIKÖY GÖZTEPE'DE SATILIK 3+1 DAİRE 128 M2 (ARSA PAYI 53.13 M2)", "fiyat": "9.800.000", "lokasyon": "İstanbul Anadolu / Kadıköy / Göztepe Mah."}
+]
+
+# Fonksiyonu çağırıp çıktıyı test etme
+# formatted_output = format_context_for_sibelgpt(example_listings_from_image2)
+# print(formatted_output)
 
 # ── Ana Q&A işlevi ──────────────────────────────────────────────────────────
 async def answer_question(question: str) -> str:
