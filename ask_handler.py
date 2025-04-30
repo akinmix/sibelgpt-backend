@@ -140,7 +140,7 @@ async def answer_question(question: str) -> str:
     listings  = await search_listings_in_supabase(query_emb)
     context = format_context_for_sibelgpt(listings)
 
-  messages = [
+  messages =   [
     {
         "role": "system",
         "content": f"{SYSTEM_PROMPT}<br><br>{context}"
