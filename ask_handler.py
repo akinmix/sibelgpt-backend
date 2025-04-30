@@ -68,7 +68,7 @@ async def search_listings_in_supabase(
     if query_embedding is None:
         return []
     try:
-        resp = await supabase.rpc(
+        resp =supabase.rpc(
             "match_listings",
             {
                 "query_embedding": query_embedding,
