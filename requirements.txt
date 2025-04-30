@@ -12,6 +12,5 @@ tiktoken==0.9.0           # (OpenAI paketinin alt bağımlılığı ama net olar
 # supabase-py            # ⬅️  BU SATIRI TAMAMEN SİLİN veya yorumda bırakın
 supabase>=2.0.2          # ⬅️  YENİ satır – güncel paket adı ve sürümü
 
-
 # --- İsteğe bağlı: hızlı dosya servis / health (Backend API için) ---
 aiofiles==24.1.0          # FastAPI statik servis ederken dosya okuma (varsayılan bağımlılığı)
