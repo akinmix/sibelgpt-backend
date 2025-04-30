@@ -25,7 +25,7 @@ if not all([OAI_KEY, SB_URL, SB_KEY]):
     raise RuntimeError(".env dosyasında OPENAI / SUPABASE anahtarları eksik")
 
 openai_client = AsyncOpenAI(api_key=OAI_KEY)
-supabase      = create_client(SB_URL, SB_KEY, auth_token=None, timeout=30_000)
+supabase      = create_client(SB_URL, SB_KEY)
 
 # ── Ayarlar ─────────────────────────────────────────────────────────────────
 EMBEDDING_MODEL  = "text-embedding-3-small"
