@@ -85,14 +85,22 @@ async def search_listings_in_supabase(
 # ── İlan listesini prompt bağlamına çevir ───────────────────────────────────
 def format_context(listings: List[Dict]) -> str:
     if not listings:
-        return "İLGİLİ İLAN BULUNAMADI."
-    lines = ["İLGİLİ İLANLAR:"]
-    for l in listings:
-        lines.append(
-            f"- {l.get('baslik','(başlık yok)')} • {l.get('fiyat','?')} • "
-            f"{l.get('lokasyon','?')}\n  {l.get('detay_url','')}"
+        return "🔍 Uygun ilan bulunamadı."
+
+    formatted = "🔍 Aradığınız kriterlere uygun ilanlar:\n\n"
+    for i, l in enumerate(listings, start=1):
+        baslik = l.get("baslik", "(başlık yok)")
+        fiyat = l.get("fiyat", "?")
+        lokasyon = l.get("lokasyon", "?")
+
+        formatted += (
+            f"**{i}️⃣ {baslik}**\n"
+            f"📍 **Lokasyon:** {lokasyon}\n"
+            f"💰 **Fiyat:** {fiyat}\n"
+            f"📞 Detaylı bilgi ve randevu için: 532 687 84 64\n\n"
         )
-    return "\n".join(lines)
+    return formatted
+
 
 # ── Ana Q&A işlevi ──────────────────────────────────────────────────────────
 async def answer_question(question: str) -> str:
