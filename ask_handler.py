@@ -104,7 +104,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         baslik = l.get("baslik", "(başlık yok)")
         lokasyon = l.get("lokasyon", "?")
         fiyat_raw = l.get("fiyat")
-        fiyat = "?"  # varsayılan
+        fiyat = "?"
 
         try:
             fiyat_num = float(str(fiyat_raw).replace('.', '').replace(',', '.'))
@@ -127,7 +127,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         formatted_parts.append(ilan_html)
 
     final_output = "".join(formatted_parts)
-    final_output += "📞 Bu ilanlar hakkında daha fazla bilgi almak isterseniz, iletişime geçebilirsiniz: 532 687 84 64"
+    final_output += "<br>📞 Bu ilanlar hakkında daha fazla bilgi almak isterseniz: 532 687 84 64"
 
     return final_output
 
