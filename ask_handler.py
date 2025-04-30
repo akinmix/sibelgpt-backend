@@ -138,9 +138,9 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         # İstenen format: Sıra no, Kalın Başlık, yeni satır, girintili detaylar
         # Yeni satır için `\n`, girinti için 4 boşluk kullanıldı
         ilan_metni = (
-            f"{i}. **{baslik}**\n"          # 1. **Başlık** ve yeni satır
-            f"    * Lokasyon: {lokasyon}\n" # 4 boşluk + * Lokasyon: ... ve yeni satır
-            f"    * Fiyat: {fiyat_formatted}"   # 4 boşluk + * Fiyat: ... (Son satır olduğu için \n yok)
+            f"{i}. <strong>{baslik}</strong><br>"
+            f"&nbsp;&nbsp;&nbsp;&nbsp;• Lokasyon: {lokasyon}<br>"
+            f"&nbsp;&nbsp;&nbsp;&nbsp;• Fiyat: {fiyat_formatted}<br><br>"
         )
         formatted_listing_parts.append(ilan_metni)
 
@@ -148,7 +148,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     listings_str = "\n\n".join(formatted_listing_parts)
 
     # En sona iletişim bilgisini iki yeni satırla ekle
-    final_output = f"{listings_str}\n\nDetaylı bilgi ve randevu için: 532 687 84 64"
+    final_output = f"{listings_str}<br><br>📞 Detaylı bilgi ve randevu için: 532 687 84 64"
 
     return final_output
 
