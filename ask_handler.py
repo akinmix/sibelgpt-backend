@@ -128,10 +128,10 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
 
     final_output = "".join(formatted_parts)
     final_output += "<br>📞 Bu ilanlar hakkında daha fazla bilgi almak isterseniz: 532 687 84 64"
-
+    final_output += "<br><br><span style='color:red;'>[Sibel Test - HTML Render]</span>"
+    
     return final_output
-
-
+    
 # ── Ana Q&A işlevi ──────────────────────────────────────────────────────────
 async def answer_question(question: str) -> str:
     print("↪ Soru:", question)
