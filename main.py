@@ -90,7 +90,7 @@ async def chat(
          print("Supabase istemcisi (app.state üzerinden) alınamadı veya None.")
          return {"reply": "❌ Veritabanı bağlantısı kurulamadığı için cevap verilemiyor."}
     # Artık db_client GERÇEK AsyncClient objesi olmalı
-    answer = await ask_handler.answer_question(payload.question, db_client)
+    answer = await ask_handler.answer_question(payload.question)
     return {"reply": answer}
 
 @app.get("/", tags=["meta"])
