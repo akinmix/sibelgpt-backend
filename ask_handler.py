@@ -1,116 +1,128 @@
-# ask_handler.py (NameError Düzeltmesi - Tekrar)
+# ask_handler.py  –  30 Nisan 2025 güncel sürüm
+# ────────────────────────────────────────────────────────────────────────────
+# • Supabase tablo kolon adları:  ilan_no, baslik, fiyat, ozellikler,
+#                                 lokasyon, detay_url, embedding  (vector)
+# • OpenAI-Python v1.x (>=1.0) ile çalışır.
+# • match_listings RPC çıktısı aynı adları döndürmelidir!
+
 import os
-from openai import AsyncOpenAI
+import asyncio
+from openai import AsyncOpenAI                       # OpenAI-Python ≥1.0
+from typing import List, Dict, Optional
 
-# --- AsyncClient import denemesi ---
+# Supabase-py async client (v2.x)
 try:
-    from supabase import AsyncClient
+    from supabase import AsyncClient, create_client
 except ImportError:
-    try:
-        from supabase.lib.client_async import AsyncClient
-    except ImportError:
-        AsyncClient = None
-# ---------------------------------
+    raise RuntimeError("supabase-py yüklü değil – `pip install supabase`")
 
+# ── Ortam değişkenleri ──────────────────────────────────────────────────────
+OAI_KEY = os.getenv("OPENAI_API_KEY")
+SB_URL  = os.getenv("SUPABASE_URL")
+SB_KEY  = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY")
 
-# ── OpenAI istemcisi ───────────────────────────────────────────────────────────
-openai_client = AsyncOpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY")
-)
+if not all([OAI_KEY, SB_URL, SB_KEY]):
+    raise RuntimeError(".env dosyasında OPENAI / SUPABASE anahtarları eksik")
 
-# --- Ayarlar ---
-EMBEDDING_MODEL = "text-embedding-3-small"
-MATCH_THRESHOLD = 0.45
-MATCH_COUNT = 5
+openai_client = AsyncOpenAI(api_key=OAI_KEY)
+supabase      = create_client(SB_URL, SB_KEY, auth_token=None, timeout=30_000)
+
+# ── Ayarlar ─────────────────────────────────────────────────────────────────
+EMBEDDING_MODEL  = "text-embedding-3-small"
+MATCH_THRESHOLD  = 0.60      # eşik – 0 ile 1 arası (daha düşük = daha geniş)
+MATCH_COUNT      = 10        # dönecek ilan sayısı
+
 SYSTEM_PROMPT = (
     "Sen SibelGPT'sin: Sibel Kazan Midilli tarafından geliştirilen, "
-    "Türkiye emlak piyasası (özellikle Remax Sonuç portföyü), numeroloji ve finans konularında uzman, "
-    "Türkçe yanıt veren yardımsever bir yapay zeka asistanısın.\n"
-    "Kullanıcının emlak ile ilgili sorularını yanıtlarken SANA SAĞLANAN GÜNCEL İLAN BİLGİLERİNİ kullan. "
-    "Eğer sağlanan bilgiler soruyu yanıtlamak için yeterliyse, sadece bu bilgileri kullanarak cevap ver. "
-    "Sağlanan bilgi yoksa veya yetersizse, bunu belirt.\n"
-    "Cevaplarında ilanların kısa özetlerini ve URL'lerini verebilirsin. Fiyat ve konum bilgilerini de ekle.\n"
-    "Yanıtlarını kısa, net, profesyonel ve samimi tut."
+    "Türkiye emlak piyasası (özellikle Remax Sonuç portföyü), numeroloji ve "
+    "finans konularında uzman, Türkçe yanıt veren yardımsever bir yapay zeka "
+    "asistanısın.\n\n"
+    "Kullanıcı emlak sorusu sorduğunda, sana sağlanan 'İLGİLİ İLANLAR' "
+    "bölümündeki verileri kullanarak yanıt ver. O veriler yoksa dürüstçe "
+    "söyle ve genel tavsiye ver.\n\n"
+    "Cevapları kısa, net ve samimi tut; ilan başlığı, fiyat, lokasyon ve linki "
+    "madde madde listeleyebilirsin."
 )
 
-
-# ---- FONKSİYON TANIMLARI ----
-
-async def get_embedding(text: str) -> list[float] | None:  # <<< BU FONKSİYON TANIMI BURADA OLMALI
-    """Verilen metnin OpenAI embedding'ini alır."""
-    if not text: return None # Boş metin kontrolü
+# ── Embedding oluşturma ─────────────────────────────────────────────────────
+async def get_embedding(text: str) -> Optional[List[float]]:
+    """ Verilen metni OpenAI’dan gömme (embedding) vektörüne çevirir. """
+    text = text.strip()
+    if not text:
+        return None
     try:
-        print("DEBUG: get_embedding çağrıldı.") # Debug
-        response = await openai_client.embeddings.create(input=[text.strip()], model=EMBEDDING_MODEL)
-        if response.data and response.data[0].embedding:
-             return response.data[0].embedding
-        else:
-             print("❌ Embedding alınamadı.")
-             return None
-    except Exception as e:
-        print(f"❌ OpenAI Embedding hatası: {e}")
+        resp = await openai_client.embeddings.create(
+            model=EMBEDDING_MODEL,
+            input=[text]
+        )
+        return resp.data[0].embedding
+    except Exception as exc:
+        print("❌ OpenAI embedding hatası:", exc)
         return None
 
-async def search_listings_in_supabase(query_embedding: list[float], db_client: AsyncClient) -> list[dict]:
-    """Verilen embedding ile Supabase'de benzer ilanları arar."""
-    if not db_client or not AsyncClient: return []
-    if not query_embedding: return []
+# ── Supabase’te benzer ilanları aran ────────────────────────────────────────
+async def search_listings_in_supabase(
+    query_embedding: List[float]
+) -> List[Dict]:
+    """match_listings RPC’sini çağırıp benzer ilanları döndürür."""
+    if query_embedding is None:
+        return []
     try:
-        print(f"Supabase RPC 'match_listings' çağrılıyor (AsyncClient ile)...")
-        response = await db_client.rpc(
-            'match_listings',
-            {'query_embedding': query_embedding, 'match_threshold': MATCH_THRESHOLD, 'match_count': MATCH_COUNT}
-        ).execute() # execute() GEREKLİ!
-        print(f"Supabase RPC yanıtı alındı. Data: {response.data if hasattr(response, 'data') else 'Yanıt formatı beklenmedik'}")
-        if hasattr(response, 'data') and response.data:
-             return response.data
-        else: return []
-    except Exception as e:
-        print(f"❌ Supabase RPC hatası: {e}")
+        resp = await supabase.rpc(
+            "match_listings",
+            {
+                "query_embedding": query_embedding,
+                "match_threshold": MATCH_THRESHOLD,
+                "match_count":     MATCH_COUNT
+            }
+        ).execute()
+        # supabase-py 2.x: resp is PostgrestResponse, kayıtlar resp.data’de
+        return resp.data if hasattr(resp, "data") else resp
+    except Exception as exc:
+        print("❌ Supabase RPC hatası:", exc)
         return []
 
-def format_context(listings: list[dict]) -> str:
-    """Supabase'den gelen ilan listesini okunabilir bir bağlam metnine dönüştürür."""
+# ── İlan listesini prompt bağlamına çevir ───────────────────────────────────
+def format_context(listings: List[Dict]) -> str:
     if not listings:
-        return "Veritabanında bu soruyla ilgili güncel ilan bulunamadı."
-    context = "İlgili olabilecek güncel ilanlar:\n\n"
-    for listing in listings:
-        summary = listing.get('ozet', 'Özet bilgisi yok')
-        price = listing.get('fiyat', 'Fiyat bilgisi yok')
-        location = listing.get('location', 'Konum bilgisi yok')
-        url = listing.get('url', 'URL bilgisi yok')
-        context += f"- Özet: {summary}\n  Fiyat: {price}\n  Konum: {location}\n  URL: {url}\n\n"
-    return context.strip()
-
-async def answer_question(question: str, db_client: AsyncClient) -> str:
-    """ Kullanıcıdan gelen soruyu yanıtlar. RAG uygular. """
-    if not db_client or not AsyncClient:
-        return "❌ Dahili bir hata oluştu (Supabase istemcisi yok)."
-
-    print(f"Gelen Soru: {question}")
-    # --- get_embedding çağrısı ---
-    query_embedding = await get_embedding(question) # Hata burada oluşmuştu
-    if query_embedding is None:
-        print("❌ Embedding oluşturulamadığı için Supabase araması atlanıyor.")
-        # Embedding yoksa Supabase'i çağırmanın anlamı yok.
-        listings = []
-    else:
-        listings = await search_listings_in_supabase(query_embedding, db_client)
-    # ---------------------------
-
-    context = format_context(listings)
-    final_system_prompt = SYSTEM_PROMPT
-    final_system_prompt += "\n\nVERİTABANI ARAMA SONUCU:\n---\n" + context + "\n---"
-    try:
-        print("OpenAI ChatCompletion çağrılıyor...")
-        response = await openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "system", "content": final_system_prompt}, {"role": "user", "content": question}],
-            temperature=0.7, max_tokens=1024,
+        return "İLGİLİ İLAN BULUNAMADI."
+    lines = ["İLGİLİ İLANLAR:"]
+    for l in listings:
+        lines.append(
+            f"- {l.get('baslik','(başlık yok)')} • {l.get('fiyat','?')} • "
+            f"{l.get('lokasyon','?')}\n  {l.get('detay_url','')}"
         )
-        final_answer = response.choices[0].message.content.strip()
-        print(f"Üretilen Cevap: {final_answer}")
-        return final_answer
-    except Exception as e:
-        print(f"❌ OpenAI ChatCompletion hatası: {e}")
-        return "❌ Cevap üretilirken bir hata oluştu."
+    return "\n".join(lines)
+
+# ── Ana Q&A işlevi ──────────────────────────────────────────────────────────
+async def answer_question(question: str) -> str:
+    print("↪ Soru:", question)
+
+    query_emb = await get_embedding(question)
+    listings  = await search_listings_in_supabase(query_emb)
+    context   = format_context(listings)
+
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + context},
+        {"role": "user",   "content": question}
+    ]
+
+    try:
+        resp = await openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=1024
+        )
+        answer = resp.choices[0].message.content.strip()
+        print("✓ Yanıt üretildi.")
+        return answer
+    except Exception as exc:
+        print("❌ ChatCompletion hatası:", exc)
+        return "Üzgünüm, şu anda sorunuza yanıt verirken bir hata oluştu."
+
+# ── Demo (dosya doğrudan çalıştırılırsa) ────────────────────────────────────
+if __name__ == "__main__":
+    q = input("Soru: ")
+    loop = asyncio.get_event_loop()
+    print(loop.run_until_complete(answer_question(q)))
