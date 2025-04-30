@@ -29,8 +29,8 @@ supabase      = create_client(SB_URL, SB_KEY)
 
 # ── Ayarlar ─────────────────────────────────────────────────────────────────
 EMBEDDING_MODEL  = "text-embedding-3-small"
-MATCH_THRESHOLD  = 0.60      # eşik – 0 ile 1 arası (daha düşük = daha geniş)
-MATCH_COUNT      = 10        # dönecek ilan sayısı
+MATCH_THRESHOLD  = 0.45      # eşik – 0 ile 1 arası (daha düşük = daha geniş)
+MATCH_COUNT      = 20        # dönecek ilan sayısı
 
 SYSTEM_PROMPT = (
     "Sen SibelGPT'sin: Sibel Kazan Midilli tarafından geliştirilen, "
