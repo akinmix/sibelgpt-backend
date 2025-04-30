@@ -87,20 +87,23 @@ def format_context(listings: List[Dict]) -> str:
     if not listings:
         return "🔍 Uygun ilan bulunamadı."
 
-    formatted = "🔍 Aradığınız kriterlere uygun ilanlar:\n\n"
+    formatted_lines = ["🔍 Aradığınız kriterlere uygun ilanlar:\n"]
     for i, l in enumerate(listings, start=1):
         baslik = l.get("baslik", "(başlık yok)")
         fiyat = l.get("fiyat", "?")
         lokasyon = l.get("lokasyon", "?")
 
-        formatted += (
+        ilan_metni = (
             f"**{i}️⃣ {baslik}**\n"
             f"📍 **Lokasyon:** {lokasyon}\n"
             f"💰 **Fiyat:** {fiyat}\n"
-            f"📞 Detaylı bilgi ve randevu için: 532 687 84 64\n\n"
         )
-    return formatted
+        formatted_lines.append(ilan_metni)
 
+    # 🔽 Bu satırı ekle!
+    formatted_lines.append("📞 Detaylı bilgi ve randevu için: 532 687 84 64")
+
+    return "\n\n".join(formatted_lines)
 
 # ── Ana Q&A işlevi ──────────────────────────────────────────────────────────
 async def answer_question(question: str) -> str:
