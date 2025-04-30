@@ -83,25 +83,73 @@ async def search_listings_in_supabase(
         return []
 
 # ── İlan listesini prompt bağlamına çevir ───────────────────────────────────
+from typing import List, Dict
+import locale
+
 def format_context(listings: List[Dict]) -> str:
+    """
+    Formats a list of listing dictionaries into a numbered, detailed string
+    with contact information at the end, suitable for HTML display.
+    """
     if not listings:
         return "🔍 Uygun ilan bulunamadı."
+
+    # Türkçe locale ayarlarını kullanarak para birimini formatlamak için
+    try:
+        # İşletim sistemine göre locale isimleri değişebilir
+        # Windows için 'tr_TR' veya 'turkish', Linux için 'tr_TR.UTF-8' deneyin
+        locale.setlocale(locale.LC_ALL, 'tr_TR.UTF-8')
+    except locale.Error:
+        try:
+            locale.setlocale(locale.LC_ALL, 'tr_TR')
+        except locale.Error:
+            print("Uyarı: Türkçe locale ayarlanamadı. Fiyat formatlaması basit olabilir.")
+            # Fallback locale or skip setting locale if necessary
 
     formatted_lines = ["🔍 Aradığınız kriterlere uygun ilanlar:<br><br>"]
     for i, l in enumerate(listings, start=1):
         baslik = l.get("baslik", "(başlık yok)")
-        fiyat = l.get("fiyat", "?")
         lokasyon = l.get("lokasyon", "?")
+        fiyat_raw = l.get("fiyat")
+
+        # Fiyatı formatla (sayısal ise)
+        try:
+            # Noktaları kaldırıp, virgülü nokta ile değiştirerek float'a çevir
+            fiyat_num = float(str(fiyat_raw).replace('.', '').replace(',', '.'))
+            # Locale kullanarak para birimi formatı uygula
+            # Eğer locale çalışmazsa basit formatlama kullanılır
+            try:
+                fiyat_formatted = locale.currency(fiyat_num, symbol='₺', grouping=True)
+                # Ondalık kısmı .00 ise kaldır
+                if fiyat_formatted.endswith('.00'):
+                   fiyat_formatted = fiyat_formatted[:-3] + ' ₺'
+                elif fiyat_formatted.endswith(',00'):
+                   fiyat_formatted = fiyat_formatted[:-3] + ' ₺'
+                else:
+                    # Ensure space before TL symbol if it's added by locale.currency
+                    fiyat_formatted = fiyat_formatted.replace('₺', ' ₺').strip()
+            except NameError:
+                fiyat_formatted = f"{fiyat_num:,.0f} ₺".replace(',', '#').replace('.', ',').replace('#', '.')
+
+        except (ValueError, TypeError):
+            fiyat_formatted = str(fiyat_raw) if fiyat_raw is not None else "?"
 
         ilan_metni = (
-            f"**{i}️⃣ {baslik}**<br>"
-            f"📍 <b>Lokasyon:</b> {lokasyon}<br>"
-            f"💰 <b>Fiyat:</b> {fiyat}<br><br>"
+            f"{i}. **{baslik}**<br>"
+            f"&nbsp;&nbsp;&nbsp;&nbsp;* Lokasyon: {lokasyon}<br>"
+            f"&nbsp;&nbsp;&nbsp;&nbsp;* Fiyat: {fiyat_formatted}<br><br>"
         )
         formatted_lines.append(ilan_metni)
 
-    formatted_lines.append("📞 Detaylı bilgi ve randevu için: 532 687 84 64")
+    formatted_lines.append("Detaylı bilgi ve randevu için: 532 687 84 64")
     return "".join(formatted_lines)
+
+# --- Örnek test kullanım ---
+# example_listings = [
+#     {"baslik": "Örnek Daire", "fiyat": "10.000.000", "lokasyon": "Kadıköy / Göztepe"},
+#     ...
+# ]
+# print(format_context(example_listings))
 
 # ── Ana Q&A işlevi ──────────────────────────────────────────────────────────
 async def answer_question(question: str) -> str:
