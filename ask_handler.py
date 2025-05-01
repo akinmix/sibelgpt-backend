@@ -25,7 +25,7 @@ supabase      = create_client(SB_URL, SB_KEY)
 
 # ── Ayarlar ─────────────────────────────────────────────────────────────────
 EMBEDDING_MODEL = "text-embedding-3-small"
-MATCH_THRESHOLD = 0.45        # 0–1 arası (düşük = geniş eşik)
+MATCH_THRESHOLD = 0.65        # 0–1 arası (düşük = geniş eşik)
 MATCH_COUNT     = 20
 
 SYSTEM_PROMPT = (
