@@ -1,89 +1,8 @@
-# ask_handler.py  –  30 Nisan 2025 güncel sürüm (özellikler eklendi)
-import os
-import asyncio
-import locale
-from typing import List, Dict, Optional
-from openai import AsyncOpenAI                       # OpenAI-Python ≥1.0
-
-# Supabase-py async client (v2.x)
-try:
-    from supabase import AsyncClient, create_client
-except ImportError:
-    raise RuntimeError("supabase-py yüklü değil – `pip install supabase`")
-
-# ── Ortam değişkenleri ──────────────────────────────────────────────────────
-OAI_KEY = os.getenv("OPENAI_API_KEY")
-SB_URL  = os.getenv("SUPABASE_URL")
-SB_KEY  = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY")
-
-if not all([OAI_KEY, SB_URL, SB_KEY]):
-    raise RuntimeError(".env dosyasında OPENAI / SUPABASE anahtarları eksik")
-
-openai_client = AsyncOpenAI(api_key=OAI_KEY)
-supabase      = create_client(SB_URL, SB_KEY)
-
-# ── Ayarlar ─────────────────────────────────────────────────────────────────
-EMBEDDING_MODEL  = "text-embedding-3-small"
-MATCH_THRESHOLD  = 0.45      # eşik – 0 ile 1 arası (daha düşük = daha geniş)
-MATCH_COUNT      = 20        # dönecek ilan sayısı
-
-SYSTEM_PROMPT = (
-    "Sen SibelGPT'sin: Sibel Kazan Midilli tarafından geliştirilen, "
-    "Türkiye emlak piyasası (özellikle Remax Sonuç portföyü), numeroloji ve "
-    "finans konularında uzman, Türkçe yanıt veren yardımsever bir yapay zeka asistansın.\n\n"
-    
-    "Kullanıcı emlak sorusu sorduğunda, sana sağlanan 'İLGİLİ İLANLAR' "
-    "bölümündeki verileri kullanarak yanıt ver. O veriler yoksa dürüstçe "
-    "söyle ve genel tavsiye ver.\n\n"
-    
-    "Cevaplarını kısa, net ve samimi tut; ilan başlığı, ilan numarası, "
-    "fiyat, lokasyon ve link bilgilerini listele.\n\n"
-
-    "Cevaplarını HTML formatında üret. <ul> ve <li> etiketleriyle madde madde liste oluştur. "
-    "Satır atlamak için <br>, kalın yazmak için <strong> kullan. Yıldız (*) veya tire (-) kullanma.\n\n"
-)
-
-# ── Embedding oluşturma ─────────────────────────────────────────────────────
-async def get_embedding(text: str) -> Optional[List[float]]:
-    text = text.strip()
-    if not text:
-        return None
-    try:
-        resp = await openai_client.embeddings.create(
-            model=EMBEDDING_MODEL,
-            input=[text]
-        )
-        return resp.data[0].embedding
-    except Exception as exc:
-        print("❌ OpenAI embedding hatası:", exc)
-        return None
-
-# ── Supabase’te benzer ilanları aran ────────────────────────────────────────
-async def search_listings_in_supabase(
-    query_embedding: List[float]
-) -> List[Dict]:
-    if query_embedding is None:
-        return []
-    try:
-        resp = supabase.rpc(
-            "match_listings",
-            {
-                "query_embedding": query_embedding,
-                "match_threshold": MATCH_THRESHOLD,
-                "match_count":     MATCH_COUNT
-            }
-        ).execute()
-        return resp.data if hasattr(resp, "data") else resp
-    except Exception as exc:
-        print("❌ Supabase RPC hatası:", exc)
-        return []
-
-# ── İlan listesini prompt bağlamına çevir ───────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     if not listings:
         return "🔍 Uygun ilan bulunamadı."
 
-    # Türkçe locale ayarı (isteğe bağlı)
+    # Türkçe locale (opsiyonel)
     try:
         locale.setlocale(locale.LC_ALL, 'tr_TR.UTF-8')
     except locale.Error:
@@ -101,7 +20,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         ozellikler = l.get("ozellikler", "(özellik yok)")
         fiyat      = "?"
 
-        # Fiyatı formatla
+        # Fiyatı locale ile formatla
         try:
             fiyat_num = float(str(fiyat_raw).replace('.', '').replace(',', '.'))
             try:
@@ -115,6 +34,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         except:
             fiyat = str(fiyat_raw) if fiyat_raw else "?"
 
+        # HTML <ul><li> formatı
         ilan_html = (
             f"<li>"
             f"<strong>{i}. {baslik}</strong><br>"
@@ -126,47 +46,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         )
         formatted_parts.append(ilan_html)
 
-    # <ul> içine al
     final_output = "<ul>" + "".join(formatted_parts) + "</ul>"
     final_output += "<br>📞 Bu ilanlar hakkında daha fazla bilgi almak isterseniz: 532 687 84 64"
 
     return final_output
-
-# ── Ana Q&A işlevi ──────────────────────────────────────────────────────────
-async def answer_question(question: str) -> str:
-    print("↪ Soru:", question)
-
-    query_emb = await get_embedding(question)
-    listings  = await search_listings_in_supabase(query_emb)
-    context   = format_context_for_sibelgpt(listings)
-
-    messages = [
-        {
-            "role": "system",
-            "content": f"{SYSTEM_PROMPT}<br><br>{context}"
-        },
-        {
-            "role": "user",
-            "content": question
-        }
-    ]
-
-    try:
-        resp = await openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            temperature=0.7,
-            max_tokens=1024
-        )
-        answer = resp.choices[0].message.content.strip()
-        print("✓ Yanıt üretildi.")
-        return answer
-    except Exception as exc:
-        print("❌ ChatCompletion hatası:", exc)
-        return "Üzgünüm, şu anda sorunuza yanıt verirken bir hata oluştu."
-
-# ── Demo (dosya doğrudan çalıştırılırsa) ────────────────────────────────────
-if __name__ == "__main__":
-    q = input("Soru: ")
-    loop = asyncio.get_event_loop()
-    print(loop.run_until_complete(answer_question(q)))
