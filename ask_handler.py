@@ -1,14 +1,9 @@
-# ask_handler.py  –  30 Nisan 2025 güncel sürüm
-# ────────────────────────────────────────────────────────────────────────────
-# • Supabase tablo kolon adları:  ilan_no, baslik, fiyat, ozellikler,
-#                                 lokasyon, detay_url, embedding  (vector)
-# • OpenAI-Python v1.x (>=1.0) ile çalışır.
-# • match_listings RPC çıktısı aynı adları döndürmelidir!
-
+# ask_handler.py  –  30 Nisan 2025 güncel sürüm (özellikler eklendi)
 import os
 import asyncio
-from openai import AsyncOpenAI                       # OpenAI-Python ≥1.0
+import locale
 from typing import List, Dict, Optional
+from openai import AsyncOpenAI                       # OpenAI-Python ≥1.0
 
 # Supabase-py async client (v2.x)
 try:
@@ -41,17 +36,15 @@ SYSTEM_PROMPT = (
     "bölümündeki verileri kullanarak yanıt ver. O veriler yoksa dürüstçe "
     "söyle ve genel tavsiye ver.\n\n"
     
-    "Cevaplarını kısa, net ve samimi tut; ilan başlığı, fiyat, lokasyon ve "
-    "link bilgilerini listele.\n\n"
+    "Cevaplarını kısa, net ve samimi tut; ilan başlığı, ilan numarası, "
+    "fiyat, lokasyon ve link bilgilerini listele.\n\n"
 
     "Cevaplarını HTML formatında üret. <ul> ve <li> etiketleriyle madde madde liste oluştur. "
     "Satır atlamak için <br>, kalın yazmak için <strong> kullan. Yıldız (*) veya tire (-) kullanma.\n\n"
 )
 
-
 # ── Embedding oluşturma ─────────────────────────────────────────────────────
 async def get_embedding(text: str) -> Optional[List[float]]:
-    """ Verilen metni OpenAI’dan gömme (embedding) vektörüne çevirir. """
     text = text.strip()
     if not text:
         return None
@@ -69,11 +62,10 @@ async def get_embedding(text: str) -> Optional[List[float]]:
 async def search_listings_in_supabase(
     query_embedding: List[float]
 ) -> List[Dict]:
-    """match_listings RPC’sini çağırıp benzer ilanları döndürür."""
     if query_embedding is None:
         return []
     try:
-        resp =supabase.rpc(
+        resp = supabase.rpc(
             "match_listings",
             {
                 "query_embedding": query_embedding,
@@ -81,21 +73,17 @@ async def search_listings_in_supabase(
                 "match_count":     MATCH_COUNT
             }
         ).execute()
-        # supabase-py 2.x: resp is PostgrestResponse, kayıtlar resp.data’de
         return resp.data if hasattr(resp, "data") else resp
     except Exception as exc:
         print("❌ Supabase RPC hatası:", exc)
         return []
 
 # ── İlan listesini prompt bağlamına çevir ───────────────────────────────────
-import locale
-from typing import List, Dict
-
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     if not listings:
         return "🔍 Uygun ilan bulunamadı."
 
-    import locale
+    # Türkçe locale ayarı (isteğe bağlı)
     try:
         locale.setlocale(locale.LC_ALL, 'tr_TR.UTF-8')
     except locale.Error:
@@ -106,11 +94,14 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
 
     formatted_parts = []
     for i, l in enumerate(listings, start=1):
-        baslik = l.get("baslik", "(başlık yok)")
-        lokasyon = l.get("lokasyon", "?")
-        fiyat_raw = l.get("fiyat")
-        fiyat = "?"
+        ilan_no    = l.get("ilan_no", "(numara yok)")
+        baslik     = l.get("baslik", "(başlık yok)")
+        lokasyon   = l.get("lokasyon", "?")
+        fiyat_raw  = l.get("fiyat")
+        ozellikler = l.get("ozellikler", "(özellik yok)")
+        fiyat      = "?"
 
+        # Fiyatı formatla
         try:
             fiyat_num = float(str(fiyat_raw).replace('.', '').replace(',', '.'))
             try:
@@ -125,25 +116,29 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
             fiyat = str(fiyat_raw) if fiyat_raw else "?"
 
         ilan_html = (
+            f"<li>"
             f"<strong>{i}. {baslik}</strong><br>"
+            f"&nbsp;&nbsp;&nbsp;&nbsp;• İlan No: {ilan_no}<br>"
             f"&nbsp;&nbsp;&nbsp;&nbsp;• Lokasyon: {lokasyon}<br>"
-            f"&nbsp;&nbsp;&nbsp;&nbsp;• Fiyat: {fiyat}<br><br>"
+            f"&nbsp;&nbsp;&nbsp;&nbsp;• Fiyat: {fiyat}<br>"
+            f"&nbsp;&nbsp;&nbsp;&nbsp;• Özellikler: {ozellikler}"
+            f"</li><br>"
         )
         formatted_parts.append(ilan_html)
 
-    final_output = "".join(formatted_parts)
+    # <ul> içine al
+    final_output = "<ul>" + "".join(formatted_parts) + "</ul>"
     final_output += "<br>📞 Bu ilanlar hakkında daha fazla bilgi almak isterseniz: 532 687 84 64"
-    final_output += "<br><br><span style='color:red;'>[Sibel Test - HTML Render]</span>"
-    
+
     return final_output
-    
+
 # ── Ana Q&A işlevi ──────────────────────────────────────────────────────────
 async def answer_question(question: str) -> str:
     print("↪ Soru:", question)
 
     query_emb = await get_embedding(question)
     listings  = await search_listings_in_supabase(query_emb)
-    context = format_context_for_sibelgpt(listings)
+    context   = format_context_for_sibelgpt(listings)
 
     messages = [
         {
