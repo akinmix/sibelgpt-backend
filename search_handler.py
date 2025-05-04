@@ -9,7 +9,7 @@ from openai import AsyncOpenAI
 # ── Ortam Değişkenleri ─────────────────────────────────────
 OAI_KEY = os.getenv("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID") or "cx=d352129b3656e4b4f"
+GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID") or "d352129b3656e4b4f"  # "cx=" kısmını kaldırın
 
 # API anahtarlarının varlığını kontrol et ve log tut
 print(f"❓ OpenAI API anahtarı mevcut: {OAI_KEY is not None}")
