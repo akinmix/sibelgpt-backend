@@ -10,7 +10,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID") or "cx=d352129b3656e4b4f"
 
 if not all([OAI_KEY, GOOGLE_API_KEY]):
-    raise RuntimeError("Eksik API anahtarı veya Google Custom Search bilgisi.")
+    print("UYARI: Eksik API anahtarı - Google araması çalışmayabilir")
 
 openai_client = AsyncOpenAI(api_key=OAI_KEY)
 
