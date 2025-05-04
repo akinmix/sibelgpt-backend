@@ -1,39 +1,40 @@
-# main.py (Async Client Init in Startup Event - Google araması entegrasyonu eklendi)
+# main.py (Düzeltilmiş Versiyon)
 import os
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 from dotenv import load_dotenv
 
-# --- create_async_client ve AsyncClient import denemesi ---
+# Import dosya hatalarını azaltmak için
 try:
-    from supabase import create_async_client, AsyncClient
-    print("DEBUG: create_async_client, AsyncClient imported from supabase.")
-    SUPABASE_ASYNC_AVAILABLE = True
+    from supabase import create_client
+    from supabase.client import Client
+    SUPABASE_AVAILABLE = True
+    print("DEBUG: supabase paketi başarıyla import edildi.")
 except ImportError:
-    print("DEBUG: Failed to import async components from supabase.")
-    AsyncClient = None # Tip kontrolü için None ata
-    SUPABASE_ASYNC_AVAILABLE = False
+    SUPABASE_AVAILABLE = False
+    print("DEBUG: supabase paketi import edilemedi.")
 
 load_dotenv()
 
 # ---- Dahili modüller ----
 from image_handler import router as image_router
 import ask_handler
-import search_handler  # YENİ: Web araması modülü importu
+import search_handler  # Web arama modülü importu
 
 class ChatRequest(BaseModel):
     question: str
-    mode: str = "real-estate"  # YENİ: Varsayılan mod eklendi
+    mode: str = "real-estate"  # Varsayılan mod
 
-# YENİ: Web araması isteği modeli
+# Web araması isteği modeli
 class WebSearchRequest(BaseModel):
     question: str
     mode: str = "real-estate"
 
 app = FastAPI(
     title="SibelGPT Backend",
-    version="1.7.0", # Versiyon (Google Arama entegrasyonu eklendi)
+    version="1.7.0", # Web araması entegrasyonu versiyonu
 )
 
 # ---- CORS Middleware ----
@@ -44,38 +45,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---- Lifespan Event for Async Initialization ----
+# ---- Lifespan Event ----
 @app.on_event("startup")
 async def startup_event():
-    print("DEBUG: Startup event started.")
+    print("DEBUG: Startup event başlıyor.")
     supabase_url = os.environ.get("SUPABASE_URL")
     supabase_key = os.environ.get("SUPABASE_KEY")
-    # app.state üzerine bir attribute tanımlayarak istemciyi sakla
-    app.state.supabase_client = None
-
-    if supabase_url and supabase_key and SUPABASE_ASYNC_AVAILABLE:
-        print("DEBUG: Async Supabase client oluşturulmaya çalışılıyor...")
+    # Basitleştirilmiş Supabase istemci yönetimi
+    if SUPABASE_AVAILABLE and supabase_url and supabase_key:
         try:
-            # --- ASIL DÜZELTME: await ile çağır ---
-            client: AsyncClient | None = await create_async_client(supabase_url, supabase_key)
-            # --------------------------------------
-            app.state.supabase_client = client # Oluşturulan istemciyi app.state'e ata
-            if app.state.supabase_client:
-                 print(f"✅ Supabase async client oluşturuldu ve app.state'e atandı. Tipi: {type(app.state.supabase_client)}")
-            else:
-                 print("❌ Supabase async client oluşturuldu ama None döndü?") # Beklenmedik durum
+            app.state.supabase_client = create_client(supabase_url, supabase_key)
+            print("✅ Supabase istemcisi oluşturuldu")
         except Exception as e:
-            print(f"❌ Supabase async client oluşturulurken startup'ta hata: {e}")
-            app.state.supabase_client = None # Hata durumunda None yap
-    elif not SUPABASE_ASYNC_AVAILABLE:
-         print("❌ Hata: Supabase async components import edilemediği için istemci oluşturulamıyor.")
+            print(f"❌ Supabase istemcisi oluşturulurken hata: {e}")
+            app.state.supabase_client = None
     else:
-        print("⚠️ Uyarı: SUPABASE_URL veya SUPABASE_KEY ortam değişkenleri bulunamadı...")
+        app.state.supabase_client = None
+        print("⚠️ Supabase istemci oluşturulamadı: Paket veya ortam değişkenleri eksik")
+    
+    # Google API anahtarı kontrolü
+    if not os.environ.get("GOOGLE_API_KEY"):
+        print("⚠️ GOOGLE_API_KEY ortam değişkeni eksik - Web araması çalışmayabilir")
 
-# ---- Supabase İstemcisini Sağlama (Retrieve from app.state) ----
-async def get_supabase_client(request: Request) -> AsyncClient | None:
-    # request objesi üzerinden app.state'e erişip istemciyi al
-    # Eğer startup'ta None olarak kaldıysa None dönecektir.
+# ---- Supabase İstemcisini Sağlama ----
+async def get_supabase_client(request: Request):
+    # Basitleştirilmiş, sadece None olabilir
     if hasattr(request.app.state, 'supabase_client'):
         return request.app.state.supabase_client
     return None
@@ -86,21 +80,16 @@ app.include_router(image_router, prefix="", tags=["image"])
 @app.post("/chat", tags=["chat"])
 async def chat(
     payload: ChatRequest,
-    # get_supabase_client şimdi request.app.state'ten alacak
-    db_client: AsyncClient | None = Depends(get_supabase_client)
+    db_client = Depends(get_supabase_client)
 ):
-    print(f"DEBUG: /chat endpoint'ine istek alındı. Soru: {payload.question}, Mod: {payload.mode}")
-    if db_client is None:
-         print("Supabase istemcisi (app.state üzerinden) alınamadı veya None.")
-         return {"reply": "❌ Veritabanı bağlantısı kurulamadığı için cevap verilemiyor."}
-    # Artık db_client GERÇEK AsyncClient objesi olmalı
+    print(f"DEBUG: /chat endpoint'ine istek alındı. Soru: {payload.question}")
     answer = await ask_handler.answer_question(payload.question)
     return {"reply": answer}
 
-# YENİ: Web Araması Endpoint'i
+# Web Araması Endpoint'i
 @app.post("/web-search", tags=["search"])
 async def web_search(payload: WebSearchRequest):
-    print(f"DEBUG: /web-search endpoint'ine istek alındı. Soru: {payload.question}, Mod: {payload.mode}")
+    print(f"DEBUG: /web-search endpoint'ine istek alındı. Soru: {payload.question}")
     answer = await search_handler.web_search_answer(payload.question)
     return {"reply": answer}
 
