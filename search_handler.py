@@ -167,7 +167,7 @@ async def web_search_answer(query: str) -> str:
             messages=messages,
             temperature=0.7,
             max_tokens=1024,
-            timeout=60  # 60 saniye timeout
+            timeout=120  # 120 saniye timeout
         )
         
         openai_elapsed = time.time() - openai_start_time
