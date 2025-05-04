@@ -22,4 +22,4 @@ services:
       - key: GOOGLE_API_KEY         # Google API Anahtarı için (YENİ)
         sync: false                 # Değeri Render dashboard'dan alır
       - key: GOOGLE_CSE_ID          # Google Custom Search Engine ID (YENİ)
-        value: cx=d352129b3656e4b4f # Varsayılan değer
+        value: d352129b3656e4b4f # Varsayılan değer (cx= kaldırıldı)
