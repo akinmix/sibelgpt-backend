@@ -68,6 +68,7 @@ async def startup_event():
         print("⚠️ GOOGLE_API_KEY ortam değişkeni eksik - Web araması çalışmayabilir")
 
 # ---- Supabase İstemcisini Sağlama ----
+# Union operatörü (|) olmadan tanımlama
 async def get_supabase_client(request: Request):
     # Basitleştirilmiş, sadece None olabilir
     if hasattr(request.app.state, 'supabase_client'):
