@@ -59,7 +59,7 @@ async def search_google(query: str) -> List[Dict]:
         "q": query,
         "key": GOOGLE_API_KEY,
         "cx": GOOGLE_CSE_ID,
-        "num": 5  # Maksimum 5 sonuç getir
+        "num": 3  # Maksimum 3 sonuç getir
     }
     
     try:
