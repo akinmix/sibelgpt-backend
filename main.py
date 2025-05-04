@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 try:
     from supabase import create_client
     from supabase.client import Client
-    SUPABASE_AVAILABLE = True
+    SUPABASE_AVAILABLE = True 
     print("DEBUG: supabase paketi başarıyla import edildi.")
 except ImportError:
     SUPABASE_AVAILABLE = False
