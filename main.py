@@ -1,7 +1,6 @@
-# main.py (Async Client Init in Startup Event - Düzeltilmiş)
+# main.py (Async Client Init in Startup Event - Google araması entegrasyonu eklendi)
 import os
-# from typing import Union # Artık gerekmeyebilir
-from fastapi import FastAPI, Depends, Request # Request eklendi (app.state için)
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -21,15 +20,20 @@ load_dotenv()
 # ---- Dahili modüller ----
 from image_handler import router as image_router
 import ask_handler
+import search_handler  # YENİ: Web araması modülü importu
 
 class ChatRequest(BaseModel):
     question: str
+    mode: str = "real-estate"  # YENİ: Varsayılan mod eklendi
+
+# YENİ: Web araması isteği modeli
+class WebSearchRequest(BaseModel):
+    question: str
+    mode: str = "real-estate"
 
 app = FastAPI(
     title="SibelGPT Backend",
-    version="1.6.0", # Versiyon (Async init in startup)
-    # Not: Daha modern FastAPI'de lifespan context manager tercih edilir,
-    # ama on_event şimdilik daha basit ve çalışacaktır.
+    version="1.7.0", # Versiyon (Google Arama entegrasyonu eklendi)
 )
 
 # ---- CORS Middleware ----
@@ -85,7 +89,7 @@ async def chat(
     # get_supabase_client şimdi request.app.state'ten alacak
     db_client: AsyncClient | None = Depends(get_supabase_client)
 ):
-    print(f"DEBUG: /chat endpoint'ine istek alındı. Soru: {payload.question}") # Bu log kalsın
+    print(f"DEBUG: /chat endpoint'ine istek alındı. Soru: {payload.question}, Mod: {payload.mode}")
     if db_client is None:
          print("Supabase istemcisi (app.state üzerinden) alınamadı veya None.")
          return {"reply": "❌ Veritabanı bağlantısı kurulamadığı için cevap verilemiyor."}
@@ -93,8 +97,13 @@ async def chat(
     answer = await ask_handler.answer_question(payload.question)
     return {"reply": answer}
 
+# YENİ: Web Araması Endpoint'i
+@app.post("/web-search", tags=["search"])
+async def web_search(payload: WebSearchRequest):
+    print(f"DEBUG: /web-search endpoint'ine istek alındı. Soru: {payload.question}, Mod: {payload.mode}")
+    answer = await search_handler.web_search_answer(payload.question)
+    return {"reply": answer}
+
 @app.get("/", tags=["meta"])
 async def root():
-    return {"status": "ok"}
-
-# Ayrı startup event'ine gerek kalmadı, print'ler yukarı taşındı.
+    return {"status": "ok", "version": "1.7.0"}
