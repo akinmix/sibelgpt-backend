@@ -65,7 +65,7 @@ async def search_google(query: str) -> List[Dict]:
     try:
         print(f"🌐 Google API'ye istek gönderiliyor: {url}")
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params, timeout=30) as response:
+            async with session.get(url, params=params, timeout=60) as response:
                 print(f"📊 Google API yanıt durumu: {response.status}")
                 
                 if response.status != 200:
