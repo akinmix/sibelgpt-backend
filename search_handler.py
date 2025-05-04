@@ -9,9 +9,13 @@ OAI_KEY = os.getenv("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID") or "cx=d352129b3656e4b4f"
 
-if not all([OAI_KEY, GOOGLE_API_KEY]):
-    print("UYARI: Eksik API anahtarı - Google araması çalışmayabilir")
+# API anahtarlarının varlığını kontrol et ama hata verme
+if not OAI_KEY:
+    print("⚠️ OPENAI_API_KEY ortam değişkeni eksik")
+if not GOOGLE_API_KEY:
+    print("⚠️ GOOGLE_API_KEY ortam değişkeni eksik")
 
+# Yine de çalışmaya devam et
 openai_client = AsyncOpenAI(api_key=OAI_KEY)
 
 # ── Ayarlar ────────────────────────────────────────────────
@@ -34,6 +38,10 @@ SYSTEM_PROMPT = (
 async def search_google(query: str) -> List[Dict]:
     """Google Custom Search API kullanarak web araması yapar."""
     if not query:
+        return []
+    
+    if not GOOGLE_API_KEY:
+        print("❌ Google API anahtarı eksik!")
         return []
     
     url = "https://www.googleapis.com/customsearch/v1"
@@ -92,6 +100,9 @@ async def web_search_answer(query: str) -> str:
     search_results = await search_google(query)
     context = format_search_results(search_results)
 
+    if not search_results:
+        return "Üzgünüm, arama sonuçlarında herhangi bir bilgi bulamadım. Lütfen farklı bir arama yapmayı deneyin veya sorunuzu yeniden formüle edin."
+
     messages = [
         {"role": "system", "content": f"{SYSTEM_PROMPT}<br><br>{context}"},
         {"role": "user", "content": query}
@@ -107,7 +118,7 @@ async def web_search_answer(query: str) -> str:
         return resp.choices[0].message.content.strip()
     except Exception as exc:
         print("❌ Chat yanıt hatası:", exc)
-        return "Üzgünüm, şu anda bir hata oluştu."
+        return "Üzgünüm, şu anda bir hata oluştu. Lütfen daha sonra tekrar deneyin."
 
 # ── Terminalden Test ──────────────────────────────────────
 if __name__ == "__main__":
