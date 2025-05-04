@@ -5,10 +5,14 @@ import re
 from typing import List, Dict, Optional
 from openai import AsyncOpenAI
 
+# Supabase import sorununu düzeltme
 try:
-    from supabase import AsyncClient, create_client
+    from supabase.client import create_client, Client as AsyncClient
 except ImportError:
-    raise RuntimeError("supabase-py yüklü değil – `pip install supabase`")
+    try:
+        from supabase import create_client, Client as AsyncClient
+    except ImportError:
+        raise RuntimeError("supabase paketini yükleyin: `pip install supabase`")
 
 # ── Ortam Değişkenleri ─────────────────────────────────────
 OAI_KEY = os.getenv("OPENAI_API_KEY")
