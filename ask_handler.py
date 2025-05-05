@@ -106,6 +106,91 @@ SYSTEM_PROMPTS = {
     """
 }
 
+async def detect_topic(question: str) -> str:
+    """Kullanıcının sorusunun hangi alana ait olduğunu tespit eder."""
+    
+    # Alanları tanımlayan anahtar kelimeler
+    topics = {
+        "real-estate": [
+            "emlak", "gayrimenkul", "ev", "daire", "konut", "kiralık", "satılık", 
+            "tapu", "mortgage", "ipotek", "kredi", "remax", "metrekare", "imar", 
+            "arsa", "bina", "kat", "müstakil", "dükkan", "ofis", "iş yeri", "bahçe",
+            "balkon", "oda", "salon", "banyo", "mutfak", "yapı", "inşaat", "tadilat"
+        ],
+        "mind-coach": [
+            "numeroloji", "astroloji", "burç", "meditasyon", "reiki", "terapi", 
+            "psikoloji", "depresyon", "anksiyete", "stres", "motivasyon", "gelişim", 
+            "spiritüel", "enerji", "şifa", "kadim", "theta", "healing", "ruh", 
+            "bilinç", "farkındalık", "arınma", "denge", "uyum", "yoga", "nefes"
+        ],
+        "finance": [
+            "borsa", "hisse", "finans", "yatırım", "faiz", "döviz", "euro", "dolar", 
+            "altın", "gümüş", "kripto", "bitcoin", "ethereum", "bist", "ekonomi", 
+            "enflasyon", "tahvil", "bono", "portföy", "fon", "kazanç", "kâr", "zarar", 
+            "analiz", "teknik", "temel", "parite", "forex", "banka", "para"
+        ]
+    }
+    
+    # Soruyu küçük harfe çevirip noktolama işaretlerini kaldıralım
+    clean_question = question.lower()
+    for char in ".,;:!?-_()[]{}\"'":
+        clean_question = clean_question.replace(char, " ")
+    
+    # Her kategori için eşleşen kelime sayısını sayalım
+    matches = {topic: 0 for topic in topics}
+    
+    for topic, keywords in topics.items():
+        for keyword in keywords:
+            if keyword in clean_question:
+                matches[topic] += 1
+    
+    # En çok eşleşen kategoriyi bulalım
+    max_matches = max(matches.values())
+    
+    # Eğer hiç eşleşme yoksa veya çok az eşleşme varsa, içeriği belirsiz olarak işaretleyelim
+    if max_matches <= 1:
+        # Yeterli eşleşme yoksa, sorunun içeriğini OpenAI API ile analiz et
+        try:
+            resp = await openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system", 
+                        "content": """Kullanıcı mesajını analiz ederek aşağıdaki kategorilerden hangisine 
+                                    ait olduğunu belirle ve sadece kategori adını döndür:
+                                    1. real-estate (emlak, gayrimenkul, ev, daire, kiralık, satılık vb.)
+                                    2. mind-coach (numeroloji, astroloji, psikoloji, kişisel gelişim vb.)
+                                    3. finance (borsa, hisse, yatırım, ekonomi, kripto, döviz vb.)
+                                    Eğer mesaj belirgin bir kategoriye ait değilse, en yakın kategoriyi seç."""
+                    },
+                    {"role": "user", "content": question}
+                ],
+                temperature=0.3,
+                max_tokens=10
+            )
+            detected_topic = resp.choices[0].message.content.strip().lower()
+            
+            # Eğer yanıt direkt kategori adı değilse, içindeki kategori adını çıkaralım
+            for topic in topics.keys():
+                if topic in detected_topic:
+                    return topic
+            
+            # Hala belirleyemediyse, varsayılan olarak real-estate döndür
+            return "real-estate"
+            
+        except Exception as e:
+            print(f"⚠️ Konu tespiti hatası: {e}")
+            # Hata durumunda varsayılan olarak real-estate döndür
+            return "real-estate"
+    
+    # En çok eşleşme olan kategoriyi döndür
+    for topic, count in matches.items():
+        if count == max_matches:
+            return topic
+    
+    # Hiçbir şey bulunamazsa varsayılan olarak real-estate döndür
+    return "real-estate"
+
 # ── Embedding Fonksiyonu ───────────────────────────────────
 async def get_embedding(text: str) -> Optional[List[float]]:
     text = text.strip()
