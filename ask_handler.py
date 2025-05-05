@@ -357,9 +357,14 @@ async def answer_question(question: str, mode: str = "real-estate") -> str:
     # Sorunun hangi alana ait olduğunu tespit et
     detected_topic = await detect_topic(question)
     
+    # Tanılama için loglama ekle
+    print(f"✓ Tespit edilen konu: {detected_topic}, Kullanıcının seçtiği mod: {mode}")
+    
     # Eğer tespit edilen konu, seçili moddan farklıysa yönlendirme mesajı göster
     if detected_topic != mode:
         redirection_key = f"{mode}-to-{detected_topic}"
+        print(f"⟹ Yönlendirme anahtarı: {redirection_key}")
+        
         if redirection_key in REDIRECTION_MESSAGES:
             return REDIRECTION_MESSAGES[redirection_key]
     
