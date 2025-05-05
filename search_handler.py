@@ -195,10 +195,11 @@ def format_search_results(search_results: List[Dict]) -> str:
     return formatted_text
 
 # ── Ana Fonksiyon ─────────────────────────────────────────
-async def web_search_answer(query: str) -> str:
+async def web_search_answer(query: str, mode: str = "real-estate") -> str:
     """Google araması yapar ve OpenAI API kullanarak yanıt oluşturur."""
     print("\n" + "="*50)
     print(f"🚀 Web Araması Başlatılıyor: '{query}'")
+    print(f"🚀 Seçilen mod: '{mode}'")  # Mod bilgisini logla
     print("="*50)
     total_start_time = time.time()
 
@@ -217,10 +218,14 @@ async def web_search_answer(query: str) -> str:
         if not openai_client:
             print("❌ OpenAI istemcisi oluşturulamamış")
             return "Üzgünüm, OpenAI API bağlantısı kurulamadı. Lütfen sistem yöneticinize başvurun."
+        
+        # Seçilen moda göre system prompt'u seç - BU SATIR EKLENDİ
+        system_prompt = SEARCH_SYSTEM_PROMPTS.get(mode, SEARCH_SYSTEM_PROMPTS["real-estate"])
+        print(f"📄 Seçilen mod ({mode}) için system prompt kullanılıyor")
             
         print("🧠 OpenAI API'ye istek hazırlanıyor...")
         messages = [
-            {"role": "system", "content": f"{SYSTEM_PROMPT}<br><br>{context}"},
+            {"role": "system", "content": f"{system_prompt}<br><br>{context}"},
             {"role": "user", "content": query}
         ]
 
@@ -263,10 +268,11 @@ async def web_search_answer(query: str) -> str:
 if __name__ == "__main__":
     try:
         q = input("Arama yapmak istediğiniz sorguyu girin: ")
+        m = input("Modu seçin (real-estate, mind-coach, finance) [varsayılan: real-estate]: ") or "real-estate"
         print("\n⏳ İşlem sürüyor, lütfen bekleyin...\n")
         
         loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(web_search_answer(q))
+        result = loop.run_until_complete(web_search_answer(q, m))
         
         print("\n" + "="*30 + " SONUÇ " + "="*30)
         print(result)
