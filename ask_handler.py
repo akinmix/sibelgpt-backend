@@ -349,16 +349,37 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     return final_output
 
 # ── Ana Fonksiyon ─────────────────────────────────────────
-async def answer_question(question: str) -> str:
-    print("↪ Soru:", question)
-
+async def answer_question(question: str, mode: str = "real-estate") -> str:
+    """Kullanıcının sorusuna yanıt verir ve gerektiğinde başka modüle yönlendirir."""
+    
+    print(f"↪ Soru: {question}, Mod: {mode}")
+    
+    # Sorunun hangi alana ait olduğunu tespit et
+    detected_topic = await detect_topic(question)
+    
+    # Eğer tespit edilen konu, seçili moddan farklıysa yönlendirme mesajı göster
+    if detected_topic != mode:
+        redirection_key = f"{mode}-to-{detected_topic}"
+        if redirection_key in REDIRECTION_MESSAGES:
+            return REDIRECTION_MESSAGES[redirection_key]
+    
+    # Normal işleme devam et
     query_emb = await get_embedding(question)
-    listings  = await search_listings_in_supabase(query_emb)
-    context   = format_context_for_sibelgpt(listings)
-
+    
+    # Gayrimenkul modu için Supabase'den ilanları getir
+    if mode == "real-estate":
+        listings = await search_listings_in_supabase(query_emb)
+        context = format_context_for_sibelgpt(listings)
+    else:
+        # Diğer modlar için boş context
+        context = ""
+    
+    # Seçili moda göre system prompt'u al
+    system_prompt = SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["real-estate"])
+    
     messages = [
-        {"role": "system", "content": f"{SYSTEM_PROMPT}<br><br>{context}"},
-        {"role": "user",   "content": question}
+        {"role": "system", "content": f"{system_prompt}<br><br>{context}"},
+        {"role": "user", "content": question}
     ]
 
     try:
