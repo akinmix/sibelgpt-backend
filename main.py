@@ -34,7 +34,7 @@ class WebSearchRequest(BaseModel):
 
 app = FastAPI(
     title="SibelGPT Backend",
-    version="1.7.0", # Web araması entegrasyonu versiyonu
+    version="1.7.1", # Mod düzeltmesi versiyonu
 )
 
 # ---- CORS Middleware ----
@@ -84,7 +84,9 @@ async def chat(
     db_client = Depends(get_supabase_client)
 ):
     print(f"DEBUG: /chat endpoint'ine istek alındı. Soru: {payload.question}")
-    answer = await ask_handler.answer_question(payload.question)
+    print(f"DEBUG: İstek modu: {payload.mode}")  # Mod bilgisini logla
+    # Mode parametresini geçirerek düzeltildi
+    answer = await ask_handler.answer_question(payload.question, payload.mode)
     return {"reply": answer}
 
 # Web Araması Endpoint'i
@@ -97,4 +99,4 @@ async def web_search(payload: WebSearchRequest):
 
 @app.get("/", tags=["meta"])
 async def root():
-    return {"status": "ok", "version": "1.7.0"}
+    return {"status": "ok", "version": "1.7.1"}
