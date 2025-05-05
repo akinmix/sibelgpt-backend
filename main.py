@@ -91,7 +91,8 @@ async def chat(
 @app.post("/web-search", tags=["search"])
 async def web_search(payload: WebSearchRequest):
     print(f"DEBUG: /web-search endpoint'ine istek alındı. Soru: {payload.question}")
-    answer = await search_handler.web_search_answer(payload.question)
+    print(f"DEBUG: İstek modu: {payload.mode}")  # Mod bilgisini logla
+    answer = await search_handler.web_search_answer(payload.question, payload.mode)  # Modu geçir
     return {"reply": answer}
 
 @app.get("/", tags=["meta"])
