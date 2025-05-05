@@ -106,6 +106,82 @@ SYSTEM_PROMPTS = {
     """
 }
 
+# ── Yönlendirme Mesajları ──────────────────────────────────
+REDIRECTION_MESSAGES = {
+    "real-estate-to-mind-coach": """
+    <h3>Bu soru Zihin Koçu GPT için daha uygun görünüyor.</h3>
+    
+    <p>Şu anda <strong>Gayrimenkul GPT</strong> modülündesiniz, ancak sorduğunuz soru numeroloji, astroloji, 
+    psikoloji veya kişisel gelişim ile ilgili görünüyor.</p>
+    
+    <p>Daha iyi bir yanıt almak için lütfen üst menüden <strong>🧠 Zihin Koçu GPT</strong> butonuna tıklayarak 
+    modül değiştiriniz. Ardından sorunuzu tekrar sorabilirsiniz.</p>
+    
+    <p>Veya yine de gayrimenkul ile ilgili bir sorunuz varsa, lütfen tekrar sorunuz.</p>
+    """,
+    
+    "real-estate-to-finance": """
+    <h3>Bu soru Finans GPT için daha uygun görünüyor.</h3>
+    
+    <p>Şu anda <strong>Gayrimenkul GPT</strong> modülündesiniz, ancak sorduğunuz soru borsa, hisse senetleri, 
+    yatırım, ekonomi veya finans ile ilgili görünüyor.</p>
+    
+    <p>Daha iyi bir yanıt almak için lütfen üst menüden <strong>💰 Finans GPT</strong> butonuna tıklayarak 
+    modül değiştiriniz. Ardından sorunuzu tekrar sorabilirsiniz.</p>
+    
+    <p>Veya yine de gayrimenkul ile ilgili bir sorunuz varsa, lütfen tekrar sorunuz.</p>
+    """,
+    
+    "mind-coach-to-real-estate": """
+    <h3>Bu soru Gayrimenkul GPT için daha uygun görünüyor.</h3>
+    
+    <p>Şu anda <strong>Zihin Koçu GPT</strong> modülündesiniz, ancak sorduğunuz soru emlak, gayrimenkul, 
+    satılık/kiralık ilanlar veya inşaat ile ilgili görünüyor.</p>
+    
+    <p>Daha iyi bir yanıt almak için lütfen üst menüden <strong>🏠 Gayrimenkul GPT</strong> butonuna tıklayarak 
+    modül değiştiriniz. Ardından sorunuzu tekrar sorabilirsiniz.</p>
+    
+    <p>Veya yine de kişisel gelişim ve zihin koçluğu ile ilgili bir sorunuz varsa, lütfen tekrar sorunuz.</p>
+    """,
+    
+    "mind-coach-to-finance": """
+    <h3>Bu soru Finans GPT için daha uygun görünüyor.</h3>
+    
+    <p>Şu anda <strong>Zihin Koçu GPT</strong> modülündesiniz, ancak sorduğunuz soru borsa, hisse senetleri, 
+    yatırım, ekonomi veya finans ile ilgili görünüyor.</p>
+    
+    <p>Daha iyi bir yanıt almak için lütfen üst menüden <strong>💰 Finans GPT</strong> butonuna tıklayarak 
+    modül değiştiriniz. Ardından sorunuzu tekrar sorabilirsiniz.</p>
+    
+    <p>Veya yine de kişisel gelişim ve zihin koçluğu ile ilgili bir sorunuz varsa, lütfen tekrar sorunuz.</p>
+    """,
+    
+    "finance-to-real-estate": """
+    <h3>Bu soru Gayrimenkul GPT için daha uygun görünüyor.</h3>
+    
+    <p>Şu anda <strong>Finans GPT</strong> modülündesiniz, ancak sorduğunuz soru emlak, gayrimenkul, 
+    satılık/kiralık ilanlar veya inşaat ile ilgili görünüyor.</p>
+    
+    <p>Daha iyi bir yanıt almak için lütfen üst menüden <strong>🏠 Gayrimenkul GPT</strong> butonuna tıklayarak 
+    modül değiştiriniz. Ardından sorunuzu tekrar sorabilirsiniz.</p>
+    
+    <p>Veya yine de ekonomi ve finans ile ilgili bir sorunuz varsa, lütfen tekrar sorunuz.</p>
+    """,
+    
+    "finance-to-mind-coach": """
+    <h3>Bu soru Zihin Koçu GPT için daha uygun görünüyor.</h3>
+    
+    <p>Şu anda <strong>Finans GPT</strong> modülündesiniz, ancak sorduğunuz soru numeroloji, astroloji, 
+    psikoloji veya kişisel gelişim ile ilgili görünüyor.</p>
+    
+    <p>Daha iyi bir yanıt almak için lütfen üst menüden <strong>🧠 Zihin Koçu GPT</strong> butonuna tıklayarak 
+    modül değiştiriniz. Ardından sorunuzu tekrar sorabilirsiniz.</p>
+    
+    <p>Veya yine de ekonomi ve finans ile ilgili bir sorunuz varsa, lütfen tekrar sorunuz.</p>
+    """
+}
+
+
 async def detect_topic(question: str) -> str:
     """Kullanıcının sorusunun hangi alana ait olduğunu tespit eder."""
     
