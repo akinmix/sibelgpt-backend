@@ -323,7 +323,7 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
         return []
 # ── Formatlama Fonksiyonu ─────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
-    """İlanları formatlayarak daha kompakt HTML'e dönüştürür."""
+    """İlanları formatlayarak eksiksiz HTML'e dönüştürür."""
     if not listings:
         return "🔍 Uygun ilan bulunamadı."
 
@@ -352,15 +352,13 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     
     formatted_parts = []
     for i, l in enumerate(listings_to_format, start=1):
-        # İlan numarası
+        # İlan numarası - ilan_id veya ilan_no alanından
         ilan_no = l.get('ilan_id', l.get('ilan_no', str(i)))
         
-        # Başlık - daha kısa tutmak için başlığı kısaltıyoruz
+        # Başlık - tam başlığı göster, kısaltma yapma
         baslik = l.get('baslik', '(başlık yok)')
-        if len(baslik) > 40:
-            baslik = baslik[:37] + "..."
         
-        # Lokasyon - sadece mahalle adını al
+        # Lokasyon - tam haliyle göster
         lokasyon = l.get('lokasyon', '?')
         
         # Fiyat formatlaması
@@ -373,16 +371,20 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
             except:
                 fiyat = str(fiyat_raw)
         
-        # Kat, metrekare ve oda sayısı bilgisi
-        # Farklı veri formatlarıyla çalışacak şekilde doğrudan alıyoruz
+        # Özellikler - tüm bilgileri dahil et
+        ozellikler_liste = []
+        
+        # Oda sayısı - doğrudan al
+        oda_sayisi = l.get('oda_sayisi', '')
+        if oda_sayisi:
+            ozellikler_liste.append(oda_sayisi)
+        
+        # Metrekare - doğrudan al
         metrekare = l.get('metrekare', '')
         if metrekare:
-            metrekare = f"{metrekare} m²"
-            
-        oda_sayisi = l.get('oda_sayisi', '')
+            ozellikler_liste.append(f"{metrekare} m²")
         
-        # Kat bilgisi - doğrudan tablodaki kat alanını kullan
-        kat_bilgisi = ""
+        # Kat bilgisi - bulundugu_kat alanından
         bulundugu_kat = l.get('bulundugu_kat')
         if bulundugu_kat is not None and bulundugu_kat != '':
             try:
@@ -393,31 +395,26 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
                 
                 # Özel durumlar için kontrol
                 if kat_no == 0:
-                    kat_bilgisi = "Giriş Kat"
+                    ozellikler_liste.append("Giriş Kat")
                 elif kat_no < 0:
-                    kat_bilgisi = "Bodrum"
+                    ozellikler_liste.append("Bodrum")
                 else:
-                    kat_bilgisi = f"{kat_no}. Kat"
+                    ozellikler_liste.append(f"{kat_no}. Kat")
             except:
                 # Sayı olarak çevrilemezse olduğu gibi göster
-                kat_bilgisi = str(bulundugu_kat)
+                ozellikler_liste.append(f"{bulundugu_kat}. Kat")
         
-        # Özelliklerin özeti
-        ozellikler_ozet = []
-        if oda_sayisi:
-            ozellikler_ozet.append(oda_sayisi)
-        if metrekare:
-            ozellikler_ozet.append(metrekare)
-        if kat_bilgisi:
-            ozellikler_ozet.append(kat_bilgisi)
+        # Özellikler string'i - varsa alanı kullan, yoksa liste oluştur
+        if 'ozellikler' in l and l['ozellikler']:
+            ozellikler = l['ozellikler']
+        else:
+            ozellikler = " | ".join(ozellikler_liste) if ozellikler_liste else "(özellik bilgisi yok)"
         
-        ozellikler_text = " | ".join(ozellikler_ozet)
-        
-        # HTML oluştur - Kompakt format
+        # HTML oluştur - başlık kırpılmadan, tüm bilgiler dahil edilmiş
         ilan_html = (
             f"<li><strong>{i}. {baslik}</strong><br>"
             f"İlan No: {ilan_no} | Lokasyon: {lokasyon}<br>"
-            f"Fiyat: {fiyat} | {ozellikler_text}</li>"
+            f"Fiyat: {fiyat} | {ozellikler}</li>"
         )
         formatted_parts.append(ilan_html)
     
