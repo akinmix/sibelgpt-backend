@@ -295,35 +295,51 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
     if query_embedding is None:
         return []
     
+    all_results = []
+    
     try:
         # Önce orijinal ilanlar tablosunu sorgula
-        office_resp = supabase.rpc(
-            "match_listings",
-            {
-                "query_embedding": query_embedding,
-                "match_threshold": MATCH_THRESHOLD,
-                "match_count": MATCH_COUNT // 2  # Toplam sonuç sayısının yarısı
-            }
-        ).execute()
+        print("🔍 Kendi ilanlarımızı sorguluyoruz...")
+        try:
+            office_resp = supabase.rpc(
+                "match_listings",
+                {
+                    "query_embedding": query_embedding,
+                    "match_threshold": MATCH_THRESHOLD,
+                    "match_count": MATCH_COUNT // 2  # Toplam sonuç sayısının yarısı
+                }
+            ).execute()
+            
+            office_data = office_resp.data if hasattr(office_resp, "data") else []
+            print(f"✅ Kendi ilanlarımız sorgulandı: {len(office_data)} ilan bulundu")
+            all_results.extend(office_data)
+        except Exception as office_exc:
+            print(f"❌ Kendi ilanlarımız sorgulanırken hata: {office_exc}")
         
         # Sonra remax_ilanlar tablosunu sorgula
-        remax_resp = supabase.rpc(
-            "match_remax_listings",  # Bu fonksiyonu Supabase'de oluşturmalısınız
-            {
-                "query_embedding": query_embedding,
-                "match_threshold": MATCH_THRESHOLD,
-                "match_count": MATCH_COUNT // 2  # Toplam sonuç sayısının yarısı
-            }
-        ).execute()
+        print("🔍 Remax ilanlarını sorguluyoruz...")
+        try:
+            remax_resp = supabase.rpc(
+                "match_remax_listings",
+                {
+                    "query_embedding": query_embedding,
+                    "match_threshold": MATCH_THRESHOLD,
+                    "match_count": MATCH_COUNT // 2  # Toplam sonuç sayısının yarısı
+                }
+            ).execute()
+            
+            remax_data = remax_resp.data if hasattr(remax_resp, "data") else []
+            print(f"✅ Remax ilanları sorgulandı: {len(remax_data)} ilan bulundu")
+            all_results.extend(remax_data)
+        except Exception as remax_exc:
+            print(f"❌ Remax ilanları sorgulanırken hata: {remax_exc}")
+            print(f"❌ Hata detayı: {str(remax_exc)}")
         
-        # Sonuçları birleştir
-        office_data = office_resp.data if hasattr(office_resp, "data") else office_resp
-        remax_data = remax_resp.data if hasattr(remax_resp, "data") else remax_resp
+        print(f"📊 Toplam ilan sayısı: {len(all_results)}")
         
-        # Tüm sonuçları birleştir ve benzerlik puanına göre sırala
-        all_results = []
-        all_results.extend(office_data)
-        all_results.extend(remax_data)
+        if not all_results:
+            print("⚠️ Hiç ilan bulunamadı!")
+            return []
         
         # Benzerlik puanına göre sırala (en yüksek benzerlik önce)
         sorted_results = sorted(all_results, key=lambda x: x.get('similarity', 0), reverse=True)
@@ -332,9 +348,9 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
         return sorted_results[:MATCH_COUNT]
         
     except Exception as exc:
-        print("❌ Supabase RPC hatası:", exc)
-        print(f"Hata detayı: {str(exc)}")
-        return []
+        print("❌ Arama işleminde genel hata:", exc)
+        print(f"❌ Hata detayı: {str(exc)}")
+        return all_results  # Halihazırda alınmış sonuçları döndür
 # ── Formatlama Fonksiyonu ─────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     if not listings:
@@ -356,7 +372,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         # İlanlar tablosunda ilan_no sütununda
         if 'ilan_no' in l and l['ilan_no']:
             ilan_no = l['ilan_no']
-        # Remax_ilanlar tablosunda ilan_id sütununda
+        # Remax_ilanlar tablosunda ilan_id sütununda (bu sorguda ilan_no olarak dönecek)
         elif 'ilan_id' in l and l['ilan_id']:
             ilan_no = l['ilan_id']
         else:
