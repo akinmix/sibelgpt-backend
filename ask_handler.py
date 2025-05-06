@@ -292,91 +292,130 @@ async def get_embedding(text: str) -> Optional[List[float]]:
 # ── Supabase Sorgusu ───────────────────────────────────────
 async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict]:
     """Her iki tablodan da (ilanlar ve remax_ilanlar) ilanları arar ve birleştirir."""
+    print("\n" + "="*50)
+    print("🔎 ARAMA İŞLEMİ BAŞLADI")
+    print("="*50)
+    
     if query_embedding is None:
+        print("⚠️ Query embedding None - Arama yapılamaz")
         return []
     
     all_results = []
     
     try:
         # Önce orijinal ilanlar tablosunu sorgula
-        print("🔍 Kendi ilanlarımızı sorguluyoruz...")
+        print("\n🔍 Kendi ilanlarımızı sorguluyoruz...")
         try:
+            print(f"  ⚙️ Sorgu parametreleri: match_threshold = {MATCH_THRESHOLD}, match_count = {MATCH_COUNT // 2}")
+            
             office_resp = supabase.rpc(
                 "match_listings",
                 {
                     "query_embedding": query_embedding,
                     "match_threshold": MATCH_THRESHOLD,
-                    "match_count": MATCH_COUNT // 2  # Toplam sonuç sayısının yarısı
+                    "match_count": MATCH_COUNT // 2
                 }
             ).execute()
+            
+            print(f"  🔄 Sorgu yanıtı: {office_resp}")
             
             office_data = office_resp.data if hasattr(office_resp, "data") else []
             print(f"✅ Kendi ilanlarımız sorgulandı: {len(office_data)} ilan bulundu")
             
             # Detaylı log: Her bir ilanın başlığını yazdır
             for idx, ilan in enumerate(office_data):
-                print(f"  • Kendi ilan {idx+1}: {ilan.get('baslik', '(başlık yok)')}")
+                print(f"  • Kendi ilan {idx+1}: {ilan}")
             
             all_results.extend(office_data)
         except Exception as office_exc:
             print(f"❌ Kendi ilanlarımız sorgulanırken hata: {office_exc}")
+            print(f"❌ Hata tipi: {type(office_exc)}")
+            if hasattr(office_exc, '__dict__'):
+                print(f"❌ Hata detayları: {office_exc.__dict__}")
         
         # Sonra remax_ilanlar tablosunu sorgula
-        print("🔍 Remax ilanlarını sorguluyoruz...")
+        print("\n🔍 Remax ilanlarını sorguluyoruz...")
         try:
-            # Debug için sorgu bilgilerini yazdır
-            print(f"⚙️ Sorgu parametreleri: query_embedding = [VECTOR], match_threshold = {MATCH_THRESHOLD}, match_count = {MATCH_COUNT // 2}")
+            print(f"  ⚙️ Sorgu parametreleri: match_threshold = {MATCH_THRESHOLD}, match_count = {MATCH_COUNT // 2}")
             
             remax_resp = supabase.rpc(
                 "match_remax_listings",
                 {
                     "query_embedding": query_embedding,
                     "match_threshold": MATCH_THRESHOLD,
-                    "match_count": MATCH_COUNT // 2  # Toplam sonuç sayısının yarısı
+                    "match_count": MATCH_COUNT // 2
                 }
             ).execute()
+            
+            print(f"  🔄 Sorgu yanıtı: {remax_resp}")
             
             remax_data = remax_resp.data if hasattr(remax_resp, "data") else []
             print(f"✅ Remax ilanları sorgulandı: {len(remax_data)} ilan bulundu")
             
             # Detaylı log: Her bir Remax ilanının başlığını yazdır
             for idx, ilan in enumerate(remax_data):
-                print(f"  • Remax ilan {idx+1}: {ilan.get('baslik', '(başlık yok)')}")
+                print(f"  • Remax ilan {idx+1}: {ilan}")
             
             all_results.extend(remax_data)
         except Exception as remax_exc:
             print(f"❌ Remax ilanları sorgulanırken hata: {remax_exc}")
-            print(f"❌ Hata detayı: {str(remax_exc)}")
+            print(f"❌ Hata tipi: {type(remax_exc)}")
+            if hasattr(remax_exc, '__dict__'):
+                print(f"❌ Hata detayları: {remax_exc.__dict__}")
         
-        print(f"📊 Toplam ilan sayısı: {len(all_results)}")
+        print(f"\n📊 Toplam ilan sayısı: {len(all_results)}")
+        print(f"📊 Birleştirilmiş tüm sonuçlar: {all_results}")
         
         if not all_results:
             print("⚠️ Hiç ilan bulunamadı!")
             return []
         
         # Benzerlik puanına göre sırala (en yüksek benzerlik önce)
-        sorted_results = sorted(all_results, key=lambda x: x.get('similarity', 0), reverse=True)
-        print(f"🔢 Sıralanmış sonuç sayısı: {len(sorted_results)}")
-        
-        # Debug: İlk 5 sonucun benzerlik puanını yazdır
-        for idx, result in enumerate(sorted_results[:5]):
-            print(f"  • Sıralanmış sonuç {idx+1}: {result.get('baslik', '(başlık yok)')}, similarity: {result.get('similarity', 0)}")
-        
-        # En yüksek benzerliğe sahip MATCH_COUNT kadar sonucu döndür
-        final_results = sorted_results[:MATCH_COUNT]
-        print(f"🏁 Dönen toplam sonuç: {len(final_results)}")
-        
-        return final_results
+        try:
+            print("\n🔄 Sonuçlar benzerlik puanına göre sıralanıyor...")
+            sorted_results = sorted(all_results, key=lambda x: float(x.get('similarity', 0)), reverse=True)
+            print(f"🔢 Sıralanmış sonuç sayısı: {len(sorted_results)}")
+            
+            # Debug: Sıralanmış sonuçları yazdır
+            for idx, result in enumerate(sorted_results[:5]):
+                print(f"  • Sıralanmış sonuç {idx+1}: benzerlik={result.get('similarity', 0)}, başlık={result.get('baslik', '(başlık yok)')}")
+            
+            # En yüksek benzerliğe sahip MATCH_COUNT kadar sonucu döndür
+            final_results = sorted_results[:MATCH_COUNT]
+            print(f"🏁 Dönen toplam sonuç: {len(final_results)}")
+            
+            print("="*50)
+            print("🔎 ARAMA İŞLEMİ TAMAMLANDI")
+            print("="*50 + "\n")
+            
+            return final_results
+        except Exception as sort_exc:
+            print(f"❌ Sonuçlar sıralanırken hata: {sort_exc}")
+            print(f"❌ Hata tipi: {type(sort_exc)}")
+            # Sıralama hatası durumunda sırasız sonuçları döndür
+            return all_results[:MATCH_COUNT]
         
     except Exception as exc:
         print("❌ Arama işleminde genel hata:", exc)
-        print(f"❌ Hata detayı: {str(exc)}")
+        print(f"❌ Hata tipi: {type(exc)}")
+        if hasattr(exc, '__dict__'):
+            print(f"❌ Hata detayları: {exc.__dict__}")
+        
+        print("="*50)
+        print("🔎 ARAMA İŞLEMİ HATA İLE SONLANDI")
+        print("="*50 + "\n")
+        
         return all_results  # Halihazırda alınmış sonuçları döndür
 # ── Formatlama Fonksiyonu ─────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
+    """Listinglerden alınan ilanları formatlayarak HTML'e dönüştürür."""
     if not listings:
+        print("⚠️ Formatlanacak ilan bulunamadı, boş liste geldi")
         return "🔍 Uygun ilan bulunamadı."
 
+    print(f"📋 Toplam {len(listings)} adet ilan formatlanıyor")
+    print(f"📋 Listenin tam içeriği: {listings}")
+    
     try:
         locale.setlocale(locale.LC_ALL, 'tr_TR.UTF-8')
     except locale.Error:
@@ -387,49 +426,79 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
 
     formatted_parts = []
     for i, l in enumerate(listings, start=1):
+        # Her ilanın başlangıcında bir log mesajı
+        print(f"📄 İlan {i} formatlanıyor: {l}")
+        
         # İlan numarası belirleme - sadece belirli sütunlara bakıyoruz
         ilan_no = None
         
         # İlanlar tablosunda ilan_no sütununda
         if 'ilan_no' in l and l['ilan_no']:
             ilan_no = l['ilan_no']
-        # Remax_ilanlar tablosunda ilan_id sütununda (bu sorguda ilan_no olarak dönecek)
+            print(f"  • İlan No sütunundan: {ilan_no}")
+        # Remax_ilanlar tablosunda ilan_id sütununda
         elif 'ilan_id' in l and l['ilan_id']:
             ilan_no = l['ilan_id']
+            print(f"  • İlan ID sütunundan: {ilan_no}")
         else:
-            ilan_no = "(numara yok)"
+            ilan_no = str(i)  # Numarasız ilanlar için sıra numarasını kullan
+            print(f"  • İlan numarası bulunamadı, sıra numarası kullanılıyor: {ilan_no}")
         
-        # Başlık temizleme
-        baslik = re.sub(r"^\d+\.\s*", "", l.get("baslik", "(başlık yok)"))
+        # Başlık kontrolü ve temizleme
+        baslik = "(başlık yok)"
+        if 'baslik' in l and l['baslik']:
+            baslik = re.sub(r"^\d+\.\s*", "", l['baslik'])
+            print(f"  • Başlık: {baslik}")
         
-        lokasyon = l.get("lokasyon", "?")
-        fiyat_raw = l.get("fiyat")
-        ozellikler = l.get("ozellikler", "(özellik yok)")
+        # Lokasyon kontrolü
+        lokasyon = "?"
+        if 'lokasyon' in l and l['lokasyon']:
+            lokasyon = l['lokasyon']
+            print(f"  • Lokasyon: {lokasyon}")
+        
+        # Fiyat kontrolü ve formatlaması
         fiyat = "?"
-
-        try:
-            # Fiyat formatlaması
-            fiyat_num = float(str(fiyat_raw).replace('.', '').replace(',', '.'))
+        fiyat_raw = l.get("fiyat")
+        if fiyat_raw:
             try:
-                fiyat = locale.currency(fiyat_num, symbol='₺', grouping=True)
-                if fiyat.endswith('.00') or fiyat.endswith(',00'):
-                    fiyat = fiyat[:-3] + ' ₺'
-                else:
-                    fiyat = fiyat.replace('₺', '').strip() + ' ₺'
+                fiyat_num = float(str(fiyat_raw).replace('.', '').replace(',', '.'))
+                try:
+                    fiyat = locale.currency(fiyat_num, symbol='₺', grouping=True)
+                    if fiyat.endswith('.00') or fiyat.endswith(',00'):
+                        fiyat = fiyat[:-3] + ' ₺'
+                    else:
+                        fiyat = fiyat.replace('₺', '').strip() + ' ₺'
+                except:
+                    fiyat = f"{fiyat_num:,.0f} ₺".replace(',', '#').replace('.', ',').replace('#', '.')
             except:
-                fiyat = f"{fiyat_num:,.0f} ₺".replace(',', '#').replace('.', ',').replace('#', '.')
-        except:
-            fiyat = str(fiyat_raw) if fiyat_raw else "?"
+                fiyat = str(fiyat_raw)
+                print(f"  • Fiyat dönüşümünde hata, ham değer kullanılıyor: {fiyat}")
         
-        ilan_html = (
-            f"<li><strong>{i}. {baslik}</strong><br>"
-            f"&nbsp;&nbsp;&nbsp;&nbsp;• İlan No: {ilan_no}<br>"
-            f"&nbsp;&nbsp;&nbsp;&nbsp;• Lokasyon: {lokasyon}<br>"
-            f"&nbsp;&nbsp;&nbsp;&nbsp;• Fiyat: {fiyat}<br>"
-            f"&nbsp;&nbsp;&nbsp;&nbsp;• Özellikler: {ozellikler}</li><br>"
-        )
-        formatted_parts.append(ilan_html)
-
+        # Özellikler kontrolü
+        ozellikler = "(özellik yok)"
+        if 'ozellikler' in l and l['ozellikler']:
+            ozellikler = l['ozellikler']
+            print(f"  • Özellikler: {ozellikler}")
+        
+        # HTML oluşturma
+        try:
+            ilan_html = (
+                f"<li><strong>{i}. {baslik}</strong><br>"
+                f"&nbsp;&nbsp;&nbsp;&nbsp;• İlan No: {ilan_no}<br>"
+                f"&nbsp;&nbsp;&nbsp;&nbsp;• Lokasyon: {lokasyon}<br>"
+                f"&nbsp;&nbsp;&nbsp;&nbsp;• Fiyat: {fiyat}<br>"
+                f"&nbsp;&nbsp;&nbsp;&nbsp;• Özellikler: {ozellikler}</li><br>"
+            )
+            formatted_parts.append(ilan_html)
+            print(f"  ✅ İlan {i} başarıyla formatlandı")
+        except Exception as format_exc:
+            print(f"  ❌ İlan {i} formatlanırken hata: {format_exc}")
+    
+    print(f"✅ Toplam {len(formatted_parts)} adet ilan formatlandı")
+    
+    if not formatted_parts:
+        return "🔍 Uygun ilan bulunamadı."
+    
     final_output = "<ul>" + "\n".join(formatted_parts) + "</ul>"
     final_output += "<br>📞 Bu ilanlar hakkında daha fazla bilgi almak isterseniz: 532 687 84 64"
     return final_output
