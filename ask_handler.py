@@ -385,31 +385,12 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
             except:
                 fiyat = str(fiyat_raw)
         
-        # Özellikler - Kat bilgisini ayrı göster
-        ozellikler_text = ""
-        
-        # Oda sayısı
+        # Özellikler - Kat bilgisini başlıktan veya özelliklerden çıkarmaya çalış
         oda_sayisi = ""
-        if 'ozellikler' in l and l['ozellikler']:
-            ozellikler = l['ozellikler'].split('|')
-            for oz in ozellikler:
-                oz = oz.strip()
-                if "+" in oz and "m²" not in oz:  # Oda sayısı kontrolü
-                    oda_sayisi = oz
-                    break
-        
-        # Metrekare
         metrekare = ""
-        if 'ozellikler' in l and l['ozellikler']:
-            ozellikler = l['ozellikler'].split('|')
-            for oz in ozellikler:
-                oz = oz.strip()
-                if "m²" in oz:  # Metrekare kontrolü
-                    metrekare = oz
-                    break
-        
-        # Bulunduğu kat bilgisi
         kat_bilgisi = ""
+        
+        # 1. Bulundugu_kat alanından kat bilgisi çıkar
         if 'bulundugu_kat' in l and l['bulundugu_kat']:
             try:
                 # Ondalık sayıyı tam sayıya çevir (3.0 -> 3)
@@ -425,7 +406,41 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
                 else:
                     kat_bilgisi = f"{kat_no}. Kat"
             except:
+                # Metin olarak geldiyse direkt kullan
                 kat_bilgisi = str(l['bulundugu_kat'])
+        
+        # 2. Başlıktan kat bilgisi çıkarmayı dene
+        if not kat_bilgisi and 'baslik' in l and l['baslik']:
+            # "X. KAT" şeklinde kat bilgisi arama
+            kat_regex = r'(\d+)\.?\s*KAT'
+            kat_match = re.search(kat_regex, l['baslik'].upper())
+            if kat_match:
+                kat_bilgisi = f"{kat_match.group(1)}. Kat"
+            
+            # "XKAT" şeklinde kat bilgisi arama (arada boşluk olmadan)
+            elif "KAT" in l['baslik'].upper():
+                kat_regex2 = r'(\d+)\s*KAT'
+                kat_match2 = re.search(kat_regex2, l['baslik'].upper())
+                if kat_match2:
+                    kat_bilgisi = f"{kat_match2.group(1)}. Kat"
+        
+        # 3. Özelliklerden oda sayısı ve metrekare bilgisini çıkar
+        if 'ozellikler' in l and l['ozellikler']:
+            ozellikler = l['ozellikler'].split('|')
+            for oz in ozellikler:
+                oz = oz.strip()
+                # Oda sayısı
+                if "+" in oz and "m²" not in oz:
+                    oda_sayisi = oz
+                # Metrekare
+                elif "m²" in oz:
+                    metrekare = oz
+                # Kat bilgisi (eğer yukarıdaki yöntemlerle bulunamadıysa)
+                elif not kat_bilgisi and ("KAT" in oz.upper() or "kat" in oz.lower()):
+                    kat_regex = r'(\d+)\.?\s*[Kk]at'
+                    kat_match = re.search(kat_regex, oz)
+                    if kat_match:
+                        kat_bilgisi = f"{kat_match.group(1)}. Kat"
         
         # Özelliklerin özeti
         ozellikler_ozet = []
@@ -436,9 +451,24 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         if kat_bilgisi:
             ozellikler_ozet.append(kat_bilgisi)
         
+        # Eğer hiç kat bilgisi bulunamadıysa ve başlıkta "KAT" geçiyorsa
+        if not kat_bilgisi and 'baslik' in l and "KAT" in l['baslik'].upper():
+            if "ÇATI" in l['baslik'].upper():
+                kat_bilgisi = "Çatı Katı"
+                ozellikler_ozet.append(kat_bilgisi)
+            elif "GİRİŞ" in l['baslik'].upper():
+                kat_bilgisi = "Giriş Kat"
+                ozellikler_ozet.append(kat_bilgisi)
+            elif "BODRUM" in l['baslik'].upper():
+                kat_bilgisi = "Bodrum Kat"
+                ozellikler_ozet.append(kat_bilgisi)
+            elif "YÜKSEK" in l['baslik'].upper() or "TERAS" in l['baslik'].upper():
+                kat_bilgisi = "Üst Kat"
+                ozellikler_ozet.append(kat_bilgisi)
+        
         ozellikler_text = " | ".join(ozellikler_ozet)
         
-        # HTML oluştur - Çok daha kompakt format
+        # HTML oluştur - Kompakt format
         ilan_html = (
             f"<li><strong>{i}. {baslik}</strong><br>"
             f"İlan No: {ilan_no} | Lokasyon: {lokasyon}<br>"
