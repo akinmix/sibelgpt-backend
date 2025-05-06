@@ -323,7 +323,7 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
         return []
 # ── Formatlama Fonksiyonu ─────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
-    """İlanları formatlayarak HTML'e dönüştürür."""
+    """İlanları formatlayarak daha kompakt HTML'e dönüştürür."""
     if not listings:
         print("⚠️ Formatlanacak ilan bulunamadı")
         return "🔍 Uygun ilan bulunamadı."
@@ -338,86 +338,82 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         except locale.Error:
             pass
 
-    # Maksimum ilan sayısını sınırlama - fazla ilanlar SibelGPT yanıtına sığmayabilir
-    MAX_LISTINGS_TO_SHOW = 10
+    # Maksimum ilan sayısını sınırlama - SibelGPT yanıt sınırlamasına uygun
+    MAX_LISTINGS_TO_SHOW = 7  # 7'ye düşürüldü, ekranda tam görünmesi için
     listings_to_format = listings[:MAX_LISTINGS_TO_SHOW]
+    
+    # Önemli: Telefon numarasını en başta göster
+    final_output = "<p><strong>📞 Bu ilanlar hakkında bilgi almak için: 532 687 84 64</strong></p>"
+    
+    # Toplam ilan sayısı bilgisi ekle
+    total_count = len(listings)
+    shown_count = len(listings_to_format)
+    
+    if total_count > shown_count:
+        final_output += f"<p>Toplam {total_count} ilan bulundu, en alakalı {shown_count} tanesi gösteriliyor:</p>"
     
     formatted_parts = []
     for i, l in enumerate(listings_to_format, start=1):
         # İlan numarası belirleme
-        ilan_no = None
+        ilan_no = l.get('ilan_no', l.get('ilan_id', str(i)))
         
-        # İlanlar tablosunda ilan_no sütununda veya Remax tablosunda ilan_id sütununda
-        if 'ilan_no' in l and l['ilan_no']:
-            ilan_no = l['ilan_no']
-        elif 'ilan_id' in l and l['ilan_id']:
-            ilan_no = l['ilan_id']
-        else:
-            ilan_no = str(i)  # Numarasız ilanlar için sıra numarasını kullan
-        
-        # Başlık temizleme
+        # Başlık temizleme - daha kısa tutmak için başlığı kısaltıyoruz
         baslik = "(başlık yok)"
         if 'baslik' in l and l['baslik']:
             baslik = re.sub(r"^\d+\.\s*", "", l['baslik'])
+            # Başlığı 40 karakterle sınırla
+            if len(baslik) > 40:
+                baslik = baslik[:37] + "..."
         
-        # Lokasyon kontrolü
+        # Lokasyon - sadece mahalle adını al
         lokasyon = "?"
         if 'lokasyon' in l and l['lokasyon']:
-            lokasyon = l['lokasyon']
+            lokasyon_parts = l['lokasyon'].split('/')
+            # Sadece mahalle adını almaya çalış
+            if len(lokasyon_parts) >= 3:
+                lokasyon = lokasyon_parts[2].strip()  # Genelde 3. parça mahalle adı
+            else:
+                lokasyon = l['lokasyon']
         
-        # Fiyat formatlaması
+        # Fiyat formatlaması - daha kompakt
         fiyat = "?"
         fiyat_raw = l.get("fiyat")
         if fiyat_raw:
             try:
                 fiyat_num = float(str(fiyat_raw).replace('.', '').replace(',', '.'))
-                try:
-                    fiyat = locale.currency(fiyat_num, symbol='₺', grouping=True)
-                    if fiyat.endswith('.00') or fiyat.endswith(',00'):
-                        fiyat = fiyat[:-3] + ' ₺'
-                    else:
-                        fiyat = fiyat.replace('₺', '').strip() + ' ₺'
-                except:
-                    fiyat = f"{fiyat_num:,.0f} ₺".replace(',', '#').replace('.', ',').replace('#', '.')
+                fiyat = f"{fiyat_num:,.0f} ₺".replace(',', '.') 
             except:
                 fiyat = str(fiyat_raw)
         
-        # Özellikler
-        ozellikler = "(özellik yok)"
-        if 'ozellikler' in l and l['ozellikler']:
-            ozellikler = l['ozellikler']
+        # Özellikler - sadece önemli bilgileri al
+        ozellikler = l.get('ozellikler', '').split('|')
+        ozellikler_ozet = " | ".join([o.strip() for o in ozellikler if o.strip()])
         
-        # HTML oluştur - Her ilan için kompakt format
+        # HTML oluştur - Çok daha kompakt format
         ilan_html = (
             f"<li><strong>{i}. {baslik}</strong><br>"
-            f"&nbsp;&nbsp;&nbsp;&nbsp;• İlan No: {ilan_no}<br>"
-            f"&nbsp;&nbsp;&nbsp;&nbsp;• Lokasyon: {lokasyon}<br>"
-            f"&nbsp;&nbsp;&nbsp;&nbsp;• Fiyat: {fiyat}<br>"
-            f"&nbsp;&nbsp;&nbsp;&nbsp;• Özellikler: {ozellikler}</li><br>"
+            f"İlan No: {ilan_no} | Lokasyon: {lokasyon}<br>"
+            f"Fiyat: {fiyat} | {ozellikler_ozet}</li>"
         )
         formatted_parts.append(ilan_html)
     
-    print(f"✅ Toplam {len(formatted_parts)} adet ilan formatlandı")
+    print(f"✅ {len(formatted_parts)} adet ilan formatlandı")
     
     if not formatted_parts:
         return "🔍 Uygun ilan bulunamadı."
     
-    # Toplam ilan sayısı bilgisi ekle
-    total_count = len(listings)
-    shown_count = len(formatted_parts)
-    
-    if total_count > shown_count:
-        count_info = f"<p><strong>Not:</strong> Toplam {total_count} ilan bulundu, en alakalı {shown_count} tanesi gösteriliyor.</p>"
-    else:
-        count_info = ""
-    
-    # Final HTML çıktısı oluştur
-    final_output = "<ul>" + "\n".join(formatted_parts) + "</ul>"
-    final_output += count_info
-    # Telefon numarasını belirgin şekilde ekle ve yanıt sonunda olduğundan emin ol
-    final_output += "<p><strong>📞 Bu ilanlar hakkında daha fazla bilgi almak isterseniz: 532 687 84 64</strong></p>"
+    # Liste HTML'i ekle
+    final_output += "<ul>" + "\n".join(formatted_parts) + "</ul>"
     
     return final_output
+   
+      
+        
+       
+    
+    
+    
+    
 # ── Ana Fonksiyon ─────────────────────────────────────────
 async def answer_question(question: str, mode: str = "real-estate") -> str:
     """Kullanıcının sorusuna yanıt verir ve gerektiğinde başka modüle yönlendirir."""
