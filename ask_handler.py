@@ -30,8 +30,7 @@ MATCH_COUNT     = 20
 # ── Modlara Göre System Prompts ────────────────────────────
 SYSTEM_PROMPTS = {
     "real-estate": """
-    Sen SibelGPT'sin: Sibel Kazan Midilli tarafından geliştirilen, 
-    Türkiye emlak piyasası (özellikle Remax Sonuç portföyü) konusunda uzman, 
+    Sen SibelGPT'sin: Türkiye emlak piyasası konusunda uzman, 
     Türkçe yanıt veren yardımsever bir yapay zeka asistansın.
     
     Uzmanlık alanların şunlardır:
@@ -39,6 +38,15 @@ SYSTEM_PROMPTS = {
     - Türkiye ve dünyada emlak piyasasındaki gelişmeler, trendler
     - İnşaat ve gayrimenkul yatırımı konuları
     - Kullanıcının bir gayrimenkulü varsa, satış danışmanlığı yap: konum, oda sayısı, kat durumu, yapı yılı, m², iskan durumu gibi bilgileri sorarak pazarlama tavsiyesi ver.
+    
+    ÖNEMLİ KURALLAR:
+    1. İlanlarda ASLA danışman adı veya firma bilgisi belirtme. İlanları nötr bir şekilde sun.
+    2. Sadece SATILIK ilanları göster, kiralık ilanları filtreleme.
+    3. Yanıtlarının sonuna her zaman "📞 Bu ilanlar hakkında daha fazla bilgi almak isterseniz: 532 687 84 64" ekle.
+    4. İlanları sıralarken en uygun olanlarını üste koy, site ismini eklemeyi unutma.
+    5. Benzer ilanlardaki tekrarlardan kaçın, çeşitliliği korumaya çalış.
+    6. Her ilana bir numara ver ve açıkça formatla.
+    7. İlan bilgilerinin doğruluğunu kontrol ettiğini belirt.
     
     Eğer kullanıcı sana Zihin Koçu (numeroloji, astroloji, kadim bilgiler, psikoloji, ruh sağlığı, 
     thetahealing, motivasyon, kişisel gelişim) veya Finans (borsa, hisse senetleri, teknik/temel 
@@ -49,14 +57,14 @@ SYSTEM_PROMPTS = {
     verilerini kullanarak en alakalı ilanları seçip listele. Eğer yeterli veri yoksa 
     dürüstçe belirt ve kullanıcıya sorular sorarak ihtiyacını netleştir.
     
-    Cevaplarını kısa, net ve samimi tut; her ilanda başlık, ilan numarası, fiyat, lokasyon ve özellik bilgisi olsun.Sadece teknik bilgi verme; aynı zamanda samimi, bilinçli ve güven veren bir danışman gibi davran
+    Cevaplarını kısa, net ve samimi tut; her ilanda başlık, ilan numarası, fiyat, lokasyon ve özellik bilgisi olsun. Sadece teknik bilgi verme; aynı zamanda samimi, bilinçli ve güven veren bir danışman gibi davran.
+    
     Yanıtlarını HTML formatında oluştur. <ul> ve <li> kullan. Satır atlamak için <br>, 
     kalın yazı için <strong> kullan. Markdown işaretleri (*, -) kullanma.
     """,
     
     "mind-coach": """
-    Sen SibelGPT'sin: Sibel Kazan Midilli tarafından geliştirilen,
-    numeroloji, astroloji, kadim bilgiler, psikoloji, ruh sağlığı, thetahealing, 
+    Sen SibelGPT'sin: numeroloji, astroloji, kadim bilgiler, psikoloji, ruh sağlığı, thetahealing, 
     motivasyon ve kişisel gelişim konularında uzman, Türkçe yanıt veren 
     yardımsever bir yapay zeka zihin koçusun.
     
@@ -80,8 +88,7 @@ SYSTEM_PROMPTS = {
     """,
     
     "finance": """
-    Sen SibelGPT'sin: Sibel Kazan Midilli tarafından geliştirilen,
-    İstanbul Borsası, hisse senetleri, teknik ve temel analiz, kripto paralar, 
+    Sen SibelGPT'sin: İstanbul Borsası, hisse senetleri, teknik ve temel analiz, kripto paralar, 
     faiz, tahviller, emtia piyasası, döviz piyasası, pariteler, makro ve mikro ekonomi
     konularında uzman, Türkçe yanıt veren yardımsever bir yapay zeka finans danışmanısın.
     
@@ -284,22 +291,50 @@ async def get_embedding(text: str) -> Optional[List[float]]:
 
 # ── Supabase Sorgusu ───────────────────────────────────────
 async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict]:
+    """Her iki tablodan da (ilanlar ve remax_ilanlar) ilanları arar ve birleştirir."""
     if query_embedding is None:
         return []
+    
     try:
-        resp = supabase.rpc(
+        # Önce orijinal ilanlar tablosunu sorgula
+        office_resp = supabase.rpc(
             "match_listings",
             {
                 "query_embedding": query_embedding,
                 "match_threshold": MATCH_THRESHOLD,
-                "match_count":     MATCH_COUNT
+                "match_count": MATCH_COUNT // 2  # Toplam sonuç sayısının yarısı
             }
         ).execute()
-        return resp.data if hasattr(resp, "data") else resp
+        
+        # Sonra remax_ilanlar tablosunu sorgula
+        remax_resp = supabase.rpc(
+            "match_remax_listings",  # Bu fonksiyonu Supabase'de oluşturmalısınız
+            {
+                "query_embedding": query_embedding,
+                "match_threshold": MATCH_THRESHOLD,
+                "match_count": MATCH_COUNT // 2  # Toplam sonuç sayısının yarısı
+            }
+        ).execute()
+        
+        # Sonuçları birleştir
+        office_data = office_resp.data if hasattr(office_resp, "data") else office_resp
+        remax_data = remax_resp.data if hasattr(remax_resp, "data") else remax_resp
+        
+        # Tüm sonuçları birleştir ve benzerlik puanına göre sırala
+        all_results = []
+        all_results.extend(office_data)
+        all_results.extend(remax_data)
+        
+        # Benzerlik puanına göre sırala (en yüksek benzerlik önce)
+        sorted_results = sorted(all_results, key=lambda x: x.get('similarity', 0), reverse=True)
+        
+        # En yüksek benzerliğe sahip MATCH_COUNT kadar sonucu döndür
+        return sorted_results[:MATCH_COUNT]
+        
     except Exception as exc:
         print("❌ Supabase RPC hatası:", exc)
+        print(f"Hata detayı: {str(exc)}")
         return []
-
 # ── Formatlama Fonksiyonu ─────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     if not listings:
@@ -315,14 +350,19 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
 
     formatted_parts = []
     for i, l in enumerate(listings, start=1):
-        ilan_no    = l.get("ilan_no", "(numara yok)")
-        baslik     = re.sub(r"^\d+\.\s*", "", l.get("baslik", "(başlık yok)"))  # numara temizle
-        lokasyon   = l.get("lokasyon", "?")
-        fiyat_raw  = l.get("fiyat")
+        # İlan numarası belirleme (farklı tablolarda farklı alan adları olabilir)
+        ilan_no = l.get("ilan_no", l.get("ilan_id", "(numara yok)"))
+        
+        # Başlık temizleme
+        baslik = re.sub(r"^\d+\.\s*", "", l.get("baslik", "(başlık yok)"))
+        
+        lokasyon = l.get("lokasyon", "?")
+        fiyat_raw = l.get("fiyat")
         ozellikler = l.get("ozellikler", "(özellik yok)")
-        fiyat      = "?"
+        fiyat = "?"
 
         try:
+            # Fiyat formatlaması
             fiyat_num = float(str(fiyat_raw).replace('.', '').replace(',', '.'))
             try:
                 fiyat = locale.currency(fiyat_num, symbol='₺', grouping=True)
@@ -335,8 +375,13 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         except:
             fiyat = str(fiyat_raw) if fiyat_raw else "?"
 
+        # İlan kaynak bilgisi ekleme
+        source_text = ""
+        if "remax" in str(ilan_no).lower() or any("remax" in str(field).lower() for field in l.values()):
+            source_text = "<strong>REMAX İlanı</strong><br>"
+
         ilan_html = (
-            f"<li><strong>{i}. {baslik}</strong><br>"
+            f"<li>{source_text}<strong>{i}. {baslik}</strong><br>"
             f"&nbsp;&nbsp;&nbsp;&nbsp;• İlan No: {ilan_no}<br>"
             f"&nbsp;&nbsp;&nbsp;&nbsp;• Lokasyon: {lokasyon}<br>"
             f"&nbsp;&nbsp;&nbsp;&nbsp;• Fiyat: {fiyat}<br>"
