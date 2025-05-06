@@ -319,6 +319,9 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
         # Sonra remax_ilanlar tablosunu sorgula
         print("🔍 Remax ilanlarını sorguluyoruz...")
         try:
+            # Debug için sorgu bilgilerini yazdır
+            print(f"⚙️ Sorgu parametreleri: query_embedding = [VECTOR], match_threshold = {MATCH_THRESHOLD}, match_count = {MATCH_COUNT // 2}")
+            
             remax_resp = supabase.rpc(
                 "match_remax_listings",
                 {
@@ -334,6 +337,10 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
         except Exception as remax_exc:
             print(f"❌ Remax ilanları sorgulanırken hata: {remax_exc}")
             print(f"❌ Hata detayı: {str(remax_exc)}")
+            print(f"❌ Hata JSON: {remax_exc.__dict__ if hasattr(remax_exc, '__dict__') else 'Detay yok'}")
+            
+            # Yine de devam et, sadece mevcut sonuçları göster
+            print("⚠️ Remax ilanları eklenemedi, sadece kendi ilanlarımız gösterilecek")
         
         print(f"📊 Toplam ilan sayısı: {len(all_results)}")
         
