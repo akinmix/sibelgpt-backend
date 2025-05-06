@@ -406,14 +406,6 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     final_output += "<ul>" + "\n".join(formatted_parts) + "</ul>"
     
     return final_output
-   
-      
-        
-       
-    
-    
-    
-    
 # ── Ana Fonksiyon ─────────────────────────────────────────
 async def answer_question(question: str, mode: str = "real-estate") -> str:
     """Kullanıcının sorusuna yanıt verir ve gerektiğinde başka modüle yönlendirir."""
