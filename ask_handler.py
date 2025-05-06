@@ -24,7 +24,7 @@ supabase      = create_client(SB_URL, SB_KEY)
 
 # ── Ayarlar ────────────────────────────────────────────────
 EMBEDDING_MODEL = "text-embedding-3-small"
-MATCH_THRESHOLD = 0.65
+MATCH_THRESHOLD = 0.40   # 0.65'ten 0.4'e düşürüldü 
 MATCH_COUNT     = 20
 
 # ── Modlara Göre System Prompts ────────────────────────────
