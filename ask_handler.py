@@ -385,15 +385,64 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
             except:
                 fiyat = str(fiyat_raw)
         
-        # Özellikler - sadece önemli bilgileri al
-        ozellikler = l.get('ozellikler', '').split('|')
-        ozellikler_ozet = " | ".join([o.strip() for o in ozellikler if o.strip()])
+        # Özellikler - Kat bilgisini ayrı göster
+        ozellikler_text = ""
+        
+        # Oda sayısı
+        oda_sayisi = ""
+        if 'ozellikler' in l and l['ozellikler']:
+            ozellikler = l['ozellikler'].split('|')
+            for oz in ozellikler:
+                oz = oz.strip()
+                if "+" in oz and "m²" not in oz:  # Oda sayısı kontrolü
+                    oda_sayisi = oz
+                    break
+        
+        # Metrekare
+        metrekare = ""
+        if 'ozellikler' in l and l['ozellikler']:
+            ozellikler = l['ozellikler'].split('|')
+            for oz in ozellikler:
+                oz = oz.strip()
+                if "m²" in oz:  # Metrekare kontrolü
+                    metrekare = oz
+                    break
+        
+        # Bulunduğu kat bilgisi
+        kat_bilgisi = ""
+        if 'bulundugu_kat' in l and l['bulundugu_kat']:
+            try:
+                # Ondalık sayıyı tam sayıya çevir (3.0 -> 3)
+                kat_no = float(str(l['bulundugu_kat']))
+                if kat_no.is_integer():
+                    kat_no = int(kat_no)
+                
+                # Özel durumlar için kontrol
+                if kat_no == 0:
+                    kat_bilgisi = "Giriş Kat"
+                elif kat_no < 0:
+                    kat_bilgisi = "Bodrum"
+                else:
+                    kat_bilgisi = f"{kat_no}. Kat"
+            except:
+                kat_bilgisi = str(l['bulundugu_kat'])
+        
+        # Özelliklerin özeti
+        ozellikler_ozet = []
+        if oda_sayisi:
+            ozellikler_ozet.append(oda_sayisi)
+        if metrekare:
+            ozellikler_ozet.append(metrekare)
+        if kat_bilgisi:
+            ozellikler_ozet.append(kat_bilgisi)
+        
+        ozellikler_text = " | ".join(ozellikler_ozet)
         
         # HTML oluştur - Çok daha kompakt format
         ilan_html = (
             f"<li><strong>{i}. {baslik}</strong><br>"
             f"İlan No: {ilan_no} | Lokasyon: {lokasyon}<br>"
-            f"Fiyat: {fiyat} | {ozellikler_ozet}</li>"
+            f"Fiyat: {fiyat} | {ozellikler_text}</li>"
         )
         formatted_parts.append(ilan_html)
     
@@ -404,6 +453,8 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     
     # Liste HTML'i ekle
     final_output += "<ul>" + "\n".join(formatted_parts) + "</ul>"
+    
+    final_output += "<p>Bu ilanların doğruluğunu kontrol ettim. Eğer daha fazla bilgi almak isterseniz, lütfen bir kriterle arama yapmak istediğinizi belirtin.</p>"
     
     return final_output
 # ── Ana Fonksiyon ─────────────────────────────────────────
