@@ -24,7 +24,7 @@ supabase      = create_client(SB_URL, SB_KEY)
 
 # ── Ayarlar ────────────────────────────────────────────────
 EMBEDDING_MODEL = "text-embedding-3-small"
-MATCH_THRESHOLD = 0.40   # 0.65'ten 0.4'e düşürüldü 
+MATCH_THRESHOLD =  0.3  # Orta seviyede bir değer
 MATCH_COUNT     = 20
 
 # ── Modlara Göre System Prompts ────────────────────────────
@@ -312,6 +312,11 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
             
             office_data = office_resp.data if hasattr(office_resp, "data") else []
             print(f"✅ Kendi ilanlarımız sorgulandı: {len(office_data)} ilan bulundu")
+            
+            # Detaylı log: Her bir ilanın başlığını yazdır
+            for idx, ilan in enumerate(office_data):
+                print(f"  • Kendi ilan {idx+1}: {ilan.get('baslik', '(başlık yok)')}")
+            
             all_results.extend(office_data)
         except Exception as office_exc:
             print(f"❌ Kendi ilanlarımız sorgulanırken hata: {office_exc}")
@@ -333,14 +338,15 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
             
             remax_data = remax_resp.data if hasattr(remax_resp, "data") else []
             print(f"✅ Remax ilanları sorgulandı: {len(remax_data)} ilan bulundu")
+            
+            # Detaylı log: Her bir Remax ilanının başlığını yazdır
+            for idx, ilan in enumerate(remax_data):
+                print(f"  • Remax ilan {idx+1}: {ilan.get('baslik', '(başlık yok)')}")
+            
             all_results.extend(remax_data)
         except Exception as remax_exc:
             print(f"❌ Remax ilanları sorgulanırken hata: {remax_exc}")
             print(f"❌ Hata detayı: {str(remax_exc)}")
-            print(f"❌ Hata JSON: {remax_exc.__dict__ if hasattr(remax_exc, '__dict__') else 'Detay yok'}")
-            
-            # Yine de devam et, sadece mevcut sonuçları göster
-            print("⚠️ Remax ilanları eklenemedi, sadece kendi ilanlarımız gösterilecek")
         
         print(f"📊 Toplam ilan sayısı: {len(all_results)}")
         
@@ -350,9 +356,17 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
         
         # Benzerlik puanına göre sırala (en yüksek benzerlik önce)
         sorted_results = sorted(all_results, key=lambda x: x.get('similarity', 0), reverse=True)
+        print(f"🔢 Sıralanmış sonuç sayısı: {len(sorted_results)}")
+        
+        # Debug: İlk 5 sonucun benzerlik puanını yazdır
+        for idx, result in enumerate(sorted_results[:5]):
+            print(f"  • Sıralanmış sonuç {idx+1}: {result.get('baslik', '(başlık yok)')}, similarity: {result.get('similarity', 0)}")
         
         # En yüksek benzerliğe sahip MATCH_COUNT kadar sonucu döndür
-        return sorted_results[:MATCH_COUNT]
+        final_results = sorted_results[:MATCH_COUNT]
+        print(f"🏁 Dönen toplam sonuç: {len(final_results)}")
+        
+        return final_results
         
     except Exception as exc:
         print("❌ Arama işleminde genel hata:", exc)
