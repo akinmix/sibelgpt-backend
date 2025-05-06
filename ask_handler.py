@@ -350,8 +350,17 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
 
     formatted_parts = []
     for i, l in enumerate(listings, start=1):
-        # İlan numarası belirleme (farklı tablolarda farklı alan adları olabilir)
-        ilan_no = l.get("ilan_no", l.get("ilan_id", "(numara yok)"))
+        # İlan numarası belirleme - sadece belirli sütunlara bakıyoruz
+        ilan_no = None
+        
+        # İlanlar tablosunda ilan_no sütununda
+        if 'ilan_no' in l and l['ilan_no']:
+            ilan_no = l['ilan_no']
+        # Remax_ilanlar tablosunda ilan_id sütununda
+        elif 'ilan_id' in l and l['ilan_id']:
+            ilan_no = l['ilan_id']
+        else:
+            ilan_no = "(numara yok)"
         
         # Başlık temizleme
         baslik = re.sub(r"^\d+\.\s*", "", l.get("baslik", "(başlık yok)"))
@@ -374,14 +383,9 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
                 fiyat = f"{fiyat_num:,.0f} ₺".replace(',', '#').replace('.', ',').replace('#', '.')
         except:
             fiyat = str(fiyat_raw) if fiyat_raw else "?"
-
-        # İlan kaynak bilgisi ekleme
-        source_text = ""
-        if "remax" in str(ilan_no).lower() or any("remax" in str(field).lower() for field in l.values()):
-            source_text = "<strong>REMAX İlanı</strong><br>"
-
+        
         ilan_html = (
-            f"<li>{source_text}<strong>{i}. {baslik}</strong><br>"
+            f"<li><strong>{i}. {baslik}</strong><br>"
             f"&nbsp;&nbsp;&nbsp;&nbsp;• İlan No: {ilan_no}<br>"
             f"&nbsp;&nbsp;&nbsp;&nbsp;• Lokasyon: {lokasyon}<br>"
             f"&nbsp;&nbsp;&nbsp;&nbsp;• Fiyat: {fiyat}<br>"
@@ -392,7 +396,6 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     final_output = "<ul>" + "\n".join(formatted_parts) + "</ul>"
     final_output += "<br>📞 Bu ilanlar hakkında daha fazla bilgi almak isterseniz: 532 687 84 64"
     return final_output
-
 # ── Ana Fonksiyon ─────────────────────────────────────────
 async def answer_question(question: str, mode: str = "real-estate") -> str:
     """Kullanıcının sorusuna yanıt verir ve gerektiğinde başka modüle yönlendirir."""
