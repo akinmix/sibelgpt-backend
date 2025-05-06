@@ -291,121 +291,36 @@ async def get_embedding(text: str) -> Optional[List[float]]:
 
 # ── Supabase Sorgusu ───────────────────────────────────────
 async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict]:
-    """Her iki tablodan da (ilanlar ve remax_ilanlar) ilanları arar ve birleştirir."""
-    print("\n" + "="*50)
-    print("🔎 ARAMA İŞLEMİ BAŞLADI")
-    print("="*50)
-    
+    """Remax ilanlar tablosundan arama yapar."""
     if query_embedding is None:
-        print("⚠️ Query embedding None - Arama yapılamaz")
         return []
     
-    all_results = []
-    
     try:
-        # Önce orijinal ilanlar tablosunu sorgula
-        print("\n🔍 Kendi ilanlarımızı sorguluyoruz...")
-        try:
-            print(f"  ⚙️ Sorgu parametreleri: match_threshold = {MATCH_THRESHOLD}, match_count = {MATCH_COUNT // 2}")
-            
-            office_resp = supabase.rpc(
-                "match_listings",
-                {
-                    "query_embedding": query_embedding,
-                    "match_threshold": MATCH_THRESHOLD,
-                    "match_count": MATCH_COUNT // 2
-                }
-            ).execute()
-            
-            print(f"  🔄 Sorgu yanıtı: {office_resp}")
-            
-            office_data = office_resp.data if hasattr(office_resp, "data") else []
-            print(f"✅ Kendi ilanlarımız sorgulandı: {len(office_data)} ilan bulundu")
-            
-            # Detaylı log: Her bir ilanın başlığını yazdır
-            for idx, ilan in enumerate(office_data):
-                print(f"  • Kendi ilan {idx+1}: {ilan}")
-            
-            all_results.extend(office_data)
-        except Exception as office_exc:
-            print(f"❌ Kendi ilanlarımız sorgulanırken hata: {office_exc}")
-            print(f"❌ Hata tipi: {type(office_exc)}")
-            if hasattr(office_exc, '__dict__'):
-                print(f"❌ Hata detayları: {office_exc.__dict__}")
+        # Sadece remax_ilanlar tablosunu sorgula
+        print("🔍 İlanlar sorgulanıyor...")
         
-        # Sonra remax_ilanlar tablosunu sorgula
-        print("\n🔍 Remax ilanlarını sorguluyoruz...")
-        try:
-            print(f"  ⚙️ Sorgu parametreleri: match_threshold = {MATCH_THRESHOLD}, match_count = {MATCH_COUNT // 2}")
-            
-            remax_resp = supabase.rpc(
-                "match_remax_listings",
-                {
-                    "query_embedding": query_embedding,
-                    "match_threshold": MATCH_THRESHOLD,
-                    "match_count": MATCH_COUNT // 2
-                }
-            ).execute()
-            
-            print(f"  🔄 Sorgu yanıtı: {remax_resp}")
-            
-            remax_data = remax_resp.data if hasattr(remax_resp, "data") else []
-            print(f"✅ Remax ilanları sorgulandı: {len(remax_data)} ilan bulundu")
-            
-            # Detaylı log: Her bir Remax ilanının başlığını yazdır
-            for idx, ilan in enumerate(remax_data):
-                print(f"  • Remax ilan {idx+1}: {ilan}")
-            
-            all_results.extend(remax_data)
-        except Exception as remax_exc:
-            print(f"❌ Remax ilanları sorgulanırken hata: {remax_exc}")
-            print(f"❌ Hata tipi: {type(remax_exc)}")
-            if hasattr(remax_exc, '__dict__'):
-                print(f"❌ Hata detayları: {remax_exc.__dict__}")
+        resp = supabase.rpc(
+            "match_remax_listings",
+            {
+                "query_embedding": query_embedding,
+                "match_threshold": MATCH_THRESHOLD,
+                "match_count": MATCH_COUNT
+            }
+        ).execute()
         
-        print(f"\n📊 Toplam ilan sayısı: {len(all_results)}")
-        print(f"📊 Birleştirilmiş tüm sonuçlar: {all_results}")
+        results = resp.data if hasattr(resp, "data") else []
+        print(f"✅ İlanlar sorgulandı: {len(results)} ilan bulundu")
         
-        if not all_results:
+        if not results:
             print("⚠️ Hiç ilan bulunamadı!")
             return []
         
-        # Benzerlik puanına göre sırala (en yüksek benzerlik önce)
-        try:
-            print("\n🔄 Sonuçlar benzerlik puanına göre sıralanıyor...")
-            sorted_results = sorted(all_results, key=lambda x: float(x.get('similarity', 0)), reverse=True)
-            print(f"🔢 Sıralanmış sonuç sayısı: {len(sorted_results)}")
-            
-            # Debug: Sıralanmış sonuçları yazdır
-            for idx, result in enumerate(sorted_results[:5]):
-                print(f"  • Sıralanmış sonuç {idx+1}: benzerlik={result.get('similarity', 0)}, başlık={result.get('baslik', '(başlık yok)')}")
-            
-            # En yüksek benzerliğe sahip MATCH_COUNT kadar sonucu döndür
-            final_results = sorted_results[:MATCH_COUNT]
-            print(f"🏁 Dönen toplam sonuç: {len(final_results)}")
-            
-            print("="*50)
-            print("🔎 ARAMA İŞLEMİ TAMAMLANDI")
-            print("="*50 + "\n")
-            
-            return final_results
-        except Exception as sort_exc:
-            print(f"❌ Sonuçlar sıralanırken hata: {sort_exc}")
-            print(f"❌ Hata tipi: {type(sort_exc)}")
-            # Sıralama hatası durumunda sırasız sonuçları döndür
-            return all_results[:MATCH_COUNT]
+        return results
         
     except Exception as exc:
-        print("❌ Arama işleminde genel hata:", exc)
-        print(f"❌ Hata tipi: {type(exc)}")
-        if hasattr(exc, '__dict__'):
-            print(f"❌ Hata detayları: {exc.__dict__}")
-        
-        print("="*50)
-        print("🔎 ARAMA İŞLEMİ HATA İLE SONLANDI")
-        print("="*50 + "\n")
-        
-        return all_results  # Halihazırda alınmış sonuçları döndür
+        print("❌ Arama işleminde hata:", exc)
+        print(f"❌ Hata detayı: {str(exc)}")
+        return []
 # ── Formatlama Fonksiyonu ─────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     """Listinglerden alınan ilanları formatlayarak HTML'e dönüştürür."""
