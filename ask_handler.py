@@ -323,13 +323,12 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
         return []
 # ── Formatlama Fonksiyonu ─────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
-    """Listinglerden alınan ilanları formatlayarak HTML'e dönüştürür."""
+    """İlanları formatlayarak HTML'e dönüştürür."""
     if not listings:
-        print("⚠️ Formatlanacak ilan bulunamadı, boş liste geldi")
+        print("⚠️ Formatlanacak ilan bulunamadı")
         return "🔍 Uygun ilan bulunamadı."
 
     print(f"📋 Toplam {len(listings)} adet ilan formatlanıyor")
-    print(f"📋 Listenin tam içeriği: {listings}")
     
     try:
         locale.setlocale(locale.LC_ALL, 'tr_TR.UTF-8')
@@ -339,39 +338,34 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         except locale.Error:
             pass
 
+    # Maksimum ilan sayısını sınırlama - fazla ilanlar SibelGPT yanıtına sığmayabilir
+    MAX_LISTINGS_TO_SHOW = 10
+    listings_to_format = listings[:MAX_LISTINGS_TO_SHOW]
+    
     formatted_parts = []
-    for i, l in enumerate(listings, start=1):
-        # Her ilanın başlangıcında bir log mesajı
-        print(f"📄 İlan {i} formatlanıyor: {l}")
-        
-        # İlan numarası belirleme - sadece belirli sütunlara bakıyoruz
+    for i, l in enumerate(listings_to_format, start=1):
+        # İlan numarası belirleme
         ilan_no = None
         
-        # İlanlar tablosunda ilan_no sütununda
+        # İlanlar tablosunda ilan_no sütununda veya Remax tablosunda ilan_id sütununda
         if 'ilan_no' in l and l['ilan_no']:
             ilan_no = l['ilan_no']
-            print(f"  • İlan No sütunundan: {ilan_no}")
-        # Remax_ilanlar tablosunda ilan_id sütununda
         elif 'ilan_id' in l and l['ilan_id']:
             ilan_no = l['ilan_id']
-            print(f"  • İlan ID sütunundan: {ilan_no}")
         else:
             ilan_no = str(i)  # Numarasız ilanlar için sıra numarasını kullan
-            print(f"  • İlan numarası bulunamadı, sıra numarası kullanılıyor: {ilan_no}")
         
-        # Başlık kontrolü ve temizleme
+        # Başlık temizleme
         baslik = "(başlık yok)"
         if 'baslik' in l and l['baslik']:
             baslik = re.sub(r"^\d+\.\s*", "", l['baslik'])
-            print(f"  • Başlık: {baslik}")
         
         # Lokasyon kontrolü
         lokasyon = "?"
         if 'lokasyon' in l and l['lokasyon']:
             lokasyon = l['lokasyon']
-            print(f"  • Lokasyon: {lokasyon}")
         
-        # Fiyat kontrolü ve formatlaması
+        # Fiyat formatlaması
         fiyat = "?"
         fiyat_raw = l.get("fiyat")
         if fiyat_raw:
@@ -387,35 +381,42 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
                     fiyat = f"{fiyat_num:,.0f} ₺".replace(',', '#').replace('.', ',').replace('#', '.')
             except:
                 fiyat = str(fiyat_raw)
-                print(f"  • Fiyat dönüşümünde hata, ham değer kullanılıyor: {fiyat}")
         
-        # Özellikler kontrolü
+        # Özellikler
         ozellikler = "(özellik yok)"
         if 'ozellikler' in l and l['ozellikler']:
             ozellikler = l['ozellikler']
-            print(f"  • Özellikler: {ozellikler}")
         
-        # HTML oluşturma
-        try:
-            ilan_html = (
-                f"<li><strong>{i}. {baslik}</strong><br>"
-                f"&nbsp;&nbsp;&nbsp;&nbsp;• İlan No: {ilan_no}<br>"
-                f"&nbsp;&nbsp;&nbsp;&nbsp;• Lokasyon: {lokasyon}<br>"
-                f"&nbsp;&nbsp;&nbsp;&nbsp;• Fiyat: {fiyat}<br>"
-                f"&nbsp;&nbsp;&nbsp;&nbsp;• Özellikler: {ozellikler}</li><br>"
-            )
-            formatted_parts.append(ilan_html)
-            print(f"  ✅ İlan {i} başarıyla formatlandı")
-        except Exception as format_exc:
-            print(f"  ❌ İlan {i} formatlanırken hata: {format_exc}")
+        # HTML oluştur - Her ilan için kompakt format
+        ilan_html = (
+            f"<li><strong>{i}. {baslik}</strong><br>"
+            f"&nbsp;&nbsp;&nbsp;&nbsp;• İlan No: {ilan_no}<br>"
+            f"&nbsp;&nbsp;&nbsp;&nbsp;• Lokasyon: {lokasyon}<br>"
+            f"&nbsp;&nbsp;&nbsp;&nbsp;• Fiyat: {fiyat}<br>"
+            f"&nbsp;&nbsp;&nbsp;&nbsp;• Özellikler: {ozellikler}</li><br>"
+        )
+        formatted_parts.append(ilan_html)
     
     print(f"✅ Toplam {len(formatted_parts)} adet ilan formatlandı")
     
     if not formatted_parts:
         return "🔍 Uygun ilan bulunamadı."
     
+    # Toplam ilan sayısı bilgisi ekle
+    total_count = len(listings)
+    shown_count = len(formatted_parts)
+    
+    if total_count > shown_count:
+        count_info = f"<p><strong>Not:</strong> Toplam {total_count} ilan bulundu, en alakalı {shown_count} tanesi gösteriliyor.</p>"
+    else:
+        count_info = ""
+    
+    # Final HTML çıktısı oluştur
     final_output = "<ul>" + "\n".join(formatted_parts) + "</ul>"
-    final_output += "<br>📞 Bu ilanlar hakkında daha fazla bilgi almak isterseniz: 532 687 84 64"
+    final_output += count_info
+    # Telefon numarasını belirgin şekilde ekle ve yanıt sonunda olduğundan emin ol
+    final_output += "<p><strong>📞 Bu ilanlar hakkında daha fazla bilgi almak isterseniz: 532 687 84 64</strong></p>"
+    
     return final_output
 # ── Ana Fonksiyon ─────────────────────────────────────────
 async def answer_question(question: str, mode: str = "real-estate") -> str:
