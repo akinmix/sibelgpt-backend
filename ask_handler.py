@@ -324,6 +324,7 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
     except Exception as exc:
         print("❌ Arama işleminde hata:", exc)
         return []
+
 # ── Formatlama Fonksiyonu ─────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     """İlanları formatlayarak eksiksiz HTML'e dönüştürür."""
@@ -340,7 +341,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
             pass
 
     # Maksimum ilan sayısını sınırlama - SibelGPT yanıt sınırlamasına uygun
-    MAX_LISTINGS_TO_SHOW =  10 # Daha fazla ilan göstermek için artırıldı
+    MAX_LISTINGS_TO_SHOW = 10  # Daha fazla ilan göstermek için artırıldı
     listings_to_format = listings[:MAX_LISTINGS_TO_SHOW]
     
     # Önemli: Telefon numarasını en başta göster
@@ -387,28 +388,28 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         if metrekare:
             ozellikler_liste.append(f"{metrekare} m²")
         
-     # Kat bilgisi - bulundugu_kat alanından
-        # Kat bilgisi - bulundugu_kat alanından
-bulundugu_kat = l.get('bulundugu_kat')
-if bulundugu_kat is not None and bulundugu_kat != '':
-    try:
-        # Float olarak gelirse tamsayıya çevir (3.0 -> 3)
-        kat_no = float(bulundugu_kat)
-        
-        # Özel durumlar için kontrol
-        if kat_no == 0:
-            ozellikler_liste.append("Giriş Kat")
-        elif kat_no < 0:
-            ozellikler_liste.append("Bodrum")
-        else:
-            # Her zaman tam sayı olarak göster
-            kat_int = int(kat_no)
-            ozellikler_liste.append(f"{kat_int}. Kat")
-    except:
-        # Sayı olarak çevrilemezse olduğu gibi göster
-        ozellikler_liste.append(f"{bulundugu_kat}. Kat")
+        # Kat bilgisi - bulundugu_kat alanından (GÜNCELLENMIŞ)
+        bulundugu_kat = l.get('bulundugu_kat')
+        if bulundugu_kat is not None and bulundugu_kat != '':
+            try:
+                # Float olarak gelirse işle
+                kat_no = float(bulundugu_kat)
                 
-              
+                # Özel durumlar için kontrol
+                if kat_no == 0:
+                    ozellikler_liste.append("Giriş Kat")
+                elif kat_no < 0:
+                    ozellikler_liste.append("Bodrum Kat")  # "Bodrum Kat" olarak güncelledim ("Bodrum" yerine)
+                else:
+                    # Her zaman tam sayı olarak göster
+                    kat_int = int(kat_no)
+                    ozellikler_liste.append(f"{kat_int}. Kat")
+            except:
+                # Sayı olarak çevrilemezse olduğu gibi göster ama "Kat" ifadesini ekle
+                if "kat" not in str(bulundugu_kat).lower():
+                    ozellikler_liste.append(f"{bulundugu_kat}. Kat")
+                else:
+                    ozellikler_liste.append(f"{bulundugu_kat}")
         
         # Özellikler string'i - varsa alanı kullan, yoksa liste oluştur
         if 'ozellikler' in l and l['ozellikler']:
@@ -430,6 +431,7 @@ if bulundugu_kat is not None and bulundugu_kat != '':
     final_output += "<p>Bu ilanların doğruluğunu kontrol ettim. Eğer daha fazla bilgi almak isterseniz, lütfen bir kriterle arama yapmak istediğinizi belirtin.</p>"
     
     return final_output
+
 # ── Ana Fonksiyon ─────────────────────────────────────────
 async def answer_question(question: str, mode: str = "real-estate") -> str:
     """Kullanıcının sorusuna yanıt verir ve gerektiğinde başka modüle yönlendirir."""
