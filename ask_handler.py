@@ -326,6 +326,7 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
         return []
 
 # ── Formatlama Fonksiyonu ─────────────────────────────────
+# ── Formatlama Fonksiyonu ─────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     """İlanları formatlayarak eksiksiz HTML'e dönüştürür."""
     if not listings:
@@ -344,15 +345,14 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     MAX_LISTINGS_TO_SHOW = 10  # Daha fazla ilan göstermek için artırıldı
     listings_to_format = listings[:MAX_LISTINGS_TO_SHOW]
     
-    # Önemli: Telefon numarasını en başta göster
-    final_output = "<p><strong>📞 Bu ilanlar hakkında bilgi almak için: 532 687 84 64</strong></p>"
-    
-    # Toplam ilan sayısı bilgisi ekle
+    # Açıklayıcı mesaj ve telefon numarasını birleştir
     total_count = len(listings)
     shown_count = len(listings_to_format)
     
     if total_count > shown_count:
-        final_output += f"<p>Toplam {total_count} ilan bulundu, en alakalı {shown_count} tanesi gösteriliyor:</p>"
+        final_output = f"<p><strong>📞 Sorgunuzla ilgili toplam {total_count} ilan bulunmuştur. Size en uygun olan {shown_count} tanesi burada listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
+    else:
+        final_output = "<p><strong>📞 Sorgunuzla ilgili ilanlar burada listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
     
     formatted_parts = []
     for i, l in enumerate(listings_to_format, start=1):
@@ -443,10 +443,9 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     # Liste HTML'i ekle
     final_output += "<ul>" + "\n".join(formatted_parts) + "</ul>"
     
-    final_output += "<p>Bu ilanların doğruluğunu kontrol ettim. Eğer daha fazla bilgi almak isterseniz, lütfen bir kriterle arama yapmak istediğinizi belirtin.</p>"
+    final_output += "<p>Bu ilanların doğruluğunu kontrol ettim. Farklı bir arama yapmak isterseniz, lütfen kriterleri belirtiniz.</p>"
     
     return final_output
-
 # ── Ana Fonksiyon ─────────────────────────────────────────
 async def answer_question(question: str, mode: str = "real-estate") -> str:
     """Kullanıcının sorusuna yanıt verir ve gerektiğinde başka modüle yönlendirir."""
