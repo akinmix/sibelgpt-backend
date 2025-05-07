@@ -340,7 +340,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
             pass
 
     # Maksimum ilan sayısını sınırlama - SibelGPT yanıt sınırlamasına uygun
-    MAX_LISTINGS_TO_SHOW = 7  # 7'ye düşürüldü, ekranda tam görünmesi için
+    MAX_LISTINGS_TO_SHOW =  10 # Daha fazla ilan göstermek için artırıldı
     listings_to_format = listings[:MAX_LISTINGS_TO_SHOW]
     
     # Önemli: Telefon numarasını en başta göster
