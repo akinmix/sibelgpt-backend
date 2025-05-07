@@ -413,9 +413,25 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         
         # Özellikler string'i - varsa alanı kullan, yoksa liste oluştur
         if 'ozellikler' in l and l['ozellikler']:
-            ozellikler = l['ozellikler']
-        else:
-            ozellikler = " | ".join(ozellikler_liste) if ozellikler_liste else "(özellik bilgisi yok)"
+         ozellikler = l['ozellikler']
+    
+       # Tek başına sayı olan alanları bul ve "X. Kat" olarak değiştir
+    ozellikler_parts = ozellikler.split('|')
+        for i, part in enumerate(ozellikler_parts):
+        part = part.strip()
+        # Eğer bu kısım sadece bir sayı ise
+        if re.match(r'^\d+$', part):
+            kat_no = int(part)
+            if kat_no == 0:
+                ozellikler_parts[i] = "Giriş Kat"
+            elif kat_no < 0:
+                ozellikler_parts[i] = "Bodrum Kat"
+            else:
+                ozellikler_parts[i] = f"{kat_no}. Kat"
+    
+    ozellikler = " | ".join(ozellikler_parts)
+else:
+    ozellikler = " | ".join(ozellikler_liste) if ozellikler_liste else "(özellik bilgisi yok)"
         
         # HTML oluştur - başlık kırpılmadan, tüm bilgiler dahil edilmiş
         ilan_html = (
