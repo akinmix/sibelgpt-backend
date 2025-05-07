@@ -345,13 +345,11 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     MAX_LISTINGS_TO_SHOW = 10  # Daha fazla ilan göstermek için artırıldı
     listings_to_format = listings[:MAX_LISTINGS_TO_SHOW]
     
-    # Açıklayıcı mesaj ve telefon numarasını birleştir
+    # Toplam ve gösterilen ilan sayısını hesapla
     total_count = len(listings)
     shown_count = len(listings_to_format)
     
-    if total_count > shown_count:
-        final_output = f"<p><strong>📞 Sorgunuzla ilgili toplam {total_count} ilan bulunmuştur. Size en uygun olan {shown_count} tanesi burada listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
-    else:
+    # Açıklayıcı mesaj ve telefon numarasını birleştir
         final_output = "<p><strong>📞 Sorgunuzla ilgili ilanlar burada listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
     
     formatted_parts = []
