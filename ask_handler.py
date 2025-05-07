@@ -326,7 +326,6 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
         return []
 
 # ── Formatlama Fonksiyonu ─────────────────────────────────
-# ── Formatlama Fonksiyonu ─────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     """İlanları formatlayarak eksiksiz HTML'e dönüştürür."""
     if not listings:
@@ -350,7 +349,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     shown_count = len(listings_to_format)
     
     # Açıklayıcı mesaj ve telefon numarasını birleştir
-        final_output = "<p><strong>📞 Sorgunuzla ilgili ilanlar burada listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
+    final_output = "<p><strong>📞 Sorgunuzla ilgili ilanlar burada listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
     
     formatted_parts = []
     for i, l in enumerate(listings_to_format, start=1):
@@ -444,6 +443,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     final_output += "<p>Bu ilanların doğruluğunu kontrol ettim. Farklı bir arama yapmak isterseniz, lütfen kriterleri belirtiniz.</p>"
     
     return final_output
+
 # ── Ana Fonksiyon ─────────────────────────────────────────
 async def answer_question(question: str, mode: str = "real-estate") -> str:
     """Kullanıcının sorusuna yanıt verir ve gerektiğinde başka modüle yönlendirir."""
