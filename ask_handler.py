@@ -387,7 +387,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         if metrekare:
             ozellikler_liste.append(f"{metrekare} m²")
         
-        # Kat bilgisi - bulundugu_kat alanından
+     # Kat bilgisi - bulundugu_kat alanından
         bulundugu_kat = l.get('bulundugu_kat')
         if bulundugu_kat is not None and bulundugu_kat != '':
             try:
