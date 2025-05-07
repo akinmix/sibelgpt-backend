@@ -25,7 +25,7 @@ supabase      = create_client(SB_URL, SB_KEY)
 # ── Ayarlar ────────────────────────────────────────────────
 EMBEDDING_MODEL = "text-embedding-3-small"
 MATCH_THRESHOLD =  0.3  # Orta seviyede bir değer
-MATCH_COUNT     = 20
+MATCH_COUNT     =  50   # Maksimum 50 ilan ara, ama tümünü gösterme mecburiyeti yok
 
 # ── Modlara Göre System Prompts ────────────────────────────
 SYSTEM_PROMPTS = {
@@ -296,30 +296,33 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
         return []
     
     try:
-        # Sadece remax_ilanlar tablosunu sorgula
+        # İlanları sorgula
         print("🔍 İlanlar sorgulanıyor...")
         
-        resp = supabase.rpc(
+        response = supabase.rpc(
             "match_remax_listings",
             {
                 "query_embedding": query_embedding,
                 "match_threshold": MATCH_THRESHOLD,
-                "match_count": MATCH_COUNT
+                "match_count": MATCH_COUNT  # Maksimum sayı
             }
         ).execute()
         
-        results = resp.data if hasattr(resp, "data") else []
-        print(f"✅ İlanlar sorgulandı: {len(results)} ilan bulundu")
+        all_results = response.data if hasattr(response, "data") else []
         
-        if not results:
+        # Gerçek sonuç sayısını göster - benzerlik puanına göre filtreleme
+        valid_results = [r for r in all_results if r.get('similarity', 0) > MATCH_THRESHOLD]
+        
+        print(f"✅ İlanlar sorgulandı: Toplam {len(valid_results)} gerçek ilişkili ilan bulundu")
+        
+        if not valid_results:
             print("⚠️ Hiç ilan bulunamadı!")
             return []
         
-        return results
+        return valid_results
         
     except Exception as exc:
         print("❌ Arama işleminde hata:", exc)
-        print(f"❌ Hata detayı: {str(exc)}")
         return []
 # ── Formatlama Fonksiyonu ─────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
