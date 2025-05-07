@@ -4,7 +4,7 @@ import locale
 import re
 from typing import List, Dict, Optional
 from openai import AsyncOpenAI
- 
+
 try:
     from supabase import create_client
     from supabase.client import Client
@@ -388,22 +388,21 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         if metrekare:
             ozellikler_liste.append(f"{metrekare} m²")
         
-        # Kat bilgisi - bulundugu_kat alanından (GÜNCELLENMIŞ)
+        # Kat bilgisi - bulundugu_kat alanından
         bulundugu_kat = l.get('bulundugu_kat')
         if bulundugu_kat is not None and bulundugu_kat != '':
             try:
-                # Float olarak gelirse işle
-                kat_no = float(bulundugu_kat)
+                # Artık tam sayı olduğunu biliyoruz
+                kat_no = int(bulundugu_kat)
                 
                 # Özel durumlar için kontrol
                 if kat_no == 0:
                     ozellikler_liste.append("Giriş Kat")
                 elif kat_no < 0:
-                    ozellikler_liste.append("Bodrum Kat")  # "Bodrum Kat" olarak güncelledim ("Bodrum" yerine)
+                    ozellikler_liste.append("Bodrum Kat")
                 else:
-                    # Her zaman tam sayı olarak göster
-                    kat_int = int(kat_no)
-                    ozellikler_liste.append(f"{kat_int}. Kat")
+                    # Tam sayıya "Kat" kelimesini ekleyelim
+                    ozellikler_liste.append(f"{kat_no}. Kat")
             except:
                 # Sayı olarak çevrilemezse olduğu gibi göster ama "Kat" ifadesini ekle
                 if "kat" not in str(bulundugu_kat).lower():
@@ -413,25 +412,25 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         
         # Özellikler string'i - varsa alanı kullan, yoksa liste oluştur
         if 'ozellikler' in l and l['ozellikler']:
-         ozellikler = l['ozellikler']
-    
-       # Tek başına sayı olan alanları bul ve "X. Kat" olarak değiştir
-    ozellikler_parts = ozellikler.split('|')
-        for i, part in enumerate(ozellikler_parts):
-        part = part.strip()
-        # Eğer bu kısım sadece bir sayı ise
-        if re.match(r'^\d+$', part):
-            kat_no = int(part)
-            if kat_no == 0:
-                ozellikler_parts[i] = "Giriş Kat"
-            elif kat_no < 0:
-                ozellikler_parts[i] = "Bodrum Kat"
-            else:
-                ozellikler_parts[i] = f"{kat_no}. Kat"
-    
-    ozellikler = " | ".join(ozellikler_parts)
-else:
-    ozellikler = " | ".join(ozellikler_liste) if ozellikler_liste else "(özellik bilgisi yok)"
+            ozellikler = l['ozellikler']
+            
+            # Tek başına sayı olan alanları bul ve "X. Kat" olarak değiştir
+            ozellikler_parts = ozellikler.split('|')
+            for i, part in enumerate(ozellikler_parts):
+                part = part.strip()
+                # Eğer bu kısım sadece bir sayı ise
+                if re.match(r'^\d+$', part):
+                    kat_no = int(part)
+                    if kat_no == 0:
+                        ozellikler_parts[i] = "Giriş Kat"
+                    elif kat_no < 0:
+                        ozellikler_parts[i] = "Bodrum Kat"
+                    else:
+                        ozellikler_parts[i] = f"{kat_no}. Kat"
+            
+            ozellikler = " | ".join(ozellikler_parts)
+        else:
+            ozellikler = " | ".join(ozellikler_liste) if ozellikler_liste else "(özellik bilgisi yok)"
         
         # HTML oluştur - başlık kırpılmadan, tüm bilgiler dahil edilmiş
         ilan_html = (
