@@ -4,7 +4,7 @@ import locale
 import re
 from typing import List, Dict, Optional
 from openai import AsyncOpenAI
-
+ 
 try:
     from supabase import create_client
     from supabase.client import Client
