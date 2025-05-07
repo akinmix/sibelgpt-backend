@@ -388,24 +388,27 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
             ozellikler_liste.append(f"{metrekare} m²")
         
      # Kat bilgisi - bulundugu_kat alanından
-        bulundugu_kat = l.get('bulundugu_kat')
-        if bulundugu_kat is not None and bulundugu_kat != '':
-            try:
-                # Float olarak gelirse tamsayıya çevir (3.0 -> 3)
-                kat_no = float(bulundugu_kat)
-                if kat_no.is_integer():
-                    kat_no = int(kat_no)
+        # Kat bilgisi - bulundugu_kat alanından
+bulundugu_kat = l.get('bulundugu_kat')
+if bulundugu_kat is not None and bulundugu_kat != '':
+    try:
+        # Float olarak gelirse tamsayıya çevir (3.0 -> 3)
+        kat_no = float(bulundugu_kat)
+        
+        # Özel durumlar için kontrol
+        if kat_no == 0:
+            ozellikler_liste.append("Giriş Kat")
+        elif kat_no < 0:
+            ozellikler_liste.append("Bodrum")
+        else:
+            # Her zaman tam sayı olarak göster
+            kat_int = int(kat_no)
+            ozellikler_liste.append(f"{kat_int}. Kat")
+    except:
+        # Sayı olarak çevrilemezse olduğu gibi göster
+        ozellikler_liste.append(f"{bulundugu_kat}. Kat")
                 
-                # Özel durumlar için kontrol
-                if kat_no == 0:
-                    ozellikler_liste.append("Giriş Kat")
-                elif kat_no < 0:
-                    ozellikler_liste.append("Bodrum")
-                else:
-                    ozellikler_liste.append(f"{kat_no}. Kat")
-            except:
-                # Sayı olarak çevrilemezse olduğu gibi göster
-                ozellikler_liste.append(f"{bulundugu_kat}. Kat")
+              
         
         # Özellikler string'i - varsa alanı kullan, yoksa liste oluştur
         if 'ozellikler' in l and l['ozellikler']:
