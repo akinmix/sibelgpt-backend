@@ -50,7 +50,7 @@ SYSTEM_PROMPTS = {
     5. Her yanıtın üst kısmında <h3> başlık </h3> kullan ve soruya göre değiştir.
     6. Uzun metinleri paragraflar arasında <br> ekleyerek böl.
     7. Karşılaştırmalı bilgileri veya adım adım süreçleri <div style="background:#f8f9fa;padding:10px;border-left:4px solid #3498db;margin:10px 0;"> içerisinde göster.
-    8. Uyarıları <div style="background:#ffeaa7;padding:10px;border-left:4px solid #fdcb6e;margin:10px 0;"> içinde vurgula.
+    8. Uyarıları <div style="background:#f8d7da;padding:10px;border-left:4px solid #dc3545;margin:10px 0;"> <strong style="color:#721c24;">⚠️ ÖNEMLİ UYARI:</strong><p style="color:#721c24;margin-top:5px;">Uyarı metni buraya...</p></div> içinde vurgula.
 
     ÖNEMLİ KURALLAR:
     1. Kullanıcının gayrimenkul ile ilgili HER TÜR sorusuna kapsamlı yanıt ver. Asla "yardımcı olamıyorum" deme.
