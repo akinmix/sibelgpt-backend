@@ -127,8 +127,8 @@ async def get_dashboard_statistics(
         )
     
     try:
-        # Supabase RPC fonksiyonunu çağır
-        result = db_client.rpc('get_dashboard_statistics').execute()
+        # Supabase RPC fonksiyonunu çağır - boş parametre ile
+        result = db_client.rpc('get_dashboard_statistics', {}).execute()
         
         if result.data:
             print("✅ Dashboard istatistikleri başarıyla alındı")
