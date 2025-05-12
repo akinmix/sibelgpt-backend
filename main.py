@@ -196,7 +196,7 @@ async def get_dashboard_statistics(db_client = Depends(get_supabase_client)):
         print("🔄 Supabase RPC çağrısı: get_dashboard_")
         
         # NOT: params parametresi Supabase Python SDK'da zorunlu
-        result = db_client.rpc('get_dashboard_', params={}).execute()
+        result = db_client.rpc('get_dashboard_statistics', params={}).execute()
         
         print(f"✅ RPC yanıtı alındı: {type(result.data)}")
         
