@@ -8,6 +8,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from pathlib import Path
 from datetime import datetime
+import json
 
 # Import dosya hatalarını azaltmak için
 try:
@@ -56,11 +57,23 @@ async def startup_event():
     print("DEBUG: Startup event başlıyor.")
     supabase_url = os.environ.get("SUPABASE_URL")
     supabase_key = os.environ.get("SUPABASE_KEY")
+    
+    print(f"DEBUG: Supabase URL: {supabase_url[:20]}..." if supabase_url else "Supabase URL yok")
+    print(f"DEBUG: Supabase Key var mı: {bool(supabase_key)}")
+    
     # Basitleştirilmiş Supabase istemci yönetimi
     if SUPABASE_AVAILABLE and supabase_url and supabase_key:
         try:
             app.state.supabase_client = create_client(supabase_url, supabase_key)
             print("✅ Supabase istemcisi oluşturuldu")
+            
+            # Bağlantı testi
+            try:
+                test = app.state.supabase_client.table('remax_ilanlar').select('id').limit(1).execute()
+                print(f"✅ Supabase bağlantı testi başarılı")
+            except Exception as e:
+                print(f"⚠️ Supabase bağlantı testi hatası: {e}")
+                
         except Exception as e:
             print(f"❌ Supabase istemcisi oluşturulurken hata: {e}")
             app.state.supabase_client = None
@@ -132,20 +145,50 @@ async def get_dashboard_statistics(
     print("DEBUG: Dashboard istatistikleri istendi")
     
     if not db_client:
+        print("❌ Supabase istemcisi yok")
         return JSONResponse(
             status_code=500,
             content={"error": "Veritabanı bağlantısı yok"}
         )
     
     try:
-        # Supabase RPC fonksiyonunu çağır - boş parametre ile
-        result = db_client.rpc('get_dashboard_statistics', {}).execute()
+        # Doğru fonksiyon adıyla RPC çağrısı
+        print("DEBUG: Supabase RPC çağrılıyor: get_dashboard_")
+        result = db_client.rpc('get_dashboard_').execute()
+        
+        print(f"DEBUG: RPC ham sonucu: {result}")
+        print(f"DEBUG: RPC data: {result.data}")
+        print(f"DEBUG: RPC data tipi: {type(result.data)}")
         
         if result.data:
             print("✅ Dashboard istatistikleri başarıyla alındı")
+            
+            # JSON formatında dönen veriyi işle
+            json_data = result.data
+            
+            # Eğer data bir liste ise ilk elemanı al
+            if isinstance(json_data, list) and len(json_data) > 0:
+                json_data = json_data[0]
+                print(f"DEBUG: Liste içinden ilk eleman alındı")
+            
+            # Eğer string olarak JSON geliyorsa parse et
+            if isinstance(json_data, str):
+                try:
+                    json_data = json.loads(json_data)
+                    print(f"DEBUG: String JSON parse edildi")
+                except json.JSONDecodeError as e:
+                    print(f"❌ JSON parse hatası: {e}")
+                    return JSONResponse(
+                        status_code=500,
+                        content={"error": f"JSON parse hatası: {str(e)}"}
+                    )
+            
+            # Veriyi kontrol et
+            print(f"DEBUG: Final JSON data tipi: {type(json_data)}")
+            
             return {
                 "status": "success",
-                "statistics": result.data
+                "statistics": json_data
             }
         else:
             print("❌ Dashboard istatistikleri boş döndü")
@@ -156,9 +199,16 @@ async def get_dashboard_statistics(
             
     except Exception as e:
         print(f"❌ Dashboard istatistikleri alınırken hata: {e}")
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"❌ Traceback:\n{error_trace}")
+        
         return JSONResponse(
             status_code=500,
-            content={"error": str(e)}
+            content={
+                "error": str(e),
+                "details": error_trace
+            }
         )
 
 # ---- Basit Dashboard Test Endpoint ----
@@ -181,7 +231,7 @@ async def test_dashboard_statistics():
             "ilce_dagilimi": [
                 {"ilce": "Kadıköy", "ilan_sayisi": 405, "ortalama_fiyat": 19890138.27},
                 {"ilce": "Beylikdüzü", "ilan_sayisi": 304, "ortalama_fiyat": 8759901.32},
-                {"ilce": "Kartal", "ilan_sayisi": 290, "ortalama_fiyat": 8382693.1},
+                {"ilce": "Kartal", "ilan_sayisi": 290, "ortalama_fiyat": 8382693.10},
                 {"ilce": "Pendik", "ilan_sayisi": 273, "ortalama_fiyat": 7970626.37},
                 {"ilce": "Maltepe", "ilan_sayisi": 257, "ortalama_fiyat": 8779984.43}
             ],
