@@ -1,36 +1,39 @@
-# main.py - SibelGPT Backend (Dashboard özelliği ile)
+# main.py - SibelGPT Backend
 import os
-from fastapi import FastAPI, Depends, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel
-from typing import Optional
-from dotenv import load_dotenv
+import json
 from pathlib import Path
 from datetime import datetime
-import json
+from typing import Optional
 
-# Import dosya hatalarını azaltmak için
+from fastapi import FastAPI, Depends, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from dotenv import load_dotenv
+
+# Supabase import kontrolü
 try:
     from supabase import create_client
     from supabase.client import Client
-    SUPABASE_AVAILABLE = True 
-    print("DEBUG: supabase paketi başarıyla import edildi.")
+    SUPABASE_AVAILABLE = True
+    print("✅ Supabase paketi başarıyla import edildi.")
 except ImportError:
     SUPABASE_AVAILABLE = False
-    print("DEBUG: supabase paketi import edilemedi.")
+    print("❌ Supabase paketi import edilemedi.")
 
+# Ortam değişkenlerini yükle
 load_dotenv()
 
-# ---- Dahili modüller ----
+# Dahili modüller
 from image_handler import router as image_router
 import ask_handler
-import search_handler  # Web arama modülü importu
+import search_handler
 
 # ---- Modeller (Pydantic) ----
 class ChatRequest(BaseModel):
     question: str
-    mode: str = "real-estate"  # Varsayılan mod
+    mode: str = "real-estate"
 
 class WebSearchRequest(BaseModel):
     question: str
@@ -39,29 +42,44 @@ class WebSearchRequest(BaseModel):
 # ---- FastAPI Uygulaması ----
 app = FastAPI(
     title="SibelGPT Backend",
-    version="1.8.0", # Dashboard eklendi
+    version="1.8.0",
+    description="SibelGPT AI Assistant Backend API"
 )
 
 # ---- CORS Middleware ----
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Tüm originlere izin ver
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---- Lifespan Event ----
+# ---- Static Files (Dashboard için) ----
+if os.path.exists("public"):
+    app.mount("/static", StaticFiles(directory="public"), name="static")
+    print("✅ Static klasör mount edildi")
+else:
+    print("❌ 'public' klasörü bulunamadı")
+
+# ---- Startup Event ----
 @app.on_event("startup")
 async def startup_event():
-    print("DEBUG: Startup event başlıyor.")
-    supabase_url = os.environ.get("SUPABASE_URL")
-    supabase_key = os.environ.get("SUPABASE_KEY")
+    """Uygulama başlangıcında çalışır"""
+    print("\n=== SibelGPT Backend Başlatılıyor ===")
     
-    print(f"DEBUG: Supabase URL: {supabase_url[:20]}..." if supabase_url else "Supabase URL yok")
-    print(f"DEBUG: Supabase Key var mı: {bool(supabase_key)}")
+    # Ortam değişkenlerini kontrol et
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+    google_key = os.getenv("GOOGLE_API_KEY")
     
-    # Basitleştirilmiş Supabase istemci yönetimi
+    print(f"✓ Supabase URL: {'VAR' if supabase_url else 'YOK'}")
+    print(f"✓ Supabase Key: {'VAR' if supabase_key else 'YOK'}")
+    print(f"✓ OpenAI Key: {'VAR' if openai_key else 'YOK'}")
+    print(f"✓ Google Key: {'VAR' if google_key else 'YOK'}")
+    
+    # Supabase bağlantısını kur
     if SUPABASE_AVAILABLE and supabase_url and supabase_key:
         try:
             app.state.supabase_client = create_client(supabase_url, supabase_key)
@@ -69,232 +87,262 @@ async def startup_event():
             
             # Bağlantı testi
             try:
-                test = app.state.supabase_client.table('remax_ilanlar').select('id').limit(1).execute()
-                print(f"✅ Supabase bağlantı testi başarılı")
+                test_result = app.state.supabase_client.table('remax_ilanlar').select('id').limit(1).execute()
+                print("✅ Supabase bağlantı testi başarılı")
             except Exception as e:
                 print(f"⚠️ Supabase bağlantı testi hatası: {e}")
-                
         except Exception as e:
-            print(f"❌ Supabase istemcisi oluşturulurken hata: {e}")
+            print(f"❌ Supabase istemcisi oluşturulamadı: {e}")
             app.state.supabase_client = None
     else:
         app.state.supabase_client = None
-        print("⚠️ Supabase istemci oluşturulamadı: Paket veya ortam değişkenleri eksik")
+        print("⚠️ Supabase bağlantısı kurulamadı")
     
-    # Google API anahtarı kontrolü
-    if not os.environ.get("GOOGLE_API_KEY"):
-        print("⚠️ GOOGLE_API_KEY ortam değişkeni eksik - Web araması çalışmayabilir")
+    # Dosya yapısını kontrol et
+    print(f"\n📁 Çalışma dizini: {os.getcwd()}")
+    print(f"📁 Dosyalar: {os.listdir('.')}")
+    if os.path.exists('public'):
+        print(f"📁 Public klasörü: {os.listdir('public')}")
+    
+    print("=== Başlatma Tamamlandı ===\n")
 
-# ---- Supabase İstemcisini Sağlama ----
-async def get_supabase_client(request: Request):
+# ---- Dependency ----
+async def get_supabase_client(request: Request) -> Optional[Client]:
     """Supabase istemcisini döndürür"""
-    if hasattr(request.app.state, 'supabase_client'):
-        return request.app.state.supabase_client
-    return None
+    return getattr(request.app.state, 'supabase_client', None)
 
-# ---- ROUTE KAYDI ----
+# ---- Router Kaydı ----
 app.include_router(image_router, prefix="", tags=["image"])
 
 # ---- Ana Endpoint ----
 @app.get("/", tags=["meta"])
 async def root():
-    return {"status": "ok", "version": "1.8.0", "service": "SibelGPT Backend"}
+    """API ana endpoint"""
+    return {
+        "status": "ok",
+        "service": "SibelGPT Backend",
+        "version": "1.8.0",
+        "endpoints": {
+            "chat": "/chat",
+            "web_search": "/web-search",
+            "image": "/image",
+            "statistics": "/statistics/dashboard",
+            "dashboard": "/dashboard",
+            "health": "/health"
+        }
+    }
 
-# ---- Health Check Endpoint ----
+# ---- Health Check ----
 @app.get("/health", tags=["meta"])
 async def health_check(db_client = Depends(get_supabase_client)):
     """Servis sağlık kontrolü"""
-    health_status = {
+    return {
         "status": "healthy",
         "version": "1.8.0",
         "timestamp": datetime.now().isoformat(),
         "services": {
             "supabase": db_client is not None,
-            "openai": os.environ.get("OPENAI_API_KEY") is not None,
-            "google": os.environ.get("GOOGLE_API_KEY") is not None
+            "openai": bool(os.getenv("OPENAI_API_KEY")),
+            "google": bool(os.getenv("GOOGLE_API_KEY"))
         }
     }
-    return health_status
 
 # ---- Chat Endpoint ----
 @app.post("/chat", tags=["chat"])
-async def chat(
-    payload: ChatRequest,
-    db_client = Depends(get_supabase_client)
-):
-    print(f"DEBUG: /chat endpoint'ine istek alındı. Soru: {payload.question}")
-    print(f"DEBUG: İstek modu: {payload.mode}")
-    # Mode parametresini geçirerek düzeltildi
-    answer = await ask_handler.answer_question(payload.question, payload.mode)
-    return {"reply": answer}
+async def chat(payload: ChatRequest, db_client = Depends(get_supabase_client)):
+    """AI sohbet endpoint'i"""
+    print(f"📨 Chat isteği: {payload.question[:50]}... (mod: {payload.mode})")
+    
+    try:
+        answer = await ask_handler.answer_question(payload.question, payload.mode)
+        return {"reply": answer}
+    except Exception as e:
+        print(f"❌ Chat hatası: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Sohbet işleminde hata oluştu", "detail": str(e)}
+        )
 
 # ---- Web Araması Endpoint ----
 @app.post("/web-search", tags=["search"])
 async def web_search(payload: WebSearchRequest):
-    print(f"DEBUG: /web-search endpoint'ine istek alındı. Soru: {payload.question}")
-    print(f"DEBUG: İstek modu: {payload.mode}")
-    answer = await search_handler.web_search_answer(payload.question, payload.mode)
-    return {"reply": answer}
-
-# ---- Dashboard İstatistik Endpoint ----
-@app.get("/statistics/dashboard", tags=["statistics"])
-async def get_dashboard_statistics(
-    db_client = Depends(get_supabase_client)
-):
-    """Dashboard istatistiklerini döndürür"""
-    print("DEBUG: Dashboard istatistikleri istendi")
+    """Web araması endpoint'i"""
+    print(f"🔍 Web arama isteği: {payload.question[:50]}... (mod: {payload.mode})")
     
-    if not db_client:
-        print("❌ Supabase istemcisi yok")
+    try:
+        answer = await search_handler.web_search_answer(payload.question, payload.mode)
+        return {"reply": answer}
+    except Exception as e:
+        print(f"❌ Web arama hatası: {e}")
         return JSONResponse(
             status_code=500,
+            content={"error": "Web araması sırasında hata oluştu", "detail": str(e)}
+        )
+
+# ---- Dashboard İstatistikleri ----
+@app.get("/statistics/dashboard", tags=["statistics"])
+async def get_dashboard_statistics(db_client = Depends(get_supabase_client)):
+    """Dashboard istatistiklerini döndürür"""
+    print("📊 Dashboard istatistikleri istendi")
+    
+    if not db_client:
+        return JSONResponse(
+            status_code=503,
             content={"error": "Veritabanı bağlantısı yok"}
         )
     
     try:
-        # Doğru fonksiyon adıyla RPC çağrısı
-        print("DEBUG: Supabase RPC çağrılıyor: get_dashboard_")
-        result = db_client.rpc('get_dashboard_').execute()
+        # RPC fonksiyonunu çağır - params parametresi ile
+        print("🔄 Supabase RPC çağrısı: get_dashboard_")
         
-        print(f"DEBUG: RPC ham sonucu: {result}")
-        print(f"DEBUG: RPC data: {result.data}")
-        print(f"DEBUG: RPC data tipi: {type(result.data)}")
+        # NOT: params parametresi Supabase Python SDK'da zorunlu
+        result = db_client.rpc('get_dashboard_', params={}).execute()
+        
+        print(f"✅ RPC yanıtı alındı: {type(result.data)}")
         
         if result.data:
-            print("✅ Dashboard istatistikleri başarıyla alındı")
+            # Veri bir liste ise ilk elemanı al
+            data = result.data
+            if isinstance(data, list) and len(data) > 0:
+                data = data[0]
             
-            # JSON formatında dönen veriyi işle
-            json_data = result.data
-            
-            # Eğer data bir liste ise ilk elemanı al
-            if isinstance(json_data, list) and len(json_data) > 0:
-                json_data = json_data[0]
-                print(f"DEBUG: Liste içinden ilk eleman alındı")
-            
-            # Eğer string olarak JSON geliyorsa parse et
-            if isinstance(json_data, str):
+            # String JSON ise parse et
+            if isinstance(data, str):
                 try:
-                    json_data = json.loads(json_data)
-                    print(f"DEBUG: String JSON parse edildi")
-                except json.JSONDecodeError as e:
-                    print(f"❌ JSON parse hatası: {e}")
-                    return JSONResponse(
-                        status_code=500,
-                        content={"error": f"JSON parse hatası: {str(e)}"}
-                    )
-            
-            # Veriyi kontrol et
-            print(f"DEBUG: Final JSON data tipi: {type(json_data)}")
+                    data = json.loads(data)
+                except json.JSONDecodeError:
+                    pass
             
             return {
                 "status": "success",
-                "statistics": json_data
+                "statistics": data
             }
         else:
-            print("❌ Dashboard istatistikleri boş döndü")
             return JSONResponse(
                 status_code=404,
-                content={"error": "Veri alınamadı"}
+                content={"error": "Veri bulunamadı"}
             )
             
     except Exception as e:
-        print(f"❌ Dashboard istatistikleri alınırken hata: {e}")
+        print(f"❌ Dashboard istatistik hatası: {e}")
         import traceback
-        error_trace = traceback.format_exc()
-        print(f"❌ Traceback:\n{error_trace}")
+        print(traceback.format_exc())
         
         return JSONResponse(
             status_code=500,
             content={
-                "error": str(e),
-                "details": error_trace
+                "error": "İstatistikler alınırken hata oluştu",
+                "detail": str(e),
+                "type": type(e).__name__
             }
         )
 
-# ---- Basit Dashboard Test Endpoint ----
+# ---- Test İstatistikleri (Backup) ----
 @app.get("/statistics/test", tags=["statistics"])
-async def test_dashboard_statistics():
-    """Dashboard istatistikleri - Test versiyon"""
+async def test_statistics():
+    """Test amaçlı sabit istatistikler"""
     return {
         "status": "success",
         "statistics": {
             "genel_ozet": {
                 "toplam_ilan": 5047,
-                "fiyatli_ilan_sayisi": 5047,
                 "ortalama_fiyat": 13051170.53,
-                "min_fiyat": 12000.0,
-                "max_fiyat": 480000000.0,
-                "ilce_sayisi": 39,
-                "en_cok_ilan_ilce": "Kadıköy",
-                "en_cok_ilan_ilce_ort_fiyat": 19890138.27
+                "en_cok_ilan_ilce": "Kadıköy"
             },
             "ilce_dagilimi": [
                 {"ilce": "Kadıköy", "ilan_sayisi": 405, "ortalama_fiyat": 19890138.27},
-                {"ilce": "Beylikdüzü", "ilan_sayisi": 304, "ortalama_fiyat": 8759901.32},
-                {"ilce": "Kartal", "ilan_sayisi": 290, "ortalama_fiyat": 8382693.10},
-                {"ilce": "Pendik", "ilan_sayisi": 273, "ortalama_fiyat": 7970626.37},
-                {"ilce": "Maltepe", "ilan_sayisi": 257, "ortalama_fiyat": 8779984.43}
+                {"ilce": "Beylikdüzü", "ilan_sayisi": 304, "ortalama_fiyat": 8759901.32}
             ],
             "fiyat_dagilimi": [
                 {"aralik": "5-10M ₺", "ilan_sayisi": 1724, "yuzde": 34.16},
-                {"aralik": "0-5M ₺", "ilan_sayisi": 1528, "yuzde": 30.28},
-                {"aralik": "10-20M ₺", "ilan_sayisi": 1010, "yuzde": 20.01},
-                {"aralik": "20M+ ₺", "ilan_sayisi": 785, "yuzde": 15.55}
+                {"aralik": "0-5M ₺", "ilan_sayisi": 1528, "yuzde": 30.28}
             ],
             "oda_tipi_dagilimi": [
                 {"oda_sayisi": "3+1", "ilan_sayisi": 1668, "ortalama_fiyat": 10535730.51},
-                {"oda_sayisi": "2+1", "ilan_sayisi": 1574, "ortalama_fiyat": 6540311.82},
-                {"oda_sayisi": "4+1", "ilan_sayisi": 423, "ortalama_fiyat": 22123768.32},
-                {"oda_sayisi": "1+1", "ilan_sayisi": 373, "ortalama_fiyat": 5498733.24},
-                {"oda_sayisi": "5+1", "ilan_sayisi": 244, "ortalama_fiyat": 25459885.25}
+                {"oda_sayisi": "2+1", "ilan_sayisi": 1574, "ortalama_fiyat": 6540311.82}
             ]
         }
     }
 
-# ---- Dashboard HTML Sayfası ----
+# ---- Dashboard HTML ----
 @app.get("/dashboard", tags=["frontend"])
 async def serve_dashboard():
-    """Dashboard HTML sayfasını döndürür"""
-    dashboard_path = Path("public/dashboard.html")
+    """Dashboard HTML sayfasını serve eder"""
+    print("🖥️ Dashboard sayfası istendi")
     
-    print(f"DEBUG: Dashboard dosya yolu: {dashboard_path}")
-    print(f"DEBUG: Dosya var mı: {dashboard_path.exists()}")
+    # Farklı yolları dene
+    possible_paths = [
+        "public/dashboard.html",
+        "./public/dashboard.html",
+        Path("public") / "dashboard.html",
+        Path(".") / "public" / "dashboard.html"
+    ]
     
-    if dashboard_path.exists():
-        return FileResponse(
-            dashboard_path,
-            media_type="text/html",
-            headers={
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0"
-            }
-        )
-    else:
-        return JSONResponse(
-            status_code=404,
-            content={
-                "error": "Dashboard sayfası bulunamadı", 
-                "path": str(dashboard_path.absolute())
-            }
-        )
+    for path in possible_paths:
+        if os.path.exists(path):
+            print(f"✅ Dashboard bulundu: {path}")
+            return FileResponse(path, media_type="text/html")
+    
+    # Static mount üzerinden dene
+    if os.path.exists("public/dashboard.html"):
+        print("✅ Dashboard static üzerinden yönlendiriliyor")
+        return RedirectResponse(url="/static/dashboard.html")
+    
+    # Dosya bulunamadı - detaylı hata bilgisi
+    current_dir = os.getcwd()
+    files_in_root = os.listdir(current_dir)
+    
+    public_info = {
+        "exists": os.path.exists("public"),
+        "files": os.listdir("public") if os.path.exists("public") else []
+    }
+    
+    return JSONResponse(
+        status_code=404,
+        content={
+            "error": "Dashboard sayfası bulunamadı",
+            "current_directory": current_dir,
+            "root_files": files_in_root,
+            "public_directory": public_info,
+            "tried_paths": [str(p) for p in possible_paths]
+        }
+    )
 
 # ---- Error Handlers ----
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
+    """404 hatası için özel handler"""
     return JSONResponse(
         status_code=404,
-        content={"error": "Endpoint bulunamadı", "path": str(request.url.path)}
+        content={
+            "error": "Sayfa bulunamadı",
+            "path": str(request.url.path),
+            "available_endpoints": [
+                "/", "/health", "/chat", "/web-search", 
+                "/image", "/statistics/dashboard", "/dashboard"
+            ]
+        }
     )
 
 @app.exception_handler(500)
-async def internal_error_handler(request, exc):
+async def server_error_handler(request, exc):
+    """500 hatası için özel handler"""
     return JSONResponse(
         status_code=500,
-        content={"error": "Sunucu hatası", "detail": str(exc)}
+        content={
+            "error": "Sunucu hatası",
+            "detail": str(exc),
+            "type": type(exc).__name__
+        }
     )
 
-# ---- Main Çalıştırma ----
+# ---- Ana Program ----
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=10000, reload=True)
+    print("🚀 SibelGPT Backend başlatılıyor...")
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=int(os.getenv("PORT", 10000)),
+        reload=True
+    )
