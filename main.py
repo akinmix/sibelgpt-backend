@@ -1,4 +1,4 @@
-# main.py (Düzeltilmiş ve Güncellenmiş Versiyon)
+# main.py - SibelGPT Backend (Dashboard özelliği ile)
 import os
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing import Optional
 from dotenv import load_dotenv
 from pathlib import Path
+from datetime import datetime
 
 # Import dosya hatalarını azaltmak için
 try:
@@ -43,15 +44,9 @@ app = FastAPI(
 # ---- CORS Middleware ----
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://www.sibelgpt.com", 
-        "https://sibelgpt.com", 
-        "http://localhost:3000",
-        "http://localhost:8000",
-        "http://localhost:10000",  # Dashboard için
-        "*"  # Development için - production'da kaldırın
-    ],
-    allow_methods=["GET", "POST", "OPTIONS", "*"],
+    allow_origins=["*"],  # Tüm originlere izin ver
+    allow_credentials=True,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -91,6 +86,22 @@ app.include_router(image_router, prefix="", tags=["image"])
 @app.get("/", tags=["meta"])
 async def root():
     return {"status": "ok", "version": "1.8.0", "service": "SibelGPT Backend"}
+
+# ---- Health Check Endpoint ----
+@app.get("/health", tags=["meta"])
+async def health_check(db_client = Depends(get_supabase_client)):
+    """Servis sağlık kontrolü"""
+    health_status = {
+        "status": "healthy",
+        "version": "1.8.0",
+        "timestamp": datetime.now().isoformat(),
+        "services": {
+            "supabase": db_client is not None,
+            "openai": os.environ.get("OPENAI_API_KEY") is not None,
+            "google": os.environ.get("GOOGLE_API_KEY") is not None
+        }
+    }
+    return health_status
 
 # ---- Chat Endpoint ----
 @app.post("/chat", tags=["chat"])
@@ -150,6 +161,46 @@ async def get_dashboard_statistics(
             content={"error": str(e)}
         )
 
+# ---- Basit Dashboard Test Endpoint ----
+@app.get("/statistics/test", tags=["statistics"])
+async def test_dashboard_statistics():
+    """Dashboard istatistikleri - Test versiyon"""
+    return {
+        "status": "success",
+        "statistics": {
+            "genel_ozet": {
+                "toplam_ilan": 5047,
+                "fiyatli_ilan_sayisi": 5047,
+                "ortalama_fiyat": 13051170.53,
+                "min_fiyat": 12000.0,
+                "max_fiyat": 480000000.0,
+                "ilce_sayisi": 39,
+                "en_cok_ilan_ilce": "Kadıköy",
+                "en_cok_ilan_ilce_ort_fiyat": 19890138.27
+            },
+            "ilce_dagilimi": [
+                {"ilce": "Kadıköy", "ilan_sayisi": 405, "ortalama_fiyat": 19890138.27},
+                {"ilce": "Beylikdüzü", "ilan_sayisi": 304, "ortalama_fiyat": 8759901.32},
+                {"ilce": "Kartal", "ilan_sayisi": 290, "ortalama_fiyat": 8382693.1},
+                {"ilce": "Pendik", "ilan_sayisi": 273, "ortalama_fiyat": 7970626.37},
+                {"ilce": "Maltepe", "ilan_sayisi": 257, "ortalama_fiyat": 8779984.43}
+            ],
+            "fiyat_dagilimi": [
+                {"aralik": "5-10M ₺", "ilan_sayisi": 1724, "yuzde": 34.16},
+                {"aralik": "0-5M ₺", "ilan_sayisi": 1528, "yuzde": 30.28},
+                {"aralik": "10-20M ₺", "ilan_sayisi": 1010, "yuzde": 20.01},
+                {"aralik": "20M+ ₺", "ilan_sayisi": 785, "yuzde": 15.55}
+            ],
+            "oda_tipi_dagilimi": [
+                {"oda_sayisi": "3+1", "ilan_sayisi": 1668, "ortalama_fiyat": 10535730.51},
+                {"oda_sayisi": "2+1", "ilan_sayisi": 1574, "ortalama_fiyat": 6540311.82},
+                {"oda_sayisi": "4+1", "ilan_sayisi": 423, "ortalama_fiyat": 22123768.32},
+                {"oda_sayisi": "1+1", "ilan_sayisi": 373, "ortalama_fiyat": 5498733.24},
+                {"oda_sayisi": "5+1", "ilan_sayisi": 244, "ortalama_fiyat": 25459885.25}
+            ]
+        }
+    }
+
 # ---- Dashboard HTML Sayfası ----
 @app.get("/dashboard", tags=["frontend"])
 async def serve_dashboard():
@@ -177,21 +228,6 @@ async def serve_dashboard():
                 "path": str(dashboard_path.absolute())
             }
         )
-
-# ---- Health Check Endpoint ----
-@app.get("/health", tags=["meta"])
-async def health_check(db_client = Depends(get_supabase_client)):
-    """Servis sağlık kontrolü"""
-    health_status = {
-        "status": "healthy",
-        "version": "1.8.0",
-        "services": {
-            "supabase": db_client is not None,
-            "openai": os.environ.get("OPENAI_API_KEY") is not None,
-            "google": os.environ.get("GOOGLE_API_KEY") is not None
-        }
-    }
-    return health_status
 
 # ---- Error Handlers ----
 @app.exception_handler(404)
