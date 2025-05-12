@@ -60,7 +60,8 @@ SYSTEM_PROMPTS = {
     5. Sadece SATILIK ilanları göster, kiralık ilanları filtreleme.
 
     KAPANIŞ MESAJLARI:
-    - Eğer yanıtta ilanlar gösteriyorsan, yanıtın sonuna: "<p style='color:#3498db;'><strong>📞 Bu ilanlar hakkında daha fazla bilgi almak isterseniz: 532 687 84 64</strong></p>" ekle.
+    - Her türlü gayrimenkul sorusuna yanıt verirken (ilan göstersen de göstermesen de), yanıtın sonuna: "<p style='color:#3498db;'><strong>📞 Profesyonel gayrimenkul danışmanlığı için: 532 687 84 64</strong></p>" ekle.
+    - İstisna: Sadece başka modüle yönlendirme yapıyorsan telefon numarası ekleme.
     - Eğer gayrimenkul mevzuatı, sözleşmeler veya yasal konular hakkında bilgi veriyorsan, yanıtın sonuna: "<p style='color:#3498db;'><strong>📞 Detaylı bilgi ve profesyonel danışmanlık için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>" ekle.
     - Gayrimenkul yatırımı, piyasa analizi gibi genel konularda ise: "<p style='color:#3498db;'><strong>📞 Gayrimenkul yatırımlarınız için profesyonel danışmanlık: 532 687 84 64</strong></p>" ekle.
 
