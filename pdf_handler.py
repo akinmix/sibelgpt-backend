@@ -1,4 +1,4 @@
-# pdf_handler.py - REMAX İlanlarından PDF Oluşturma (Fotoğraflı)
+# pdf_handler.py - REMAX İlanlarından PDF Oluşturma (Fotoğraflı + Debug)
 import os
 import httpx
 import io
@@ -65,6 +65,8 @@ def parse_property_data(firecrawl_data: Dict) -> Dict:
     content = firecrawl_data.get("data", {}).get("markdown", "")
     links = firecrawl_data.get("data", {}).get("links", [])
     
+    print(f"DEBUG: Toplam link sayısı: {len(links)}")  # Debug
+    
     # Başlık
     lines = content.split("\n")
     title = ""
@@ -108,13 +110,16 @@ def parse_property_data(firecrawl_data: Dict) -> Dict:
     image_urls = []
     for link in links:
         if "i.remax.com.tr/photos" in link and (link.endswith('.jpg') or link.endswith('.png')):
+            print(f"DEBUG: Fotoğraf URL bulundu: {link}")  # Debug
             # Thumbnail'ları (T/) orjinal (L/) ile değiştir
             if '/T/' in link:
                 link = link.replace('/T/', '/L/')
+                print(f"DEBUG: URL dönüştürüldü: {link}")  # Debug
             image_urls.append(link)
     
     # Tekrarlı URL'leri kaldır ve ilk 12'yi al
     unique_images = list(dict.fromkeys(image_urls))[:12]
+    print(f"DEBUG: Toplam {len(unique_images)} benzersiz fotoğraf bulundu")  # Debug
     
     return {
         'title': title,
@@ -127,17 +132,19 @@ def parse_property_data(firecrawl_data: Dict) -> Dict:
 
 async def download_image(url: str) -> Optional[bytes]:
     """Fotoğrafı indirir ve bytes olarak döndürür"""
+    print(f"DEBUG: Fotoğraf indiriliyor: {url}")  # Debug log
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:  # Timeout'u artırdım
             response = await client.get(url)
             response.raise_for_status()
+            print(f"DEBUG: Fotoğraf başarıyla indirildi: {len(response.content)} bytes")
             return response.content
     except Exception as e:
-        print(f"Fotoğraf indirme hatası: {e}")
+        print(f"HATA: Fotoğraf indirme hatası - URL: {url}, Hata: {e}")
         return None
 
 def create_pdf(property_data: Dict) -> bytes:
-    """Parse edilmiş veriden PDF oluşturur"""
+    """Parse edilmiş veriden PDF oluşturur (fotoğrafsız)"""
     
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -159,7 +166,7 @@ def create_pdf(property_data: Dict) -> bytes:
     
     c.setFillColor('white')
     c.setFont("Helvetica-Bold", 24)
-    c.drawString(50, height-50, clean_turkish_chars("SİBEL KAZAN MİDİLLİ"))
+    c.drawString(50, height-50, clean_turkish_chars("Sibel Kazan Midilli"))
     c.setFont("Helvetica", 14)
     c.drawString(50, height-70, clean_turkish_chars("REMAX SONUÇ | Gayrimenkul Danışmanı"))
     
@@ -270,7 +277,7 @@ def create_pdf(property_data: Dict) -> bytes:
     c.rect(0, height-60, width, 60, fill=1)
     c.setFillColor('white')
     c.setFont("Helvetica-Bold", 18)
-    c.drawString(50, height-40, clean_turkish_chars("FOTOĞRAFLAR"))
+    c.drawString(50, height-40, clean_turkish_chars("FOTOGRAFLAR"))
     
     # Fotoğrafları yerleştir - sadece ilk 4 tanesi
     if property_data.get('images'):
@@ -321,15 +328,22 @@ def create_pdf(property_data: Dict) -> bytes:
 async def create_pdf_with_images(property_data: Dict) -> bytes:
     """Parse edilmiş veriden fotoğraflı PDF oluşturur"""
     
+    print(f"DEBUG: PDF oluşturma başlıyor, {len(property_data.get('images', []))} fotoğraf var")  # Debug
+    
     # Önce fotoğrafları indirelim
     downloaded_images = []
     if property_data.get('images'):
         for i, img_url in enumerate(property_data['images'][:4]):  # İlk 4 fotoğraf
+            print(f"DEBUG: Fotoğraf {i+1} indiriliyor: {img_url}")  # Debug
             img_data = await download_image(img_url)
             if img_data:
+                print(f"DEBUG: Fotoğraf {i+1} başarıyla indirildi: {len(img_data)} bytes")  # Debug
                 downloaded_images.append(img_data)
             else:
+                print(f"DEBUG: Fotoğraf {i+1} indirilemedi")  # Debug
                 downloaded_images.append(None)  # Placeholder için
+    else:
+        print("DEBUG: Hiç fotoğraf URL'si bulunamadı")  # Debug
     
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -504,8 +518,10 @@ async def create_pdf_with_images(property_data: Dict) -> bytes:
                 img_reader = ImageReader(img_buffer)
                 c.drawImage(img_reader, x_offset, y_offset, new_width, new_height)
                 
+                print(f"DEBUG: Fotoğraf {i+1} PDF'e eklendi")  # Debug
+                
             except Exception as e:
-                print(f"Fotoğraf ekleme hatası: {e}")
+                print(f"HATA: Fotoğraf {i+1} ekleme hatası: {e}")
                 # Hata durumunda placeholder
                 c.setFillColor(secondary_color)
                 c.setFont("Helvetica", 12)
@@ -533,6 +549,29 @@ async def create_pdf_with_images(property_data: Dict) -> bytes:
     c.save()
     buffer.seek(0)
     return buffer.read()
+
+# Test endpoint
+@router.get("/test-firecrawl/{property_id}")
+async def test_firecrawl(property_id: str):
+    """FireCrawl'dan gelen veriyi test eder"""
+    
+    try:
+        firecrawl_data = await scrape_property_with_firecrawl(property_id)
+        links = firecrawl_data.get("data", {}).get("links", [])
+        
+        photo_links = []
+        for link in links:
+            if "i.remax.com.tr/photos" in link:
+                photo_links.append(link)
+        
+        return {
+            "total_links": len(links),
+            "photo_links_count": len(photo_links),
+            "photo_links": photo_links[:10],  # İlk 10 fotoğraf
+            "sample_links": links[:20]  # İlk 20 link
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 @router.get("/generate-property-pdf/{property_id}")
 async def generate_property_pdf(property_id: str):
