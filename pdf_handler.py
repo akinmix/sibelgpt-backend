@@ -47,8 +47,11 @@ async def scrape_property_with_firecrawl(property_id: str) -> Dict:
     
     payload = {
         "url": url,
-        "formats": ["markdown", "links"],
-        "extractMainContent": True
+        "formats": ["markdown", "links", "html"],
+        "extractMainContent": True,
+        "waitFor": 5000,  # 5 saniye bekle
+        "screenshot": False,
+        "onlyMainContent": False  # Tüm içeriği tara
     }
     
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -166,7 +169,7 @@ def create_pdf(property_data: Dict) -> bytes:
     
     c.setFillColor('white')
     c.setFont("Helvetica-Bold", 24)
-    c.drawString(50, height-50, clean_turkish_chars("Sibel Kazan Midilli"))
+    c.drawString(50, height-50, clean_turkish_chars("SİBEL KAZAN MİDİLLİ"))
     c.setFont("Helvetica", 14)
     c.drawString(50, height-70, clean_turkish_chars("REMAX SONUÇ | Gayrimenkul Danışmanı"))
     
@@ -557,21 +560,50 @@ async def test_firecrawl(property_id: str):
     
     try:
         firecrawl_data = await scrape_property_with_firecrawl(property_id)
+        
+        # Tüm veri yapısını incele
+        data_keys = list(firecrawl_data.get("data", {}).keys())
         links = firecrawl_data.get("data", {}).get("links", [])
+        html_content = firecrawl_data.get("data", {}).get("html", "")
+        
+        # HTML'de fotoğraf ara
+        photo_patterns = []
+        if html_content:
+            import re
+            patterns = [
+                r'src=["\']([^"\']+remax[^"\']+photos[^"\']+)["\']',
+                r'data-src=["\']([^"\']+remax[^"\']+photos[^"\']+)["\']',
+                r'(https?://[^"\'\s]+remax[^"\'\s]+photos[^"\'\s]+)',
+                r'(https?://[^"\'\s]+\.jpg)',
+                r'(https?://[^"\'\s]+\.png)'
+            ]
+            
+            for pattern in patterns:
+                matches = re.findall(pattern, html_content[:5000])  # İlk 5000 karakter
+                if matches:
+                    photo_patterns.append({
+                        "pattern": pattern,
+                        "count": len(matches),
+                        "samples": matches[:3]
+                    })
         
         photo_links = []
         for link in links:
-            if "i.remax.com.tr/photos" in link:
+            if "photos" in link or ".jpg" in link or ".png" in link:
                 photo_links.append(link)
         
         return {
+            "available_data_keys": data_keys,
             "total_links": len(links),
             "photo_links_count": len(photo_links),
-            "photo_links": photo_links[:10],  # İlk 10 fotoğraf
-            "sample_links": links[:20]  # İlk 20 link
+            "photo_links": photo_links[:10],
+            "html_available": bool(html_content),
+            "html_length": len(html_content) if html_content else 0,
+            "html_photo_patterns": photo_patterns,
+            "sample_links": links[:20]
         }
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(e), "type": type(e).__name__}
 
 @router.get("/generate-property-pdf/{property_id}")
 async def generate_property_pdf(property_id: str):
