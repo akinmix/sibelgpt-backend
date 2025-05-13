@@ -339,7 +339,7 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
 
 # ── Formatlama Fonksiyonu ─────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
-    """İlanları formatlayarak eksiksiz HTML'e dönüştürür."""
+    """İlanları formatlayarak eksiksiz HTML'e dönüştürür ve PDF butonu ekler."""
     if not listings:
         return "🔍 Uygun ilan bulunamadı."
 
@@ -441,11 +441,18 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         else:
             ozellikler = " | ".join(ozellikler_liste) if ozellikler_liste else "(özellik bilgisi yok)"
         
-        # HTML oluştur - başlık kırpılmadan, tüm bilgiler dahil edilmiş
+        # HTML oluştur - başlık kırpılmadan, tüm bilgiler dahil edilmiş ve PDF butonu eklenmiş
         ilan_html = (
             f"<li><strong>{i}. {baslik}</strong><br>"
             f"İlan No: {ilan_no} | Lokasyon: {lokasyon}<br>"
-            f"Fiyat: {fiyat} | {ozellikler}</li>"
+            f"Fiyat: {fiyat} | {ozellikler}<br>"
+            f"<button onclick=\"window.open('https://sibelgpt-backend.onrender.com/generate-property-pdf/{ilan_no}', '_blank')\" "
+            f"style='margin-top:6px; padding:6px 15px; background:#1976d2; color:white; border:none; "
+            f"border-radius:25px; cursor:pointer; font-size:13px; font-weight:500; display:inline-flex; "
+            f"align-items:center; gap:5px; box-shadow:0 2px 5px rgba(0,0,0,0.1); transition:all 0.3s ease;' "
+            f"onmouseover=\"this.style.background='#115293'; this.style.transform='translateY(-1px)';\" "
+            f"onmouseout=\"this.style.background='#1976d2'; this.style.transform='translateY(0)';\">"
+            f"<i class='fas fa-file-pdf' style='font-size:16px;'></i> PDF İndir</button></li>"
         )
         formatted_parts.append(ilan_html)
     
