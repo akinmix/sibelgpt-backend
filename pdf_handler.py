@@ -11,6 +11,12 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 from reportlab.lib.colors import HexColor
 
+router = APIRouter()
+
+# FireCrawl API ayarları
+FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
+FIRECRAWL_URL = "https://api.firecrawl.dev/v0/scrape"
+
 def clean_turkish_chars(text: str) -> str:
     """Türkçe karakterleri ASCII'ye çevirir"""
     replacements = {
@@ -24,10 +30,6 @@ def clean_turkish_chars(text: str) -> str:
     for turkish, ascii_char in replacements.items():
         text = text.replace(turkish, ascii_char)
     return text
-
-# FireCrawl API ayarları
-FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
-FIRECRAWL_URL = "https://api.firecrawl.dev/v0/scrape"
 
 async def scrape_property_with_firecrawl(property_id: str) -> Dict:
     """FireCrawl kullanarak REMAX ilan verilerini çeker"""
