@@ -112,28 +112,47 @@ def parse_property_data(firecrawl_data: Dict) -> Dict:
     # Fotoğraf URL'leri
     image_urls = []
     for link in links:
-        if "i.remax.com.tr/photos" in link and (link.endswith('.jpg') or link.endswith('.png')):
-            print(f"DEBUG: Fotoğraf URL bulundu: {link}")  # Debug
-            # Thumbnail'ları (T/) orjinal (L/) ile değiştir
-            if '/T/' in link:
-                link = link.replace('/T/', '/L/')
-                print(f"DEBUG: URL dönüştürüldü: {link}")  # Debug
+        # Tüm resim linklerini al
+        if any(ext in link.lower() for ext in ['.jpg', '.jpeg', '.png', '.webp']):
+            print(f"DEBUG: Fotoğraf URL bulundu: {link}")
+            # REMAX logo değilse ekle
+            if "logo" not in link.lower():
+                image_urls.append(link)
+            
+    # FireCrawl'ın bulduğu REMAX fotoğraf linklerini kontrol et
+    for link in links:
+        if "remax.com.tr/Content/Images" in link and link not in image_urls:
+            print(f"DEBUG: REMAX fotoğraf URL bulundu: {link}")
             image_urls.append(link)
     
     # Tekrarlı URL'leri kaldır ve ilk 12'yi al
     unique_images = list(dict.fromkeys(image_urls))[:12]
     print(f"DEBUG: Toplam {len(unique_images)} benzersiz fotoğraf bulundu")  # Debug
     
-    # Eğer fotoğraf bulunamazsa test fotoğrafları kullan
+    # Eğer fotoğraf bulunamazsa URL kalıbı ile dene
     if not unique_images:
-        print("DEBUG: Fotoğraf bulunamadı, test fotoğrafları kullanılıyor")
-        unique_images = [
-            "https://www.remax.com.tr/Content/Images/uploaded/yH0vDHxNc8-remax-logo.png",
-            "https://picsum.photos/800/600?random=1",
-            "https://picsum.photos/800/600?random=2",
-            "https://picsum.photos/800/600?random=3",
-            "https://picsum.photos/800/600?random=4"
-        ]
+        print("DEBUG: Fotoğraf bulunamadı, URL kalıbı deneniyor")
+        # REMAX fotoğraf URL kalıbı: https://i.remax.com.tr/photos/18/P{ID}/L/{1-20}.jpg
+        
+        # Portföy no'dan ID'yi çıkar
+        if portfoy_no and portfoy_no.startswith('P'):
+            photo_id = portfoy_no[1:]  # P'yi kaldır
+            
+            # İlk 5 fotoğrafı dene
+            for i in range(1, 6):
+                photo_url = f"https://i.remax.com.tr/photos/18/P{photo_id}/L/{i}.jpg"
+                unique_images.append(photo_url)
+                print(f"DEBUG: Denenen URL: {photo_url}")
+        
+        # Hala yoksa test fotoğrafları kullan
+        if not unique_images:
+            print("DEBUG: URL kalıbı başarısız, test fotoğrafları kullanılıyor")
+            unique_images = [
+                "https://picsum.photos/800/600?random=1",
+                "https://picsum.photos/800/600?random=2",
+                "https://picsum.photos/800/600?random=3",
+                "https://picsum.photos/800/600?random=4"
+            ]
     
     return {
         'title': title,
@@ -146,15 +165,26 @@ def parse_property_data(firecrawl_data: Dict) -> Dict:
 
 async def download_image(url: str) -> Optional[bytes]:
     """Fotoğrafı indirir ve bytes olarak döndürür"""
-    print(f"DEBUG: Fotoğraf indiriliyor: {url}")  # Debug log
+    print(f"DEBUG: Fotoğraf indiriliyor: {url}")
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:  # Timeout'u artırdım
-            response = await client.get(url)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+            'Accept-Language': 'tr-TR,tr;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Cache-Control': 'no-cache',
+            'Referer': 'https://www.remax.com.tr/'
+        }
+        
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            response = await client.get(url, headers=headers)
             response.raise_for_status()
             print(f"DEBUG: Fotoğraf başarıyla indirildi: {len(response.content)} bytes")
             return response.content
     except Exception as e:
         print(f"HATA: Fotoğraf indirme hatası - URL: {url}, Hata: {e}")
+        if "403" in str(e):
+            print("HATA: 403 Forbidden - REMAX sunucusu erişimi engelliyor")
         return None
 
 def create_pdf(property_data: Dict) -> bytes:
