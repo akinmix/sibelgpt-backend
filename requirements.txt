@@ -13,10 +13,10 @@ supabase==1.0.3           # Belirli bir sürüm - stabil çalışan versiyon
 
 # --- HTTP İstekleri ve Web Araması İşlevleri ---
 aiohttp==3.9.1            # HTTP istekleri için async kütüphane
-httpx==0.25.2             # Modern async HTTP istemcisi (FireCrawl için)
+httpx>=0.25.0             # Modern async HTTP istemcisi (FireCrawl için) - esnek sürüm
 
 # --- PDF Oluşturma ---
-reportlab==4.0.8          # PDF oluşturma kütüphanesi
+reportlab>=4.0.0          # PDF oluşturma kütüphanesi - esnek sürüm
 
 # --- İsteğe bağlı: hızlı dosya servis / health (Backend API için) ---
 aiofiles==24.1.0          # FastAPI statik servis ederken dosya okuma
