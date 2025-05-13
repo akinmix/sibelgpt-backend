@@ -129,30 +129,10 @@ def parse_property_data(firecrawl_data: Dict) -> Dict:
     unique_images = list(dict.fromkeys(image_urls))[:12]
     print(f"DEBUG: Toplam {len(unique_images)} benzersiz fotoğraf bulundu")  # Debug
     
-    # Eğer fotoğraf bulunamazsa URL kalıbı ile dene
+    # Eğer fotoğraf bulunamazsa boş bırak
     if not unique_images:
-        print("DEBUG: Fotoğraf bulunamadı, URL kalıbı deneniyor")
-        # REMAX fotoğraf URL kalıbı: https://i.remax.com.tr/photos/18/P{ID}/L/{1-20}.jpg
-        
-        # Portföy no'dan ID'yi çıkar
-        if portfoy_no and portfoy_no.startswith('P'):
-            photo_id = portfoy_no[1:]  # P'yi kaldır
-            
-            # İlk 5 fotoğrafı dene
-            for i in range(1, 6):
-                photo_url = f"https://i.remax.com.tr/photos/18/P{photo_id}/L/{i}.jpg"
-                unique_images.append(photo_url)
-                print(f"DEBUG: Denenen URL: {photo_url}")
-        
-        # Hala yoksa test fotoğrafları kullan
-        if not unique_images:
-            print("DEBUG: URL kalıbı başarısız, test fotoğrafları kullanılıyor")
-            unique_images = [
-                "https://picsum.photos/800/600?random=1",
-                "https://picsum.photos/800/600?random=2",
-                "https://picsum.photos/800/600?random=3",
-                "https://picsum.photos/800/600?random=4"
-            ]
+        print("DEBUG: Fotoğraf bulunamadı, PDF fotoğrafsız oluşturulacak")
+        unique_images = []
     
     return {
         'title': title,
