@@ -166,25 +166,35 @@ def parse_property_data(firecrawl_data: Dict) -> Dict:
 async def download_image(url: str) -> Optional[bytes]:
     """Fotoğrafı indirir ve bytes olarak döndürür"""
     print(f"DEBUG: Fotoğraf indiriliyor: {url}")
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-            'Accept-Language': 'tr-TR,tr;q=0.9,en;q=0.8',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Cache-Control': 'no-cache',
-            'Referer': 'https://www.remax.com.tr/'
-        }
+    
+    # REMAX URL'leri için sadece tek proxy kullan
+    if "remax.com.tr" in url:
+        # Sadece images.weserv.nl kullan
+        proxy_url = f"https://images.weserv.nl/?url={url}"
+        print(f"DEBUG: Proxy kullanılıyor: {proxy_url}")
         
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-            response = await client.get(url, headers=headers)
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(proxy_url)
+                if response.status_code == 200:
+                    print(f"DEBUG: Proxy başarılı: {len(response.content)} bytes")
+                    return response.content
+                else:
+                    print(f"DEBUG: Proxy başarısız: {response.status_code}")
+                    return None
+        except Exception as e:
+            print(f"DEBUG: Proxy hatası: {e}")
+            return None
+    
+    # Diğer URL'ler için normal indir
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url)
             response.raise_for_status()
             print(f"DEBUG: Fotoğraf başarıyla indirildi: {len(response.content)} bytes")
             return response.content
     except Exception as e:
-        print(f"HATA: Fotoğraf indirme hatası - URL: {url}, Hata: {e}")
-        if "403" in str(e):
-            print("HATA: 403 Forbidden - REMAX sunucusu erişimi engelliyor")
+        print(f"DEBUG: Fotoğraf indirme hatası: {e}")
         return None
 
 def create_pdf(property_data: Dict) -> bytes:
