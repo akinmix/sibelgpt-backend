@@ -1,4 +1,4 @@
-# main.py - SibelGPT Backend
+# main.py - SibelGPT Backend - v3.0.0
 import os
 import json
 from pathlib import Path
@@ -42,8 +42,8 @@ class WebSearchRequest(BaseModel):
 # ---- FastAPI Uygulaması ----
 app = FastAPI(
    title="SibelGPT Backend",
-   version="2.0.0",
-   description="SibelGPT AI Assistant Backend API"
+   version="3.0.0",
+   description="SibelGPT AI Assistant Backend API - Fully Dynamic"
 )
 
 # ---- CORS Middleware ----
@@ -66,7 +66,7 @@ else:
 @app.on_event("startup")
 async def startup_event():
    """Uygulama başlangıcında çalışır"""
-   print("\n=== SibelGPT Backend Başlatılıyor ===")
+   print("\n=== SibelGPT Backend v3.0.0 Başlatılıyor ===")
    
    # Ortam değişkenlerini kontrol et
    supabase_url = os.getenv("SUPABASE_URL")
@@ -115,7 +115,7 @@ async def root():
    return {
        "status": "ok",
        "service": "SibelGPT Backend",
-       "version": "2.0.0",
+       "version": "3.0.0",
        "endpoints": {
            "chat": "/chat",
            "web_search": "/web-search",
@@ -133,7 +133,7 @@ async def health_check(db_client = Depends(get_supabase_client)):
    """Servis sağlık kontrolü"""
    return {
        "status": "healthy",
-       "version": "2.0.0",
+       "version": "3.0.0",
        "timestamp": datetime.now().isoformat(),
        "services": {
            "supabase": db_client is not None,
@@ -222,142 +222,198 @@ async def get_dashboard_statistics(db_client = Depends(get_supabase_client)):
            }
        )
 
-# ---- Basit İstatistikler (Doğrudan Sorgular) ----
+# ---- TAMAMEN DİNAMİK İSTATİSTİKLER ----
 @app.get("/statistics/simple", tags=["statistics"])
 async def get_simple_statistics(db_client = Depends(get_supabase_client)):
-   """Basit istatistikler - Doğrudan tablo sorgularıyla TÜM İLÇELERİ gösterir"""
-   print("📊 Basit istatistikler istendi")
+   """Basit istatistikler - TÜM VERİLER SUPABASE'DEN ÇEKİLİR"""
+   print("📊 Dinamik istatistikler istendi")
    
    if not db_client:
-       return JSONResponse(status_code=503, content={"error": "Veritabanı bağlantısı yok"})
+       return JSONResponse(
+           status_code=503,
+           content={"error": "Veritabanı bağlantısı yok"}
+       )
    
    try:
-       # 1. Toplam ilan sayısını al
-       total_result = db_client.table('remax_ilanlar').select('*', count='exact').execute()
-       total_count = total_result.count if total_result.count else 0
-       print(f"✓ Toplam ilan: {total_count}")
+       # 1. TÜM VERİYİ ÇEK (ilce, fiyat, oda_sayisi)
+       print("🔄 Supabase'den tüm veriler çekiliyor...")
+       all_data_result = db_client.table('remax_ilanlar').select('ilce, fiyat, oda_sayisi').execute()
        
-       # 2. TÜM ilanları çekerek ilçe bazlı istatistikler oluştur
-       all_listings = db_client.table('remax_ilanlar').select('ilce').execute()
+       if not all_data_result.data:
+           print("⚠️ Hiç veri bulunamadı")
+           return JSONResponse(
+               status_code=404,
+               content={"error": "Veritabanında hiç ilan bulunamadı"}
+           )
        
-       # 3. İlçe bazlı sayım yap
-       ilce_counts = {}
-       if all_listings.data:
-           for record in all_listings.data:
-               ilce = record.get('ilce')
-               if ilce:  # None veya boş değilse
-                   if ilce not in ilce_counts:
-                       ilce_counts[ilce] = 0
-                   ilce_counts[ilce] += 1
+       all_data = all_data_result.data
+       total_count = len(all_data)
+       print(f"✅ {total_count} kayıt bulundu")
        
-       print(f"✓ Toplam {len(ilce_counts)} farklı ilçe bulundu")
-       
-       # 4. İlan sayısına göre sırala ve ilk 10'u al
-       sorted_ilceler = sorted(ilce_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-       
-       # 5. İlçe dağılımını hazırla
-       ilce_dagilimi = []
-       
-       # Gerçek verilerden alınan ortalama fiyatlar (önceki sorgulardan)
-       ortalama_fiyatlar = {
-           "Kadıköy": 19890138.27,
-           "Beylikdüzü": 8759901.32,
-           "Kartal": 8382693.10,
-           "Pendik": 7970626.37,
-           "Maltepe": 8779984.43,
-           "Üsküdar": 17250000.00,
-           "Ümraniye": 7500000.00,
-           "Esenyurt": 4250000.00,
-           "Büyükçekmece": 5600000.00,
-           "Sarıyer": 25000000.00,
-           "Beşiktaş": 22000000.00,
-           "Sancaktepe": 6800000.00,
-           "Ataşehir": 12500000.00,
-           "Tuzla": 6900000.00,
-           "Şişli": 20000000.00,
-           "Çekmeköy": 7200000.00,
-           "Kağıthane": 9500000.00,
-           "Eyüpsultan": 5900000.00
+       # 2. VERİ YAPILARINI HAZIRLA
+       ilce_stats = {}
+       oda_stats = {}
+       price_ranges = {
+           '0-5M': 0,
+           '5-10M': 0,
+           '10-20M': 0,
+           '20M+': 0
        }
+       total_price_sum = 0
+       valid_price_count = 0
        
-       for ilce, count in sorted_ilceler:
+       # 3. HER KAYDI İŞLE
+       print("🔄 Veriler işleniyor...")
+       for row in all_data:
+           ilce = row.get('ilce')
+           fiyat = row.get('fiyat')
+           oda_sayisi = row.get('oda_sayisi')
+           
+           # İLÇE İSTATİSTİKLERİ
+           if ilce:
+               if ilce not in ilce_stats:
+                   ilce_stats[ilce] = {
+                       'count': 0,
+                       'price_sum': 0,
+                       'valid_prices': 0
+                   }
+               ilce_stats[ilce]['count'] += 1
+               
+               # FİYAT İŞLEME
+               if fiyat:
+                   try:
+                       # Fiyat temizleme: "5.500.000" -> 5500000
+                       fiyat_str = str(fiyat)
+                       clean_price = float(fiyat_str.replace('.', '').replace(',', ''))
+                       
+                       if clean_price > 0:
+                           ilce_stats[ilce]['price_sum'] += clean_price
+                           ilce_stats[ilce]['valid_prices'] += 1
+                           total_price_sum += clean_price
+                           valid_price_count += 1
+                           
+                           # FİYAT ARALIĞI BELİRLE
+                           if clean_price < 5000000:
+                               price_ranges['0-5M'] += 1
+                           elif clean_price < 10000000:
+                               price_ranges['5-10M'] += 1
+                           elif clean_price < 20000000:
+                               price_ranges['10-20M'] += 1
+                           else:
+                               price_ranges['20M+'] += 1
+                   except Exception as e:
+                       pass  # Geçersiz fiyat verisi, atla
+           
+           # ODA SAYISI İSTATİSTİKLERİ
+           if oda_sayisi:
+               if oda_sayisi not in oda_stats:
+                   oda_stats[oda_sayisi] = {
+                       'count': 0,
+                       'price_sum': 0,
+                       'valid_prices': 0
+                   }
+               oda_stats[oda_sayisi]['count'] += 1
+               
+               # Oda tipi için ortalama fiyat
+               if fiyat:
+                   try:
+                       clean_price = float(str(fiyat).replace('.', '').replace(',', ''))
+                       if clean_price > 0:
+                           oda_stats[oda_sayisi]['price_sum'] += clean_price
+                           oda_stats[oda_sayisi]['valid_prices'] += 1
+                   except:
+                       pass
+       
+       # 4. İLÇE DAĞILIMINI HAZIRLA
+       ilce_dagilimi = []
+       for ilce, stats in ilce_stats.items():
+           avg_price = 0
+           if stats['valid_prices'] > 0:
+               avg_price = stats['price_sum'] / stats['valid_prices']
+           
            ilce_dagilimi.append({
-               "ilce": ilce,
-               "ilan_sayisi": count,
-               "ortalama_fiyat": ortalama_fiyatlar.get(ilce, 10000000.00)
+               'ilce': ilce,
+               'ilan_sayisi': stats['count'],
+               'ortalama_fiyat': avg_price
            })
        
-       # 6. En çok ilan olan ilçe
-       en_cok_ilan_ilce = sorted_ilceler[0][0] if sorted_ilceler else "Kadıköy"
+       # İlan sayısına göre sırala, ilk 10'u al
+       ilce_dagilimi.sort(key=lambda x: x['ilan_sayisi'], reverse=True)
+       top_10_ilceler = ilce_dagilimi[:10]
        
-       print(f"✓ En çok ilan: {en_cok_ilan_ilce}")
-       print(f"✓ İlçe dağılımı hazır: {[item['ilce'] for item in ilce_dagilimi[:3]]}...")
+       print(f"✅ {len(ilce_stats)} ilçe bulundu, ilk 10'u alındı")
        
-       # 7. Final response
+       # 5. ODA TİPİ DAĞILIMINI HAZIRLA
+       oda_tipi_dagilimi = []
+       for oda, stats in oda_stats.items():
+           avg_price = 0
+           if stats['valid_prices'] > 0:
+               avg_price = stats['price_sum'] / stats['valid_prices']
+           
+           oda_tipi_dagilimi.append({
+               'oda_sayisi': oda,
+               'ilan_sayisi': stats['count'],
+               'ortalama_fiyat': avg_price
+           })
+       
+       # İlan sayısına göre sırala, ilk 6'yı al
+       oda_tipi_dagilimi.sort(key=lambda x: x['ilan_sayisi'], reverse=True)
+       top_6_oda = oda_tipi_dagilimi[:6]
+       
+       # 6. FİYAT ARALIĞI YÜZDELERİNİ HESAPLA
+       fiyat_dagilimi = []
+       total_with_price = sum(price_ranges.values())
+       
+       for aralik, count in price_ranges.items():
+           yuzde = 0
+           if total_with_price > 0:
+               yuzde = (count / total_with_price) * 100
+           
+           fiyat_dagilimi.append({
+               'aralik': aralik + ' ₺',
+               'ilan_sayisi': count,
+               'yuzde': round(yuzde, 2)
+           })
+       
+       # 7. GENEL İSTATİSTİKLER
+       genel_ortalama = 0
+       if valid_price_count > 0:
+           genel_ortalama = total_price_sum / valid_price_count
+       
+       en_cok_ilan_ilce = "Bilinmiyor"
+       if top_10_ilceler:
+           en_cok_ilan_ilce = top_10_ilceler[0]['ilce']
+       
+       print("✅ Tüm hesaplamalar tamamlandı")
+       
+       # 8. SONUCU DÖNDÜR
        return {
            "status": "success",
            "statistics": {
                "genel_ozet": {
                    "toplam_ilan": total_count,
-                   "ortalama_fiyat": 13051170.53,
+                   "ortalama_fiyat": genel_ortalama,
                    "en_cok_ilan_ilce": en_cok_ilan_ilce
                },
-               "ilce_dagilimi": ilce_dagilimi,
-               "fiyat_dagilimi": [
-                   {"aralik": "0-5M ₺", "ilan_sayisi": 1528, "yuzde": 30.28},
-                   {"aralik": "5-10M ₺", "ilan_sayisi": 1724, "yuzde": 34.16},
-                   {"aralik": "10-20M ₺", "ilan_sayisi": 1010, "yuzde": 20.01},
-                   {"aralik": "20M+ ₺", "ilan_sayisi": 785, "yuzde": 15.55}
-               ],
-               "oda_tipi_dagilimi": [
-                   {"oda_sayisi": "3+1", "ilan_sayisi": 1668, "ortalama_fiyat": 10535730.51},
-                   {"oda_sayisi": "2+1", "ilan_sayisi": 1574, "ortalama_fiyat": 6540311.82},
-                   {"oda_sayisi": "4+1", "ilan_sayisi": 423, "ortalama_fiyat": 22123768.32},
-                   {"oda_sayisi": "1+1", "ilan_sayisi": 373, "ortalama_fiyat": 5498733.24}
-               ]
+               "ilce_dagilimi": top_10_ilceler,
+               "fiyat_dagilimi": fiyat_dagilimi,
+               "oda_tipi_dagilimi": top_6_oda
            }
        }
        
    except Exception as e:
-       print(f"❌ İstatistik hatası: {e}")
+       print(f"❌ Kritik hata: {e}")
        import traceback
        print(traceback.format_exc())
        
-       # Hata durumunda gerçek verilerle sabit response
-       return {
-           "status": "success",
-           "statistics": {
-               "genel_ozet": {
-                   "toplam_ilan": 5047,
-                   "ortalama_fiyat": 13051170.53,
-                   "en_cok_ilan_ilce": "Kadıköy"
-               },
-               "ilce_dagilimi": [
-                   {"ilce": "Kadıköy", "ilan_sayisi": 405, "ortalama_fiyat": 19890138.27},
-                   {"ilce": "Beylikdüzü", "ilan_sayisi": 304, "ortalama_fiyat": 8759901.32},
-                   {"ilce": "Kartal", "ilan_sayisi": 290, "ortalama_fiyat": 8382693.10},
-                   {"ilce": "Pendik", "ilan_sayisi": 273, "ortalama_fiyat": 7970626.37},
-                   {"ilce": "Maltepe", "ilan_sayisi": 257, "ortalama_fiyat": 8779984.43},
-                   {"ilce": "Üsküdar", "ilan_sayisi": 255, "ortalama_fiyat": 17250000.00},
-                   {"ilce": "Ümraniye", "ilan_sayisi": 233, "ortalama_fiyat": 7500000.00},
-                   {"ilce": "Esenyurt", "ilan_sayisi": 202, "ortalama_fiyat": 4250000.00},
-                   {"ilce": "Büyükçekmece", "ilan_sayisi": 200, "ortalama_fiyat": 5600000.00},
-                   {"ilce": "Sarıyer", "ilan_sayisi": 178, "ortalama_fiyat": 25000000.00}
-               ],
-               "fiyat_dagilimi": [
-                   {"aralik": "0-5M ₺", "ilan_sayisi": 1528, "yuzde": 30.28},
-                   {"aralik": "5-10M ₺", "ilan_sayisi": 1724, "yuzde": 34.16},
-                   {"aralik": "10-20M ₺", "ilan_sayisi": 1010, "yuzde": 20.01},
-                   {"aralik": "20M+ ₺", "ilan_sayisi": 785, "yuzde": 15.55}
-               ],
-               "oda_tipi_dagilimi": [
-                   {"oda_sayisi": "3+1", "ilan_sayisi": 1668, "ortalama_fiyat": 10535730.51},
-                   {"oda_sayisi": "2+1", "ilan_sayisi": 1574, "ortalama_fiyat": 6540311.82},
-                   {"oda_sayisi": "4+1", "ilan_sayisi": 423, "ortalama_fiyat": 22123768.32},
-                   {"oda_sayisi": "1+1", "ilan_sayisi": 373, "ortalama_fiyat": 5498733.24}
-               ]
+       return JSONResponse(
+           status_code=500,
+           content={
+               "error": "İstatistikler hesaplanırken hata oluştu",
+               "detail": str(e),
+               "type": type(e).__name__
            }
-       }
+       )
 
 # ---- Dashboard HTML ----
 @app.get("/dashboard", tags=["frontend"])
@@ -365,7 +421,7 @@ async def serve_dashboard():
    """Dashboard HTML sayfasını serve eder"""
    print("🖥️ Dashboard sayfası istendi")
    
-   # Farklı yolları dene
+   # Olası dosya yolları
    possible_paths = [
        "public/dashboard.html",
        "./public/dashboard.html",
@@ -383,12 +439,11 @@ async def serve_dashboard():
        print("✅ Dashboard static üzerinden yönlendiriliyor")
        return RedirectResponse(url="/static/dashboard.html")
    
-   # Dosya bulunamadı
    return JSONResponse(
        status_code=404,
        content={
            "error": "Dashboard sayfası bulunamadı",
-           "available_paths": [str(p) for p in possible_paths]
+           "paths_checked": [str(p) for p in possible_paths]
        }
    )
 
@@ -423,7 +478,7 @@ async def server_error_handler(request, exc):
 # ---- Ana Program ----
 if __name__ == "__main__":
    import uvicorn
-   print("🚀 SibelGPT Backend başlatılıyor...")
+   print("🚀 SibelGPT Backend v3.0.0 başlatılıyor...")
    uvicorn.run(
        app, 
        host="0.0.0.0", 
