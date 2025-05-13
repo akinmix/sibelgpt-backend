@@ -11,7 +11,19 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 from reportlab.lib.colors import HexColor
 
-router = APIRouter()
+def clean_turkish_chars(text: str) -> str:
+    """Türkçe karakterleri ASCII'ye çevirir"""
+    replacements = {
+        'ç': 'c', 'Ç': 'C',
+        'ğ': 'g', 'Ğ': 'G',
+        'ı': 'i', 'İ': 'I',
+        'ö': 'o', 'Ö': 'O',
+        'ş': 's', 'Ş': 'S',
+        'ü': 'u', 'Ü': 'U'
+    }
+    for turkish, ascii_char in replacements.items():
+        text = text.replace(turkish, ascii_char)
+    return text
 
 # FireCrawl API ayarları
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
@@ -121,6 +133,11 @@ def create_pdf(property_data: Dict) -> bytes:
     primary_color = HexColor('#1976d2')  # Mavi
     secondary_color = HexColor('#757575')  # Gri
     
+    # UTF-8 encoding için
+    c._doc.setProducer('SibelGPT PDF Generator')
+    c._doc.setTitle('REMAX İlan Detayı')
+    c._doc.setSubject('Gayrimenkul İlanı')
+    
     # SAYFA 1: Başlık ve Genel Bilgiler
     # Header
     c.setFillColor(primary_color)
@@ -128,9 +145,9 @@ def create_pdf(property_data: Dict) -> bytes:
     
     c.setFillColor('white')
     c.setFont("Helvetica-Bold", 24)
-    c.drawString(50, height-50, "SİBEL KAZAN MİDİLLİ")
+    c.drawString(50, height-50, clean_turkish_chars("SİBEL KAZAN MİDİLLİ"))
     c.setFont("Helvetica", 14)
-    c.drawString(50, height-70, "REMAX SONUÇ | Gayrimenkul Danışmanı")
+    c.drawString(50, height-70, clean_turkish_chars("REMAX SONUÇ | Gayrimenkul Danışmanı"))
     
     # İlan Başlığı
     c.setFillColor('black')
@@ -139,7 +156,7 @@ def create_pdf(property_data: Dict) -> bytes:
     
     # Başlığı satırlara böl
     title_lines = []
-    words = property_data['title'].split()
+    words = clean_turkish_chars(property_data['title']).split()
     current_line = ""
     for word in words:
         test_line = current_line + " " + word if current_line else word
@@ -160,17 +177,17 @@ def create_pdf(property_data: Dict) -> bytes:
     y_pos -= 10
     c.setFont("Helvetica", 12)
     c.setFillColor(secondary_color)
-    c.drawString(50, y_pos, f"Portföy No: {property_data['portfoy_no']}")
+    c.drawString(50, y_pos, f"Portfoy No: {property_data['portfoy_no']}")
     
     c.setFont("Helvetica-Bold", 20)
     c.setFillColor(primary_color)
-    c.drawString(width - 200, y_pos, f"{property_data['price']} ₺")
+    c.drawString(width - 200, y_pos, f"{property_data['price']} TL")
     
     # Özellikler Tablosu
     y_pos -= 40
     c.setFont("Helvetica-Bold", 14)
     c.setFillColor('black')
-    c.drawString(50, y_pos, "TEKNİK ÖZELLİKLER")
+    c.drawString(50, y_pos, clean_turkish_chars("TEKNİK ÖZELLİKLER"))
     y_pos -= 5
     c.setStrokeColor(primary_color)
     c.setLineWidth(2)
@@ -194,14 +211,14 @@ def create_pdf(property_data: Dict) -> bytes:
             y = y_pos - ((i - len(spec_keys)//2) * 25)
         
         c.setFillColor(secondary_color)
-        c.drawString(x, y, f"{key}:")
+        c.drawString(x, y, f"{clean_turkish_chars(key)}:")
         c.setFillColor('black')
-        c.drawString(x + 100, y, specs[key])
+        c.drawString(x + 100, y, clean_turkish_chars(specs[key]))
     
     # İlan Açıklaması
     y_pos -= (len(spec_keys)//2 + 1) * 25 + 20
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(50, y_pos, "İLAN AÇIKLAMASI")
+    c.drawString(50, y_pos, clean_turkish_chars("İLAN AÇIKLAMASI"))
     y_pos -= 5
     c.setLineWidth(2)
     c.line(50, y_pos, 200, y_pos)
@@ -209,7 +226,7 @@ def create_pdf(property_data: Dict) -> bytes:
     # Açıklama metni
     y_pos -= 20
     c.setFont("Helvetica", 10)
-    desc_lines = property_data['description'].split('\n')
+    desc_lines = clean_turkish_chars(property_data['description']).split('\n')
     for line in desc_lines:
         if y_pos < 100:  # Sayfa sonu kontrolü
             break
@@ -227,7 +244,7 @@ def create_pdf(property_data: Dict) -> bytes:
     c.rect(0, 0, width, 60, fill=1)
     c.setFillColor('white')
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(50, 30, "İLETİŞİM: 532 687 84 64")
+    c.drawString(50, 30, clean_turkish_chars("İLETİŞİM: 532 687 84 64"))
     c.setFont("Helvetica", 12)
     c.drawString(50, 15, "sibelkazan@remax.com.tr | www.sibelgpt.com")
     
@@ -239,7 +256,7 @@ def create_pdf(property_data: Dict) -> bytes:
     c.rect(0, height-60, width, 60, fill=1)
     c.setFillColor('white')
     c.setFont("Helvetica-Bold", 18)
-    c.drawString(50, height-40, "FOTOĞRAFLAR")
+    c.drawString(50, height-40, clean_turkish_chars("FOTOĞRAFLAR"))
     
     # Fotoğrafları 3x4 grid halinde yerleştir
     if property_data['images']:
@@ -272,9 +289,9 @@ def create_pdf(property_data: Dict) -> bytes:
     c.rect(0, 0, width, 60, fill=1)
     c.setFillColor('white')
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(50, 30, "İLETİŞİM: 532 687 84 64")
+    c.drawString(50, 30, clean_turkish_chars("İLETİŞİM: 532 687 84 64"))
     c.setFont("Helvetica", 12)
-    c.drawString(50, 15, f"Oluşturulma Tarihi: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+    c.drawString(50, 15, f"Olusturulma Tarihi: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
     
     c.save()
     buffer.seek(0)
