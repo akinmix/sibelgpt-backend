@@ -303,50 +303,114 @@ def create_pdf(property_data: Dict) -> bytes:
     c.setFont("Helvetica", 12)
     c.drawString(50, 15, "sibelkazan@remax.com.tr | www.sibelgpt.com")
     
-    # SAYFA 2: Fotoğraflar
+   # SAYFA 2: İletişim Bilgileri ve Fotoğraflar
     c.showPage()
     
-    # Header (tekrar)
+    # Header
     c.setFillColor(primary_color)
-    c.rect(0, height-60, width, 60, fill=1)
+    c.rect(0, height-80, width, 80, fill=1)
     c.setFillColor('white')
-    c.setFont("Helvetica-Bold", 18)
-    c.drawString(50, height-40, clean_turkish_chars("FOTOGRAFLAR"))
+    c.setFont("Helvetica-Bold", 24)
+    c.drawString(50, height-50, clean_turkish_chars("İLETİŞİM BİLGİLERİ"))
     
-    # Fotoğrafları yerleştir - sadece ilk 4 tanesi
-    if property_data.get('images'):
-        images_to_show = property_data['images'][:4]  # İlk 4 fotoğraf
+    # Sibel Hanım'ın fotoğrafı
+    try:
+        photo_url = "https://www.sibelgpt.com/sibel-kazan-midilli.jpg"
+        response = httpx.get(photo_url, timeout=10)
         
-        # 2x2 grid için ayarlar
-        grid_x = 50
-        grid_y = height - 100
-        img_width = (width - 120) / 2  # 2 sütun
-        img_height = img_width * 0.75  # 4:3 oran
-        
-        for i, img_url in enumerate(images_to_show):
-            row = i // 2
-            col = i % 2
+        if response.status_code == 200:
+            photo_data = io.BytesIO(response.content)
+            img = ImageReader(photo_data)
             
-            x = grid_x + (col * (img_width + 20))
-            y = grid_y - (row * (img_height + 20))
+            # Fotoğrafı sola yerleştir
+            photo_width = 150
+            photo_height = 200  # 3:4 oran
+            photo_x = 50
+            photo_y = height - 300
+            
+            c.drawImage(img, photo_x, photo_y, width=photo_width, height=photo_height, mask='auto')
             
             # Fotoğraf çerçevesi
-            c.setStrokeColor(secondary_color)
-            c.setLineWidth(1)
-            c.rect(x, y - img_height, img_width, img_height)
-            
-            # Placeholder veya "Yükleniyor" metni
-            c.setFillColor(secondary_color)
-            c.setFont("Helvetica", 12)
-            c.drawCentredString(x + img_width/2, y - img_height/2, "Fotograflar")
-            c.drawCentredString(x + img_width/2, y - img_height/2 - 15, "PDF'e dahil edilemiyor")
-            
-            # Fotoğraf numarası
-            c.setFillColor(primary_color)
-            c.setFont("Helvetica-Bold", 10)
-            c.drawString(x + 5, y - 15, f"Foto {i+1}")
+            c.setStrokeColor(primary_color)
+            c.setLineWidth(2)
+            c.rect(photo_x-2, photo_y-2, photo_width+4, photo_height+4)
+    except Exception as e:
+        print(f"Fotoğraf yüklenemedi: {e}")
     
-    # Footer (tekrar)
+    # REMAX logosu
+    try:
+        logo_url = "https://www.sibelgpt.com/remax-logo.png"
+        response = httpx.get(logo_url, timeout=10)
+        
+        if response.status_code == 200:
+            logo_data = io.BytesIO(response.content)
+            logo_img = ImageReader(logo_data)
+            
+            # Logoyu sağ üste yerleştir
+            logo_width = 140
+            logo_height = 93  # 200:133 oranını koruyarak
+            logo_x = width - logo_width - 50
+            logo_y = height - 180
+            
+            c.drawImage(logo_img, logo_x, logo_y, width=logo_width, height=logo_height, mask='auto')
+    except Exception as e:
+        print(f"Logo yüklenemedi: {e}")
+    
+    # İletişim bilgileri - sağ tarafta
+    info_x = 250
+    y_pos = height - 250
+    
+    c.setFont("Helvetica-Bold", 24)
+    c.setFillColor(primary_color)
+    c.drawString(info_x, y_pos, clean_turkish_chars("SİBEL KAZAN MİDİLLİ"))
+    
+    y_pos -= 30
+    c.setFont("Helvetica", 16)
+    c.setFillColor('black')
+    c.drawString(info_x, y_pos, clean_turkish_chars("Gayrimenkul Danışmanı"))
+    
+    y_pos -= 40
+    contact_info = [
+        ("Telefon", "532 687 84 64"),
+        ("E-posta", "sibelkazan@remax.com.tr"),
+        ("Web", "www.sibelgpt.com"),
+        ("Ofis", clean_turkish_chars("REMAX SONUÇ"))
+    ]
+    
+    c.setFont("Helvetica", 14)
+    for label, value in contact_info:
+        c.setFillColor(secondary_color)
+        c.drawString(info_x, y_pos, f"{label}:")
+        c.setFillColor('black')
+        c.drawString(info_x + 70, y_pos, value)
+        y_pos -= 25
+    
+    # Alt bilgi kutusu
+    box_y = 120
+    c.setFillColor(HexColor('#f8f9fa'))
+    c.rect(50, box_y, width-100, 100, fill=1)
+    
+    c.setFillColor(primary_color)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(width/2, box_y + 75, clean_turkish_chars("20 Yıllık Deneyim | Güvenilir Danışmanlık | Doğru Yatırım"))
+    
+    # Çalışma alanları
+    y_pos = box_y + 50
+    areas = [
+        clean_turkish_chars("▸ Konut Alım-Satım"),
+        clean_turkish_chars("▸ Yatırım Danışmanlığı"),
+        clean_turkish_chars("▸ Değerleme Hizmetleri"),
+        clean_turkish_chars("▸ Gayrimenkul Hukuku")
+    ]
+    
+    c.setFont("Helvetica", 11)
+    c.setFillColor('black')
+    for i, area in enumerate(areas):
+        x_offset = -150 if i % 2 == 0 else 50
+        y_offset = -20 if i >= 2 else 0
+        c.drawCentredString(width/2 + x_offset, y_pos + y_offset, area)
+    
+    # Footer
     c.setFillColor(primary_color)
     c.rect(0, 0, width, 60, fill=1)
     c.setFillColor('white')
@@ -354,10 +418,6 @@ def create_pdf(property_data: Dict) -> bytes:
     c.drawString(50, 30, clean_turkish_chars("İLETİŞİM: 532 687 84 64"))
     c.setFont("Helvetica", 12)
     c.drawString(50, 15, f"Olusturulma Tarihi: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
-    
-    c.save()
-    buffer.seek(0)
-    return buffer.read()
 
 async def create_pdf_with_images(property_data: Dict) -> bytes:
     """Parse edilmiş veriden fotoğraflı PDF oluşturur"""
@@ -670,3 +730,36 @@ async def generate_property_pdf(property_id: str):
             "Content-Disposition": f"attachment; filename={property_id}_ilan.pdf"
         }
     )
+    # Test PDF bileşenleri endpoint
+    @router.get("/test-pdf-components/{property_id}")
+    async def test_pdf_components(property_id: str):
+    """PDF bileşenlerini test eder"""
+    
+    test_results = {
+        "sibel_photo": False,
+        "remax_logo": False,
+        "property_data": False
+    }
+    
+    # Fotoğraf testi
+    try:
+        photo_response = httpx.get("https://www.sibelgpt.com/sibel-kazan-midilli.jpg")
+        test_results["sibel_photo"] = photo_response.status_code == 200
+    except:
+        pass
+    
+    # Logo testi
+    try:
+        logo_response = httpx.get("https://www.sibelgpt.com/remax-logo.png")
+        test_results["remax_logo"] = logo_response.status_code == 200
+    except:
+        pass
+    
+    # İlan verisi testi
+    try:
+        data = await scrape_property_with_firecrawl(property_id)
+        test_results["property_data"] = bool(data)
+    except:
+        pass
+    
+    return test_results
