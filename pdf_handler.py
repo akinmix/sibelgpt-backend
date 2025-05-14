@@ -96,6 +96,10 @@ def parse_property_data(firecrawl_data: Dict) -> Dict:
         'Kat Sayısı': r'Kat Sayısı\*\*\s*(\d+)',
         'Isıtma': r'Isıtma\*\*\s*([\w\s\(\)]+)',
         'Banyo Sayısı': r'Banyo Sayısı\*\*\s*(\d+)'
+        'Balkon': r'Balkon\*\*\s*([\w\s]+)',
+        'Kullanım Durumu': r'Kullanım Durumu\*\*\s*([\w\s]+)',
+        'Site İçerisinde': r'Site İçerisinde\*\*\s*([\w\s]+)',
+        'Krediye Uygun': r'Krediye Uygun\*\*\s*([\w\s]+)'
     }
     
     for key, pattern in spec_patterns.items():
