@@ -316,7 +316,8 @@ def create_pdf(property_data: Dict) -> bytes:
     # Sibel Hanım'ın fotoğrafı
     try:
         photo_url = "https://www.sibelgpt.com/sibel-kazan-midilli.jpg"
-        response = httpx.get(photo_url, timeout=10)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(photo_url, timeout=10)
         
         if response.status_code == 200:
             photo_data = io.BytesIO(response.content)
@@ -340,7 +341,8 @@ def create_pdf(property_data: Dict) -> bytes:
     # REMAX logosu
     try:
         logo_url = "https://www.sibelgpt.com/remax-logo.png"
-        response = httpx.get(logo_url, timeout=10)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(logo_url, timeout=10)
         
         if response.status_code == 200:
             logo_data = io.BytesIO(response.content)
@@ -720,7 +722,7 @@ async def generate_property_pdf(property_id: str):
     except Exception as e:
         # Hata durumunda fotoğrafsız PDF oluştur
         print(f"Fotoğraflı PDF hatası: {e}")
-        pdf_bytes = create_pdf(property_data)
+        pdf_bytes = await create_pdf(property_data)  
     
     # 4. PDF'i döndür
     return Response(
