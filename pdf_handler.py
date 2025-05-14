@@ -730,36 +730,36 @@ async def generate_property_pdf(property_id: str):
             "Content-Disposition": f"attachment; filename={property_id}_ilan.pdf"
         }
     )
-    # Test PDF bileşenleri endpoint
-    @router.get("/test-pdf-components/{property_id}")
-    async def test_pdf_components(property_id: str):
-        """PDF bileşenlerini test eder"""
+  # Test PDF bileşenleri endpoint
+@router.get("/test-pdf-components/{property_id}")
+async def test_pdf_components(property_id: str):
+    """PDF bileşenlerini test eder"""
     
-        test_results = {
+    test_results = {
         "sibel_photo": False,
         "remax_logo": False,
         "property_data": False
     }
     
     # Fotoğraf testi
-        try:
+    try:
         photo_response = httpx.get("https://www.sibelgpt.com/sibel-kazan-midilli.jpg")
         test_results["sibel_photo"] = photo_response.status_code == 200
-        except:
+    except:
         pass
     
     # Logo testi
-        try:
+    try:
         logo_response = httpx.get("https://www.sibelgpt.com/remax-logo.png")
         test_results["remax_logo"] = logo_response.status_code == 200
-        except:
+    except:
         pass
     
     # İlan verisi testi
-        try:
+    try:
         data = await scrape_property_with_firecrawl(property_id)
         test_results["property_data"] = bool(data)
-        except:
+    except:
         pass
     
-        return test_results
+    return test_results
