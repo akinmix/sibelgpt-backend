@@ -75,8 +75,8 @@ def parse_property_data(firecrawl_data: Dict) -> Dict:
         if line.strip() and not line.startswith("#") and not line.startswith("["):
             # "Giriş Yap" ve benzeri gereksiz metinleri atla
             if line.strip().lower() not in ["giriş yap", "giris yap", "login", "sign in", "üye ol"]:
-            title = line.strip()
-            break
+                title = line.strip()
+                break
     
     # Portföy No
     portfoy_match = re.search(r'Portföy No:\s*([A-Z0-9]+)', content)
