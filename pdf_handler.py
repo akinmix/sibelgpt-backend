@@ -177,7 +177,7 @@ async def download_image(url: str) -> Optional[bytes]:
         print(f"DEBUG: Fotoğraf indirme hatası: {e}")
         return None
 
-def create_pdf(property_data: Dict) -> bytes:
+async def create_pdf(property_data: Dict) -> bytes:  
     """Parse edilmiş veriden PDF oluşturur (fotoğrafsız)"""
     
     buffer = io.BytesIO()
