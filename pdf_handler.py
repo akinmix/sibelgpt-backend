@@ -72,7 +72,7 @@ def parse_property_data(firecrawl_data: Dict) -> Dict:
     lines = content.split("\n")
     title = ""
     for line in lines[:5]:
-    if line.strip() and not line.startswith("#") and not line.startswith("["):
+        if line.strip() and not line.startswith("#") and not line.startswith("["):
         # "Giriş Yap" ve benzeri gereksiz metinleri atla
         if line.strip().lower() not in ["giriş yap", "giris yap", "login", "sign in", "üye ol"]:
             title = line.strip()
