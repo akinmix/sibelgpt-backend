@@ -163,7 +163,7 @@ async def create_compact_pdf(property_data: Dict) -> bytes:
     c.setFont("Helvetica", 14)
     c.drawCentredString(width/2, height-60, clean_turkish_chars("REMAX SONUÇ | Gayrimenkul Danışmanı"))
     c.setFont("Helvetica", 12)
-    c.drawCentredString(width/2, height-80, "Tel: 532 687 84 64 | sibelkazan@remax.com.tr")
+    c.drawCentredString(width/2, height-80, "Tel: 532 687 84 64 | sibel@sibelizim.com")
     
     # REMAX logosu - SAĞ TARAFA
     try:
