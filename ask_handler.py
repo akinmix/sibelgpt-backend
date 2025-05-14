@@ -507,7 +507,7 @@ async def answer_question(question: str, mode: str = "real-estate") -> str:
             model="gpt-4o-mini",
             messages=messages,
             temperature=0.7,
-            max_tokens=1024
+            max_tokens=4096
         )
         return resp.choices[0].message.content.strip()
     except Exception as exc:
