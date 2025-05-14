@@ -546,7 +546,7 @@ async def create_pdf_with_images(property_data: Dict) -> bytes:
                 c.drawString(50, y_pos, line[:90])
                 line = line[90:]
                 y_pos -= 15
-            c.drawString(50, y_pos, line)
+            c.drawString(50, y_pos, line) 
             y_pos -= 15
     
     # Footer - İletişim
