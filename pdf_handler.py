@@ -291,7 +291,7 @@ async def create_compact_pdf(property_data: Dict) -> bytes:
     
     c.setFillColor(primary_color)
     c.setFont("Helvetica-Bold", 12)
-    c.drawCentredString(width/2, 30, clean_turkish_chars("REMAX SONUÇ - Güvenilir Gayrimenkul Danışmanlığı"))
+    c.drawCentredString(width/2, 30, clean_turkish_chars("REMAX SONUÇ - Remax Sonuç'ta hiçbir işiniz SONUÇSUZ kalmaz"))
     
     c.setFillColor('black')
     c.setFont("Helvetica", 10)
