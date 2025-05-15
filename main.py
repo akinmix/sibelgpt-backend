@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from elevenlabs_handler import router as elevenlabs_router
 
 # Supabase import kontrolü
 try:
@@ -86,6 +87,7 @@ async def get_supabase_client(request: Request) -> Optional[Client]:
 # ---- Router Kaydı ----
 app.include_router(image_router, prefix="", tags=["image"])
 app.include_router(pdf_router, prefix="", tags=["pdf"])
+app.include_router(elevenlabs_router, prefix="", tags=["speech"])
 
 # ---- Ana Endpoint ----
 @app.get("/", tags=["meta"])
