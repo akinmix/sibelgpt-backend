@@ -237,7 +237,7 @@ REDIRECTION_MESSAGES = {
 }
 
 
-async def detect_topic(question: str) -> str:
+async def detect_topic(question: str, mode: str) -> str:
     """Kullanıcının sorusunun hangi alana ait olduğunu tespit eder."""
     
     # Selamlaşma ve genel sohbet kontrolü için liste
@@ -346,8 +346,6 @@ async def detect_topic(question: str) -> str:
     
     # Hiçbir şey bulunamazsa mevcut modu koru
     return mode
-    
-
 
 # ── Embedding Fonksiyonu ───────────────────────────────────
 async def get_embedding(text: str) -> Optional[List[float]]:
@@ -386,199 +384,199 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
         all_results = response.data if hasattr(response, "data") else []
         
         # Gerçek sonuç sayısını göster - benzerlik puanına göre filtreleme
-        valid_results = [r for r in all_results if r.get('similarity', 0) > MATCH_THRESHOLD]
-        
-        print(f"✅ İlanlar sorgulandı: Toplam {len(valid_results)} gerçek ilişkili ilan bulundu")
-        
-        if not valid_results:
-            print("⚠️ Hiç ilan bulunamadı!")
-            return []
-        
-        return valid_results
-        
-    except Exception as exc:
-        print("❌ Arama işleminde hata:", exc)
-        return []
+       valid_results = [r for r in all_results if r.get('similarity', 0) > MATCH_THRESHOLD]
+       
+       print(f"✅ İlanlar sorgulandı: Toplam {len(valid_results)} gerçek ilişkili ilan bulundu")
+       
+       if not valid_results:
+           print("⚠️ Hiç ilan bulunamadı!")
+           return []
+       
+       return valid_results
+       
+   except Exception as exc:
+       print("❌ Arama işleminde hata:", exc)
+       return []
 
 # ── Formatlama Fonksiyonu ─────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
-    """İlanları formatlayarak eksiksiz HTML'e dönüştürür ve PDF butonu ekler."""
-    if not listings:
-        return "🔍 Uygun ilan bulunamadı."
+   """İlanları formatlayarak eksiksiz HTML'e dönüştürür ve PDF butonu ekler."""
+   if not listings:
+       return "🔍 Uygun ilan bulunamadı."
 
-    # Locale ayarı
-    try:
-        locale.setlocale(locale.LC_ALL, 'tr_TR.UTF-8')
-    except locale.Error:
-        try:
-            locale.setlocale(locale.LC_ALL, 'tr_TR')
-        except locale.Error:
-            pass
+   # Locale ayarı
+   try:
+       locale.setlocale(locale.LC_ALL, 'tr_TR.UTF-8')
+   except locale.Error:
+       try:
+           locale.setlocale(locale.LC_ALL, 'tr_TR')
+       except locale.Error:
+           pass
 
-    # Maksimum ilan sayısını sınırlama - SibelGPT yanıt sınırlamasına uygun
-    MAX_LISTINGS_TO_SHOW = 10  # Daha fazla ilan göstermek için artırıldı
-    listings_to_format = listings[:MAX_LISTINGS_TO_SHOW]
-    
-    # Toplam ve gösterilen ilan sayısını hesapla
-    total_count = len(listings)
-    shown_count = len(listings_to_format)
-    
-    # Açıklayıcı mesaj ve telefon numarasını birleştir
-    final_output = "<p><strong>📞 Sorgunuzla ilgili ilanlar burada listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
-    
-    formatted_parts = []
-    for i, l in enumerate(listings_to_format, start=1):
-        # İlan numarası - ilan_id veya ilan_no alanından
-        ilan_no = l.get('ilan_id', l.get('ilan_no', str(i)))
-        
-        # Başlık - tam başlığı göster, kısaltma yapma
-        baslik = l.get('baslik', '(başlık yok)')
-        
-        # Lokasyon - tam haliyle göster
-        lokasyon = l.get('lokasyon', '?')
-        
-        # Fiyat formatlaması
-        fiyat = "?"
-        fiyat_raw = l.get('fiyat')
-        if fiyat_raw:
-            try:
-                fiyat_num = float(str(fiyat_raw).replace('.', '').replace(',', '.'))
-                fiyat = f"{fiyat_num:,.0f} ₺".replace(',', '.') 
-            except:
-                fiyat = str(fiyat_raw)
-        
-        # Özellikler - tüm bilgileri dahil et
-        ozellikler_liste = []
-        
-        # Oda sayısı - doğrudan al
-        oda_sayisi = l.get('oda_sayisi', '')
-        if oda_sayisi:
-            ozellikler_liste.append(oda_sayisi)
-        
-        # Metrekare - doğrudan al
-        metrekare = l.get('metrekare', '')
-        if metrekare:
-            ozellikler_liste.append(f"{metrekare} m²")
-        
-        # Kat bilgisi - bulundugu_kat alanından
-        bulundugu_kat = l.get('bulundugu_kat')
-        if bulundugu_kat is not None and bulundugu_kat != '':
-            try:
-                # Artık tam sayı olduğunu biliyoruz
-                kat_no = int(bulundugu_kat)
-                
-                # Özel durumlar için kontrol
-                if kat_no == 0:
-                    ozellikler_liste.append("Giriş Kat")
-                elif kat_no < 0:
-                    ozellikler_liste.append("Bodrum Kat")
-                else:
-                    # Tam sayıya "Kat" kelimesini ekleyelim
-                    ozellikler_liste.append(f"{kat_no}. Kat")
-            except:
-                # Sayı olarak çevrilemezse olduğu gibi göster ama "Kat" ifadesini ekle
-                if "kat" not in str(bulundugu_kat).lower():
-                    ozellikler_liste.append(f"{bulundugu_kat}. Kat")
-                else:
-                    ozellikler_liste.append(f"{bulundugu_kat}")
-        
-        # Özellikler string'i - varsa alanı kullan, yoksa liste oluştur
-        if 'ozellikler' in l and l['ozellikler']:
-            ozellikler = l['ozellikler']
-            
-            # Tek başına sayı olan alanları bul ve "X. Kat" olarak değiştir
-            ozellikler_parts = ozellikler.split('|')
-            for i, part in enumerate(ozellikler_parts):
-                part = part.strip()
-                # Eğer bu kısım sadece bir sayı ise
-                if re.match(r'^\d+$', part):
-                    kat_no = int(part)
-                    if kat_no == 0:
-                        ozellikler_parts[i] = "Giriş Kat"
-                    elif kat_no < 0:
-                        ozellikler_parts[i] = "Bodrum Kat"
-                    else:
-                        ozellikler_parts[i] = f"{kat_no}. Kat"
-            
-            ozellikler = " | ".join(ozellikler_parts)
-        else:
-            ozellikler = " | ".join(ozellikler_liste) if ozellikler_liste else "(özellik bilgisi yok)"
-        
-        # HTML oluştur - başlık kırpılmadan, tüm bilgiler dahil edilmiş ve PDF butonu eklenmiş
-        ilan_html = (
-            f"<li><strong>{i}. {baslik}</strong><br>"
-            f"İlan No: {ilan_no} | Lokasyon: {lokasyon}<br>"
-            f"Fiyat: {fiyat} | {ozellikler}<br>"
-            f"<button onclick=\"window.open('https://sibelgpt-backend.onrender.com/generate-property-pdf/{ilan_no}', '_blank')\" "
-            f"style='margin-top:6px; padding:6px 15px; background:#1976d2; color:white; border:none; "
-            f"border-radius:25px; cursor:pointer; font-size:13px; font-weight:500; display:inline-flex; "
-            f"align-items:center; gap:5px; box-shadow:0 2px 5px rgba(0,0,0,0.1); transition:all 0.3s ease;' "
-            f"onmouseover=\"this.style.background='#115293'; this.style.transform='translateY(-1px)';\" "
-            f"onmouseout=\"this.style.background='#1976d2'; this.style.transform='translateY(0)';\">"
-            f"<i class='fas fa-file-pdf' style='font-size:16px;'></i> PDF İndir</button></li>"
-        )
-        formatted_parts.append(ilan_html)
-    
-    # Liste HTML'i ekle
-    final_output += "<ul>" + "\n".join(formatted_parts) + "</ul>"
-    
-    final_output += "<p>Bu ilanların doğruluğunu kontrol ettim. Farklı bir arama yapmak isterseniz, lütfen kriterleri belirtiniz.</p>"
-    
-    return final_output
+   # Maksimum ilan sayısını sınırlama - SibelGPT yanıt sınırlamasına uygun
+   MAX_LISTINGS_TO_SHOW = 10  # Daha fazla ilan göstermek için artırıldı
+   listings_to_format = listings[:MAX_LISTINGS_TO_SHOW]
+   
+   # Toplam ve gösterilen ilan sayısını hesapla
+   total_count = len(listings)
+   shown_count = len(listings_to_format)
+   
+   # Açıklayıcı mesaj ve telefon numarasını birleştir
+   final_output = "<p><strong>📞 Sorgunuzla ilgili ilanlar burada listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
+   
+   formatted_parts = []
+   for i, l in enumerate(listings_to_format, start=1):
+       # İlan numarası - ilan_id veya ilan_no alanından
+       ilan_no = l.get('ilan_id', l.get('ilan_no', str(i)))
+       
+       # Başlık - tam başlığı göster, kısaltma yapma
+       baslik = l.get('baslik', '(başlık yok)')
+       
+       # Lokasyon - tam haliyle göster
+       lokasyon = l.get('lokasyon', '?')
+       
+       # Fiyat formatlaması
+       fiyat = "?"
+       fiyat_raw = l.get('fiyat')
+       if fiyat_raw:
+           try:
+               fiyat_num = float(str(fiyat_raw).replace('.', '').replace(',', '.'))
+               fiyat = f"{fiyat_num:,.0f} ₺".replace(',', '.') 
+           except:
+               fiyat = str(fiyat_raw)
+       
+       # Özellikler - tüm bilgileri dahil et
+       ozellikler_liste = []
+       
+       # Oda sayısı - doğrudan al
+       oda_sayisi = l.get('oda_sayisi', '')
+       if oda_sayisi:
+           ozellikler_liste.append(oda_sayisi)
+       
+       # Metrekare - doğrudan al
+       metrekare = l.get('metrekare', '')
+       if metrekare:
+           ozellikler_liste.append(f"{metrekare} m²")
+       
+       # Kat bilgisi - bulundugu_kat alanından
+       bulundugu_kat = l.get('bulundugu_kat')
+       if bulundugu_kat is not None and bulundugu_kat != '':
+           try:
+               # Artık tam sayı olduğunu biliyoruz
+               kat_no = int(bulundugu_kat)
+               
+               # Özel durumlar için kontrol
+               if kat_no == 0:
+                   ozellikler_liste.append("Giriş Kat")
+               elif kat_no < 0:
+                   ozellikler_liste.append("Bodrum Kat")
+               else:
+                   # Tam sayıya "Kat" kelimesini ekleyelim
+                   ozellikler_liste.append(f"{kat_no}. Kat")
+           except:
+               # Sayı olarak çevrilemezse olduğu gibi göster ama "Kat" ifadesini ekle
+               if "kat" not in str(bulundugu_kat).lower():
+                   ozellikler_liste.append(f"{bulundugu_kat}. Kat")
+               else:
+                   ozellikler_liste.append(f"{bulundugu_kat}")
+       
+       # Özellikler string'i - varsa alanı kullan, yoksa liste oluştur
+       if 'ozellikler' in l and l['ozellikler']:
+           ozellikler = l['ozellikler']
+           
+           # Tek başına sayı olan alanları bul ve "X. Kat" olarak değiştir
+           ozellikler_parts = ozellikler.split('|')
+           for i, part in enumerate(ozellikler_parts):
+               part = part.strip()
+               # Eğer bu kısım sadece bir sayı ise
+               if re.match(r'^\d+$', part):
+                   kat_no = int(part)
+                   if kat_no == 0:
+                       ozellikler_parts[i] = "Giriş Kat"
+                   elif kat_no < 0:
+                       ozellikler_parts[i] = "Bodrum Kat"
+                   else:
+                       ozellikler_parts[i] = f"{kat_no}. Kat"
+           
+           ozellikler = " | ".join(ozellikler_parts)
+       else:
+           ozellikler = " | ".join(ozellikler_liste) if ozellikler_liste else "(özellik bilgisi yok)"
+       
+       # HTML oluştur - başlık kırpılmadan, tüm bilgiler dahil edilmiş ve PDF butonu eklenmiş
+       ilan_html = (
+           f"<li><strong>{i}. {baslik}</strong><br>"
+           f"İlan No: {ilan_no} | Lokasyon: {lokasyon}<br>"
+           f"Fiyat: {fiyat} | {ozellikler}<br>"
+           f"<button onclick=\"window.open('https://sibelgpt-backend.onrender.com/generate-property-pdf/{ilan_no}', '_blank')\" "
+           f"style='margin-top:6px; padding:6px 15px; background:#1976d2; color:white; border:none; "
+           f"border-radius:25px; cursor:pointer; font-size:13px; font-weight:500; display:inline-flex; "
+           f"align-items:center; gap:5px; box-shadow:0 2px 5px rgba(0,0,0,0.1); transition:all 0.3s ease;' "
+           f"onmouseover=\"this.style.background='#115293'; this.style.transform='translateY(-1px)';\" "
+           f"onmouseout=\"this.style.background='#1976d2'; this.style.transform='translateY(0)';\">"
+           f"<i class='fas fa-file-pdf' style='font-size:16px;'></i> PDF İndir</button></li>"
+       )
+       formatted_parts.append(ilan_html)
+   
+   # Liste HTML'i ekle
+   final_output += "<ul>" + "\n".join(formatted_parts) + "</ul>"
+   
+   final_output += "<p>Bu ilanların doğruluğunu kontrol ettim. Farklı bir arama yapmak isterseniz, lütfen kriterleri belirtiniz.</p>"
+   
+   return final_output
 
 # ── Ana Fonksiyon ─────────────────────────────────────────
 async def answer_question(question: str, mode: str = "real-estate") -> str:
-    """Kullanıcının sorusuna yanıt verir ve gerektiğinde başka modüle yönlendirir."""
-    
-    print(f"↪ Soru: {question}, Mod: {mode}")
-    
-    # Sorunun hangi alana ait olduğunu tespit et
-    detected_topic = await detect_topic(question)
-    
-    # Tanılama için loglama ekle
-    print(f"✓ Tespit edilen konu: {detected_topic}, Kullanıcının seçtiği mod: {mode}")
-    
-    # Eğer tespit edilen konu, seçili moddan farklıysa yönlendirme mesajı göster
-    if detected_topic != mode:
-        redirection_key = f"{mode}-to-{detected_topic}"
-        print(f"⟹ Yönlendirme anahtarı: {redirection_key}")
-        
-        if redirection_key in REDIRECTION_MESSAGES:
-            return REDIRECTION_MESSAGES[redirection_key]
-    
-    # Normal işleme devam et
-    query_emb = await get_embedding(question)
-    
-    # Gayrimenkul modu için Supabase'den ilanları getir
-    if mode == "real-estate":
-        listings = await search_listings_in_supabase(query_emb)
-        context = format_context_for_sibelgpt(listings)
-    else:
-        # Diğer modlar için boş context
-        context = ""
-    
-    # Seçili moda göre system prompt'u al
-    system_prompt = SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["real-estate"])
-    
-    messages = [
-        {"role": "system", "content": f"{system_prompt}<br><br>{context}"},
-        {"role": "user", "content": question}
-    ]
+   """Kullanıcının sorusuna yanıt verir ve gerektiğinde başka modüle yönlendirir."""
+   
+   print(f"↪ Soru: {question}, Mod: {mode}")
+   
+   # Sorunun hangi alana ait olduğunu tespit et
+   detected_topic = await detect_topic(question, mode)
+   
+   # Tanılama için loglama ekle
+   print(f"✓ Tespit edilen konu: {detected_topic}, Kullanıcının seçtiği mod: {mode}")
+   
+   # Eğer tespit edilen konu, seçili moddan farklıysa yönlendirme mesajı göster
+   if detected_topic != mode:
+       redirection_key = f"{mode}-to-{detected_topic}"
+       print(f"⟹ Yönlendirme anahtarı: {redirection_key}")
+       
+       if redirection_key in REDIRECTION_MESSAGES:
+           return REDIRECTION_MESSAGES[redirection_key]
+   
+   # Normal işleme devam et
+   query_emb = await get_embedding(question)
+   
+   # Gayrimenkul modu için Supabase'den ilanları getir
+   if mode == "real-estate":
+       listings = await search_listings_in_supabase(query_emb)
+       context = format_context_for_sibelgpt(listings)
+   else:
+       # Diğer modlar için boş context
+       context = ""
+   
+   # Seçili moda göre system prompt'u al
+   system_prompt = SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["real-estate"])
+   
+   messages = [
+       {"role": "system", "content": f"{system_prompt}<br><br>{context}"},
+       {"role": "user", "content": question}
+   ]
 
-    try:
-        resp = await openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            temperature=0.7,
-            max_tokens=4096
-        )
-        return resp.choices[0].message.content.strip()
-    except Exception as exc:
-        print("❌ Chat yanıt hatası:", exc)
-        return "Üzgünüm, şu anda bir hata oluştu."
+   try:
+       resp = await openai_client.chat.completions.create(
+           model="gpt-4o-mini",
+           messages=messages,
+           temperature=0.7,
+           max_tokens=4096
+       )
+       return resp.choices[0].message.content.strip()
+   except Exception as exc:
+       print("❌ Chat yanıt hatası:", exc)
+       return "Üzgünüm, şu anda bir hata oluştu."
 
 # ── Terminalden Test ──────────────────────────────────────
 if __name__ == "__main__":
-    q = input("Soru: ")
-    loop = asyncio.get_event_loop()
-    print(loop.run_until_complete(answer_question(q)))
+   q = input("Soru: ")
+   loop = asyncio.get_event_loop()
+   print(loop.run_until_complete(answer_question(q)))
