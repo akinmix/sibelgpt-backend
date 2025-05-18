@@ -34,7 +34,7 @@ import search_handler
 class ChatRequest(BaseModel):
     question: str
     mode: str = "real-estate"
-
+    conversation_history: List[Dict] = []
 class WebSearchRequest(BaseModel):
     question: str
     mode: str = "real-estate"
