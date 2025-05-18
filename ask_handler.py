@@ -384,7 +384,7 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
         all_results = response.data if hasattr(response, "data") else []
         
         # Gerçek sonuç sayısını göster - benzerlik puanına göre filtreleme
-           valid_results = [r for r in all_results if r.get('similarity', 0) > MATCH_THRESHOLD]
+    valid_results = [r for r in all_results if r.get('similarity', 0) > MATCH_THRESHOLD]
        
        print(f"✅ İlanlar sorgulandı: Toplam {len(valid_results)} gerçek ilişkili ilan bulundu")
        
