@@ -373,18 +373,18 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
         print("🔍 İlanlar sorgulanıyor...")
         
         response = supabase.rpc(
-            "match_remax_listings",
-            {
-                "query_embedding": query_embedding,
-                "match_threshold": MATCH_THRESHOLD,
-                "match_count": MATCH_COUNT  # Maksimum sayı
-            }
-        ).execute()
-        
-        all_results = response.data if hasattr(response, "data") else []
-        
-        # Gerçek sonuç sayısını göster - benzerlik puanına göre filtreleme
-    valid_results = [r for r in all_results if r.get('similarity', 0) > MATCH_THRESHOLD]
+           "match_remax_listings",
+           {
+               "query_embedding": query_embedding,
+               "match_threshold": MATCH_THRESHOLD,
+               "match_count": MATCH_COUNT  # Maksimum sayı
+           }
+       ).execute()
+       
+       all_results = response.data if hasattr(response, "data") else []
+       
+       # Gerçek sonuç sayısını göster - benzerlik puanına göre filtreleme
+       valid_results = [r for r in all_results if r.get('similarity', 0) > MATCH_THRESHOLD]
        
        print(f"✅ İlanlar sorgulandı: Toplam {len(valid_results)} gerçek ilişkili ilan bulundu")
        
