@@ -3,7 +3,7 @@ import os
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict
 
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +35,7 @@ class ChatRequest(BaseModel):
     question: str
     mode: str = "real-estate"
     conversation_history: List[Dict] = []
+
 class WebSearchRequest(BaseModel):
     question: str
     mode: str = "real-estate"
@@ -111,7 +112,11 @@ async def health_check(db_client = Depends(get_supabase_client)):
 @app.post("/chat", tags=["chat"])
 async def chat(payload: ChatRequest, db_client = Depends(get_supabase_client)):
     try:
-        answer = await ask_handler.answer_question(payload.question, payload.mode)
+        answer = await ask_handler.answer_question(
+            payload.question, 
+            payload.mode, 
+            payload.conversation_history
+        )
         return {"reply": answer}
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
