@@ -240,6 +240,24 @@ REDIRECTION_MESSAGES = {
 async def detect_topic(question: str) -> str:
     """Kullanıcının sorusunun hangi alana ait olduğunu tespit eder."""
     
+    # Selamlaşma ve genel sohbet kontrolü için liste
+    selamlasma_kaliplari = [
+        "merhaba", "selam", "hello", "hi", "hey", "sa", "günaydın", "iyi günler", 
+        "iyi akşamlar", "nasılsın", "naber", "ne haber", "hoş geldin", "nasıl gidiyor"
+    ]
+    
+    # Soruyu küçük harfe çevirip noktolama işaretlerini kaldıralım
+    clean_question = question.lower()
+    for char in ".,;:!?-_()[]{}\"'":
+        clean_question = clean_question.replace(char, " ")
+    
+    # Eğer sadece selamlaşma içeriyorsa ve kısa bir mesajsa, mevcut modu koru
+    if len(clean_question.split()) <= 3:  # 3 kelimeden kısa mesajlar için
+        for kalip in selamlasma_kaliplari:
+            if kalip in clean_question:
+                print(f"✓ Selamlaşma mesajı tespit edildi, mevcut modda kalınıyor: {kalip}")
+                return mode  # Mevcut modun adını döndür
+    
     # Alanları tanımlayan anahtar kelimeler
     topics = {
         "real-estate": [
@@ -262,11 +280,6 @@ async def detect_topic(question: str) -> str:
         ]
     }
     
-    # Soruyu küçük harfe çevirip noktolama işaretlerini kaldıralım
-    clean_question = question.lower()
-    for char in ".,;:!?-_()[]{}\"'":
-        clean_question = clean_question.replace(char, " ")
-    
     # Her kategori için eşleşen kelime sayısını sayalım
     matches = {topic: 0 for topic in topics}
     
@@ -280,6 +293,11 @@ async def detect_topic(question: str) -> str:
     
     # Eğer hiç eşleşme yoksa veya çok az eşleşme varsa, içeriği belirsiz olarak işaretleyelim
     if max_matches <= 1:
+        # Çok kısa ve genel sohbet mesajları için mevcut modu koru
+        if len(clean_question.split()) <= 5:  # 5 kelimeden kısa mesajlar için
+            print(f"✓ Kısa genel mesaj tespit edildi, mevcut modda kalınıyor")
+            return mode  # Mevcut modu döndür
+            
         # Yeterli eşleşme yoksa, sorunun içeriğini OpenAI API ile analiz et
         try:
             resp = await openai_client.chat.completions.create(
@@ -292,7 +310,9 @@ async def detect_topic(question: str) -> str:
                                     1. real-estate (emlak, gayrimenkul, ev, daire, kiralık, satılık vb.)
                                     2. mind-coach (numeroloji, astroloji, psikoloji, kişisel gelişim vb.)
                                     3. finance (borsa, hisse, yatırım, ekonomi, kripto, döviz vb.)
-                                    Eğer mesaj belirgin bir kategoriye ait değilse, en yakın kategoriyi seç."""
+                                    4. general (selamlaşma, günlük konuşma, sohbet vb.)
+                                    Eğer mesaj "merhaba", "selam", "nasılsın" gibi basit selamlaşma veya 
+                                    genel sohbet içeriyorsa "general" olarak belirt."""
                     },
                     {"role": "user", "content": question}
                 ],
@@ -301,26 +321,33 @@ async def detect_topic(question: str) -> str:
             )
             detected_topic = resp.choices[0].message.content.strip().lower()
             
+            # "general" kategorisi döndüyse, mevcut modda kal
+            if "general" in detected_topic:
+                print(f"✓ GPT tarafından genel sohbet olarak tespit edildi, mevcut modda kalınıyor")
+                return mode
+                
             # Eğer yanıt direkt kategori adı değilse, içindeki kategori adını çıkaralım
             for topic in topics.keys():
                 if topic in detected_topic:
                     return topic
             
-            # Hala belirleyemediyse, varsayılan olarak real-estate döndür
-            return "real-estate"
+            # Hala belirleyemediyse, mevcut modu koru
+            return mode
             
         except Exception as e:
             print(f"⚠️ Konu tespiti hatası: {e}")
-            # Hata durumunda varsayılan olarak real-estate döndür
-            return "real-estate"
+            # Hata durumunda mevcut modu koru
+            return mode
     
     # En çok eşleşme olan kategoriyi döndür
     for topic, count in matches.items():
         if count == max_matches:
             return topic
     
-    # Hiçbir şey bulunamazsa varsayılan olarak real-estate döndür
-    return "real-estate"
+    # Hiçbir şey bulunamazsa mevcut modu koru
+    return mode
+    
+
 
 # ── Embedding Fonksiyonu ───────────────────────────────────
 async def get_embedding(text: str) -> Optional[List[float]]:
