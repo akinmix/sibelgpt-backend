@@ -1,5 +1,3 @@
-
-
 import os
 import asyncio 
 import locale
@@ -56,27 +54,28 @@ SYSTEM_PROMPTS = {
 
     ÖNEMLİ KURALLAR:
     1. Kullanıcının gayrimenkul ile ilgili HER TÜR sorusuna kapsamlı yanıt ver. Asla "yardımcı olamıyorum" deme.
-    2. Gayrimenkul mevzuatı, sözleşmeler ve hukuki konularda bilgi ver, ancak önemli yasal konularda bir avukata danışmalarını öner.
-    3. İlanlar için Supabase'den gelen 'İLGİLİ İLANLAR' verilerini kullan ve en alakalı ilanları seç.
-    4. İlanlarda danışman adı veya firma bilgisi belirtme. İlanları nötr bir şekilde sun.
-    5. Sadece SATILIK ilanları göster, kiralık ilanları filtreleme.
-    6. Profesyonel bir gayrimenkul danışmanı gibi davran. Kullanıcının gayrimenkul aramalarında aşağıdaki sohbet akışını izle:
+    2. Kullanıcının önceki mesajlarındaki TÜM BİLGİLERİ HATIRLA VE TEKRAR SORMA (bölge, bütçe, oda sayısı vs.).
+    3. Gayrimenkul mevzuatı, sözleşmeler ve hukuki konularda bilgi ver, ancak önemli yasal konularda bir avukata danışmalarını öner.
+    4. İlanlar için Supabase'den gelen 'İLGİLİ İLANLAR' verilerini kullan ve en alakalı ilanları seç.
+    5. İlanlarda danışman adı veya firma bilgisi belirtme. İlanları nötr bir şekilde sun.
+    6. Sadece SATILIK ilanları göster, kiralık ilanları filtreleme.
+    7. Profesyonel bir gayrimenkul danışmanı gibi davran. Kullanıcının gayrimenkul aramalarında aşağıdaki sohbet akışını izle:
        a) İlk sorgudan sonra EN FAZLA 1-2 kritik soru sor (bütçe, oda sayısı, bölge tercihi gibi).
        b) Tüm soruları aynı anda sorma; kullanıcının cevaplarına göre sohbeti yönlendir.
        c) Kullanıcının verdiği her bilgiyi değerlendir ve gereksiz soruları atla.
        d) 3-4 mesaj alışverişi sonrası somut öneriler sun.
        e) Kullanıcı zaten detaylı bilgi verdiyse (bütçe, oda sayısı, lokasyon gibi), hemen ilgili ilanları göster.
-    7. Doğal ve samimi bir sohbet akışı oluştur:
+    8. Doğal ve samimi bir sohbet akışı oluştur:
        a) "Erenköy'de ev arıyorum" → "Bütçeniz nedir?" → "3 milyon TL" → "Kaç oda istiyorsunuz?" → "3+1" → [Sonuçları göster]
        b) "Kadıköy'de 5 milyon bütçeyle 3+1 daire arıyorum" → [Doğrudan sonuçları göster, gereksiz soru sorma]
        c) "Ev arıyorum" → "Hangi bölgede ve nasıl bir ev düşünüyorsunuz?" → "Üsküdar'da" → "Bütçeniz ve oda tercihinizi paylaşırsanız size daha iyi yardımcı olabilirim."
-    8. İlanları gösterirken, HTML formatında şu bilgileri göster:
+    9. İlanları gösterirken, HTML formatında şu bilgileri göster:
        a) İlan başlığı (tam ismi, kısaltma kullanma)
        b) Lokasyon bilgisi (ilçe, mahalle)
        c) Fiyat, metrekare, oda sayısı
        d) İlan numarası ve PDF butonu
-    9. Her zaman sonuç odaklı ol. Amaç, kullanıcının ideal gayrimenkulünü en hızlı şekilde bulmasına yardım etmek.
-    10. Selamlaşma ve Genel Sohbetler:
+    10. Her zaman sonuç odaklı ol. Amaç, kullanıcının ideal gayrimenkulünü en hızlı şekilde bulmasına yardım etmek.
+    11. Selamlaşma ve Genel Sohbetler:
        a) "Merhaba", "Nasılsın", "İyi günler", "Selam" gibi selamlaşma mesajlarını, başka bir modüle yönlendirmeden doğrudan yanıtla.
        b) "Bugün günlerden ne?", "Hava nasıl?", "Bana yardımcı olur musun?" gibi genel sorularda diğer modüle yönlendirme yapma.
        c) Kullanıcı sadece sohbet başlatıyorsa, mevcut modül üzerinden devam et ve onları başka modüle yönlendirme.
@@ -216,7 +215,7 @@ REDIRECTION_MESSAGES = {
 }
 
 
-async def detect_topic(question: str, mode: str) -> str:
+async def detect_topic(question: str, mode: str = None) -> str:
     """Kullanıcının sorusunun hangi alana ait olduğunu tespit eder."""
     
     selamlasma_kaliplari = [
@@ -232,7 +231,7 @@ async def detect_topic(question: str, mode: str) -> str:
         for kalip in selamlasma_kaliplari:
             if kalip in clean_question:
                 print(f"✓ Selamlaşma mesajı tespit edildi, mevcut modda kalınıyor: {kalip}")
-                return mode
+                return mode if mode else "real-estate"
     
     topics = {
         "real-estate": [
@@ -269,7 +268,7 @@ async def detect_topic(question: str, mode: str) -> str:
     if max_matches <= 1:
         if len(clean_question.split()) <= 5:
             print(f"✓ Kısa genel mesaj tespit edildi, mevcut modda kalınıyor")
-            return mode
+            return mode if mode else "real-estate"
             
         try:
             resp = await openai_client.chat.completions.create(
@@ -295,23 +294,23 @@ async def detect_topic(question: str, mode: str) -> str:
             
             if "general" in detected_topic_by_gpt:
                 print(f"✓ GPT tarafından genel sohbet olarak tespit edildi, mevcut modda kalınıyor")
-                return mode
+                return mode if mode else "real-estate"
                 
             for topic_key in topics.keys():
                 if topic_key in detected_topic_by_gpt:
                     return topic_key
             
-            return mode
+            return mode if mode else "real-estate"
             
         except Exception as e:
             print(f"⚠️ Konu tespiti hatası (OpenAI API): {e}")
-            return mode
+            return mode if mode else "real-estate"
     
     for topic, count in matches.items():
         if count == max_matches:
             return topic
     
-    return mode
+    return mode if mode else "real-estate"
 
 # ── Embedding Fonksiyonu ───────────────────────────────────
 async def get_embedding(text: str) -> Optional[List[float]]:
@@ -355,7 +354,6 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
        
         if not valid_results:
             print("⚠️ Hiç ilan bulunamadı!")
-            # return [] # Bu return zaten alttaki return valid_results ile kapsanıyor, eğer valid_results boşsa boş liste döner
        
         return valid_results
        
@@ -477,7 +475,9 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     return final_output
 
 # ── Ana Fonksiyon ─────────────────────────────────────────
-async def answer_question(question: str, mode: str = "real-estate") -> str:
+async def answer_question(question: str, mode: str = "real-estate", conversation_history: List = None) -> str:
+    """Kullanıcının sorusuna yanıt verir ve gerektiğinde başka modüle yönlendirir."""
+    
     print(f"↪ Soru: {question}, Mod: {mode}")
    
     detected_topic_result = await detect_topic(question, mode)
@@ -489,9 +489,6 @@ async def answer_question(question: str, mode: str = "real-estate") -> str:
         
         if redirection_key in REDIRECTION_MESSAGES:
             return REDIRECTION_MESSAGES[redirection_key]
-        # else: Yönlendirme mesajı bulunamazsa ne yapılacağı belirtilmemiş, mevcut modda devam edebilir.
-        # Şimdilik, yönlendirme mesajı yoksa ve konu farklıysa bile mevcut modda devam ediyor.
-        # Bu davranış istenmiyorsa buraya bir `else` bloğu eklenebilir.
    
     query_emb = await get_embedding(question)
    
@@ -505,10 +502,19 @@ async def answer_question(question: str, mode: str = "real-estate") -> str:
    
     system_prompt = SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["real-estate"])
    
+    # Mesajları oluştur - sistem mesajını ekle
     messages = [
-        {"role": "system", "content": f"{system_prompt}<br><br>İLGİLİ İLANLAR:<br>{context if context else 'Uygun ilan bulunamadı veya bu mod için ilan aranmıyor.'}"},
-        {"role": "user", "content": question}
+        {"role": "system", "content": f"{system_prompt}<br><br>İLGİLİ İLANLAR:<br>{context if context else 'Uygun ilan bulunamadı veya bu mod için ilan aranmıyor.'}"}
     ]
+    
+    # Eğer sohbet geçmişi varsa ekle
+    if conversation_history and len(conversation_history) > 0:
+        for msg in conversation_history:
+            if isinstance(msg, dict) and 'role' in msg and 'text' in msg:
+                messages.append({"role": msg['role'], "content": msg['text']})
+    
+    # Kullanıcının yeni sorusunu ekle
+    messages.append({"role": "user", "content": question})
 
     try:
         resp = await openai_client.chat.completions.create(
@@ -528,7 +534,7 @@ if __name__ == "__main__":
     async def main():
         q = input("Soru: ")
         # Varsayılan mod "real-estate" olarak ayarlandı, test için değiştirilebilir.
-        response = await answer_question(q, mode="real-estate") 
+        response = await answer_question(q, mode="real-estate", conversation_history=[]) 
         print(response)
 
     # asyncio.run() Python 3.7+ için daha modern bir yoldur.
