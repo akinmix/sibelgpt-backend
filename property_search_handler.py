@@ -1,6 +1,6 @@
 # property_search_handler.py
 # SibelGPT Emlak İlan Arama Modülü
-
+ 
 import os
 import json
 import math
