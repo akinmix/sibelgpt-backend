@@ -1,6 +1,6 @@
 # property_search_handler.py
 # SibelGPT için: Maksimum log, maksimum sağlamlık!
-
+ 
 import numpy as np
 import os
 import json
