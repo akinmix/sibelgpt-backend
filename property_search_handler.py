@@ -10,7 +10,6 @@ import asyncio
 import traceback
 from typing import List, Dict, Optional, Any
 
-# Supabase ve OpenAI bağlantıları için gerekli importlar
 try:
     from openai import AsyncOpenAI
     from supabase import create_client
@@ -25,11 +24,9 @@ SB_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY")
 if not all([OAI_KEY, SB_URL, SB_KEY]):
     raise RuntimeError("Eksik API anahtarı veya Supabase bağlantı bilgisi.")
 
-# İstemciler
 openai_client = AsyncOpenAI(api_key=OAI_KEY)
 supabase_client = create_client(SB_URL, SB_KEY)
 
-# Ayarlar
 EMBEDDING_MODEL = "text-embedding-3-small"
 MATCH_THRESHOLD = 0.3
 MATCH_COUNT = 50
@@ -48,35 +45,46 @@ async def get_embedding(text: str) -> Optional[List[float]]:
         return resp.data[0].embedding
     except Exception as exc:
         print(f"❌ Embedding hatası: {exc}")
+        print(traceback.format_exc())
         return None
 
 def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
-    dot_product = sum(a * b for a, b in zip(vec1, vec2))
-    magnitude1 = math.sqrt(sum(a * a for a in vec1))
-    magnitude2 = math.sqrt(sum(b * b for b in vec2))
-    if magnitude1 * magnitude2 == 0:
+    try:
+        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        magnitude1 = math.sqrt(sum(a * a for a in vec1))
+        magnitude2 = math.sqrt(sum(b * b for b in vec2))
+        if magnitude1 * magnitude2 == 0:
+            return 0
+        return dot_product / (magnitude1 * magnitude2)
+    except Exception as exc:
+        print(f"❌ Cosine similarity hatası: {exc}")
+        print(traceback.format_exc())
         return 0
-    return dot_product / (magnitude1 * magnitude2)
 
 def is_property_search_query(query: str) -> bool:
-    query_lower = query.lower()
-    search_terms = [
-        "ev", "daire", "konut", "villa", "apart", "stüdyo", "rezidans",
-        "ara", "bul", "göster", "ilan", "satılık", "kiralık", "emlak",
-        "mahalle", "ilçe", "bölge", "oda", "metrekare", "m2", "fiyat", "tl", "₺"
-    ]
-    search_patterns = [
-        r'\d+\+\d+', r'\d+\s*milyon', r'\d+\s*[mM]²', r'kaç\s*[mM]²', r'\d+\s*oda',
-        r'kaç\s*oda', r'kadar\s*fiyat', r'bütçe[m\s]', r'en\s*ucuz', r'en\s*pahalı',
-        r'ara[nıtyp]*(m?a)', r'bul[a-z]*(m?a)', r'göster[a-z]*(m?e)',
-    ]
-    for term in search_terms:
-        if term in query_lower:
-            return True
-    for pattern in search_patterns:
-        if re.search(pattern, query_lower):
-            return True
-    return False
+    try:
+        query_lower = query.lower()
+        search_terms = [
+            "ev", "daire", "konut", "villa", "apart", "stüdyo", "rezidans",
+            "ara", "bul", "göster", "ilan", "satılık", "kiralık", "emlak",
+            "mahalle", "ilçe", "bölge", "oda", "metrekare", "m2", "fiyat", "tl", "₺"
+        ]
+        search_patterns = [
+            r'\d+\+\d+', r'\d+\s*milyon', r'\d+\s*[mM]²', r'kaç\s*[mM]²', r'\d+\s*oda',
+            r'kaç\s*oda', r'kadar\s*fiyat', r'bütçe[m\s]', r'en\s*ucuz', r'en\s*pahalı',
+            r'ara[nıtyp]*(m?a)', r'bul[a-z]*(m?a)', r'göster[a-z]*(m?e)',
+        ]
+        for term in search_terms:
+            if term in query_lower:
+                return True
+        for pattern in search_patterns:
+            if re.search(pattern, query_lower):
+                return True
+        return False
+    except Exception as exc:
+        print(f"❌ Sorgu analiz hatası: {exc}")
+        print(traceback.format_exc())
+        return False
 
 # --- Parametre Çıkarma ---
 
@@ -156,8 +164,9 @@ async def hybrid_property_search(question: str) -> List[Dict]:
                         fiyat = float(fiyat_temiz)
                         if fiyat <= max_fiyat:
                             filtered_listings.append(l)
-                except (ValueError, TypeError):
-                    filtered_listings.append(l)
+                except (ValueError, TypeError) as err:
+                    print(f"Fiyat filtreleme hatası: {err}")
+                    print(traceback.format_exc())
             listings = filtered_listings
 
         print(f"📋 Veritabanı sorgusu {len(listings)} ilan buldu")
@@ -175,12 +184,18 @@ async def hybrid_property_search(question: str) -> List[Dict]:
                             listing_embedding = json.loads(embedding_raw)
                         except Exception as e:
                             print("Embedding JSON decode hatası:", e)
+                            print(traceback.format_exc())
                             listing_embedding = []
                     else:
                         listing_embedding = embedding_raw
-                    listing_embedding_np = np.array(listing_embedding, dtype=np.float32)
-                    similarity = cosine_similarity(query_embedding_np, listing_embedding_np)
-                    listing['similarity'] = similarity
+                    try:
+                        listing_embedding_np = np.array(listing_embedding, dtype=np.float32)
+                        similarity = cosine_similarity(query_embedding_np, listing_embedding_np)
+                        listing['similarity'] = similarity
+                    except Exception as emb_err:
+                        print(f"Benzerlik hesaplama hatası: {emb_err}")
+                        print(traceback.format_exc())
+                        listing['similarity'] = 0
                 else:
                     listing['similarity'] = 0
             listings = sorted(listings, key=lambda x: x.get('similarity', 0), reverse=True)
@@ -196,8 +211,7 @@ async def hybrid_property_search(question: str) -> List[Dict]:
         print(traceback.format_exc())
         return []
 
-# Burada, format_property_listings, search_properties, test_search gibi diğer yardımcı fonksiyonlarını yukarıdan KOPYALA ve ekle!
-# (Bunlarda büyük hata yoksa eski halini kullanabilirsin.)
+# (Buraya diğer yardımcı fonksiyonları ekle — search_properties, test_search, vs.)
 
 if __name__ == "__main__":
     asyncio.run(test_search())
