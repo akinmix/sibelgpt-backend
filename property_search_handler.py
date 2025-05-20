@@ -212,38 +212,42 @@ def format_property_listings(listings: list) -> str:
     if not listings:
         return "<p>Hiç ilan bulunamadı.</p>"
     
-    # Güncellenmiş stil - font boyutları düzeltildi, hizalama iyileştirildi
+    # Çerçeveli tablo stili
     css_style = """
     <style>
     .property-table {
         width: 100%;
         border-collapse: collapse;
         margin: 20px 0;
-        font-size: 13px; /* Font boyutu küçültüldü */
-        border-radius: 8px;
+        font-size: 13px;
+        border: 2px solid #1976d2; /* Dış çerçeve eklendi */
+        border-radius: 4px;
         overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        table-layout: fixed; /* Sütun genişliklerini sabitler */
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        table-layout: fixed;
     }
     .property-table thead tr {
         background-color: #1976d2;
         color: white;
-        text-align: left;
+        text-align: center; /* Başlıklar ortalandı */
         font-weight: 600;
-        font-size: 12px; /* Başlık font boyutu küçültüldü */
-        text-transform: uppercase; /* Başlıkları büyük harfle gösterir */
-        letter-spacing: 0.5px; /* Harfler arası boşluk */
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     .property-table th,
     .property-table td {
-        padding: 10px 8px; /* Padding azaltıldı */
+        padding: 10px 8px;
         text-align: left;
-        border-bottom: 1px solid #e0e0e0;
+        border: 1px solid #ccc; /* Tüm hücrelere çizgi eklendi */
         overflow: hidden;
-        text-overflow: ellipsis; /* Uzun metinleri kırpar */
-        white-space: nowrap; /* Tek satırda kalmasını sağlar */
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
-    /* Sütun genişlikleri ayarlandı */
+    .property-table thead th {
+        border-bottom: 2px solid #0d47a1; /* Başlık altına kalın çizgi */
+    }
+    /* Sütun genişlikleri */
     .property-table th:nth-child(1), .property-table td:nth-child(1) { width: 10%; } /* İlan No */
     .property-table th:nth-child(2), .property-table td:nth-child(2) { width: 30%; } /* Başlık */
     .property-table th:nth-child(3), .property-table td:nth-child(3) { width: 20%; } /* Lokasyon */
@@ -255,15 +259,15 @@ def format_property_listings(listings: list) -> str:
         border-bottom: 1px solid #e0e0e0;
     }
     .property-table tbody tr:nth-of-type(even) {
-        background-color: #f9f9f9;
+        background-color: #f5f5f5;
     }
     .property-table tbody tr:hover {
-        background-color: #f0f7ff;
+        background-color: #e3f2fd; /* Hover rengi değiştirildi */
     }
     .pdf-btn {
-        background-color: #d32f2f; /* Kırmızı renk */
+        background-color: #d32f2f;
         color: white;
-        padding: 4px 8px;
+        padding: 5px 10px;
         border: none;
         border-radius: 4px;
         cursor: pointer;
@@ -272,19 +276,22 @@ def format_property_listings(listings: list) -> str:
         text-decoration: none;
         text-align: center;
         font-weight: 500;
+        width: 100%; /* Butonu hücreye tam sığdır */
+        box-sizing: border-box;
         transition: background-color 0.2s;
     }
     .pdf-btn:hover {
-        background-color: #b71c1c; /* Hover durumunda daha koyu kırmızı */
+        background-color: #b71c1c;
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
     /* Mobil cihazlar için düzenlemeler */
     @media screen and (max-width: 768px) {
         .property-table {
             font-size: 11px;
+            border-width: 1px; /* Mobilde daha ince çerçeve */
         }
         .property-table th, .property-table td {
-            padding: 8px 4px;
+            padding: 6px 4px;
         }
         .pdf-btn {
             padding: 3px 6px;
