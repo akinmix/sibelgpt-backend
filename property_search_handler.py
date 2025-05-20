@@ -156,7 +156,7 @@ async def hybrid_property_search(question: str) -> List[Dict]:
             for l in listings:
                 try:
                     fiyat_str = l.get('fiyat', '0')
-                    fiyat_temiz = fiyat_str.replace('.', '').replace(',', '.')
+                    fiyat_temiz = fiyat_str.replace('.', '').replace(',', '.').strip()
                     fiyat = float(fiyat_temiz)
                     if fiyat <= max_fiyat:
                         filtered_listings.append(l)
