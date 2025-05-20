@@ -335,7 +335,7 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
     """Remax ilanlar tablosundan arama yapar."""
     if query_embedding is None:
          print("⚠️ Query embedding boş, arama yapılamıyor!")
-        return []
+         return []
     
     try:
         print("🔍 İlanlar sorgulanıyor...")
