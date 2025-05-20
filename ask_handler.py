@@ -84,6 +84,8 @@ SYSTEM_PROMPTS = {
        c) Kullanıcı sadece sohbet başlatıyorsa, mevcut modül üzerinden devam et ve onları başka modüle yönlendirme.
        d) Günlük konuşmalara, şu anki modda kalarak samimi ve dostça cevap ver.
        e) Sadece açıkça başka bir modülün uzmanlık alanına giren konularda (örn: "Borsada hisse analizi" veya "Numeroloji hesaplama") yönlendirme yap.
+    13. ÇOK ÖNEMLİ: Bulunan TÜM ilgili ilanları göster, filtreleme yapma! Kullanıcı ilanlar arasından seçim yapmak isteyecektir, bu yüzden veritabanından dönen ve kriterlerle uyumlu TÜM ilanları (maksimum 20 adet) göster. 
+        Sadece 3-4 ilan değil, tüm bulunan ilanları listelemek önemlidir. Çünkü kullanıcı tüm seçenekleri görmek istiyor.
 
     KAPANIŞ MESAJLARI:
     - Her türlü gayrimenkul sorusuna yanıt verirken (ilan göstersen de göstermesen de), yanıtın sonuna: "<p style='color:#3498db;'><strong>📞 Profesyonel gayrimenkul danışmanlığı için: 532 687 84 64</strong></p>" ekle.
@@ -410,7 +412,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         except locale.Error:
             pass # Locale ayarlanamazsa devam et
 
-    MAX_LISTINGS_TO_SHOW = 10
+    MAX_LISTINGS_TO_SHOW = 20
     listings_to_format = listings[:MAX_LISTINGS_TO_SHOW]
     if not listings_to_format:
         return "🔍 Belirtilen kriterlere uygun ilan bulunamadı. Lütfen aramanızı genişletin."
