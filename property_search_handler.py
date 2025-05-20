@@ -247,12 +247,12 @@ async def hybrid_property_search(question: str) -> List[Dict]:
 # ── İlan Formatlama Fonksiyonu ───────────────────────────
 
 def format_property_listings(listings: List[Dict]) -> str:
-    """İlanları HTML olarak formatlar."""
+    """İlanları HTML tablo olarak formatlar."""
     if not listings:
         return "<p>🔍 Bu kriterlere uygun ilan bulunamadı. Lütfen farklı arama kriterleri deneyiniz.</p>"
     
+    # Locale ayarı
     try:
-        # Locale ayarlarını yap
         import locale
         try:
             locale.setlocale(locale.LC_ALL, 'tr_TR.UTF-8')
@@ -260,22 +260,103 @@ def format_property_listings(listings: List[Dict]) -> str:
             try:
                 locale.setlocale(locale.LC_ALL, 'tr_TR')
             except locale.Error:
-                pass  # Locale ayarlanamazsa devam et
-
+                pass
     except ImportError:
-        pass  # locale modülü bulunamazsa devam et
+        pass
     
     MAX_LISTINGS_TO_SHOW = 20
     listings_to_format = listings[:MAX_LISTINGS_TO_SHOW]
     
-    output = "<p><strong>📞 Sorgunuzla ilgili ilanlar burada listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
+    output = "<p><strong>📞 Sorgunuzla ilgili ilanlar aşağıdaki tabloda listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
     
-    output += "<ul>"
+    # Responsive ve modern tablo stili
+    output += """
+    <style>
+    .property-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+        font-family: 'Segoe UI', Arial, sans-serif;
+        box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .property-table th {
+        background-color: #1976d2;
+        color: white;
+        padding: 12px 15px;
+        text-align: left;
+        font-weight: 600;
+    }
+    
+    .property-table tr {
+        border-bottom: 1px solid #dddddd;
+    }
+    
+    .property-table tr:nth-of-type(even) {
+        background-color: #f3f3f3;
+    }
+    
+    .property-table tr:last-of-type {
+        border-bottom: 2px solid #1976d2;
+    }
+    
+    .property-table td {
+        padding: 12px 15px;
+        vertical-align: top;
+    }
+    
+    .property-table .btn-pdf {
+        display: inline-block;
+        padding: 6px 12px;
+        background: #1976d2;
+        color: white;
+        border: none;
+        border-radius: 25px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+    
+    .property-table .btn-pdf:hover {
+        background: #115293;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    
+    @media screen and (max-width: 600px) {
+        .property-table {
+            display: block;
+            overflow-x: auto;
+        }
+    }
+    </style>
+    """
+    
+    # Tablo başlangıcı
+    output += """
+    <table class="property-table">
+        <thead>
+            <tr>
+                <th>Detaylar</th>
+                <th>Lokasyon</th>
+                <th>Fiyat</th>
+                <th>Özellikler</th>
+                <th>İşlem</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    
+    # Tablo içeriği
     for i, listing in enumerate(listings_to_format, start=1):
         ilan_no = listing.get('ilan_id', f"ilan-{i}")
         baslik = listing.get('baslik', '(başlık yok)')
         
-        # Lokasyon bilgisini oluştur
+        # Lokasyon bilgisi
         ilce = listing.get('ilce', '')
         mahalle = listing.get('mahalle', '')
         lokasyon = listing.get('lokasyon', '')
@@ -290,11 +371,10 @@ def format_property_listings(listings: List[Dict]) -> str:
         else:
             lokasyon_str = "(lokasyon bilgisi yok)"
         
-        # Fiyat bilgisini oluştur
+        # Fiyat bilgisi
         fiyat = listing.get('fiyat', '')
         if fiyat:
             try:
-                # Sayısal fiyatı formatlı göster
                 fiyat_str = fiyat
                 if isinstance(fiyat, (int, float)):
                     fiyat_str = f"{fiyat:,.0f} ₺".replace(',', '.').replace('.', ',')
@@ -303,7 +383,7 @@ def format_property_listings(listings: List[Dict]) -> str:
         else:
             fiyat_str = "(fiyat bilgisi yok)"
         
-        # Özellikler listesini oluştur
+        # Özellikler
         ozellikler = []
         
         # Oda sayısı
@@ -335,28 +415,35 @@ def format_property_listings(listings: List[Dict]) -> str:
         
         ozellikler_str = " | ".join(ozellikler) if ozellikler else "(özellik bilgisi yok)"
         
-        # İlan HTML'ini oluştur
-        ilan_html = (
-            f"<li><strong>{i}. {baslik}</strong><br>"
-            f"İlan No: {ilan_no} | Lokasyon: {lokasyon_str}<br>"
-            f"Fiyat: {fiyat_str} | {ozellikler_str}<br>"
-            f"<button onclick=\"window.open('https://sibelgpt-backend.onrender.com/generate-property-pdf/{ilan_no}', '_blank')\" "
-            f"style='margin-top:6px; padding:6px 15px; background:#1976d2; color:white; border:none; "
-            f"border-radius:25px; cursor:pointer; font-size:13px; font-weight:500; display:inline-flex; "
-            f"align-items:center; gap:5px; box-shadow:0 2px 5px rgba(0,0,0,0.1); transition:all 0.3s ease;' "
-            f"onmouseover=\"this.style.background='#115293'; this.style.transform='translateY(-1px)';\" "
-            f"onmouseout=\"this.style.background='#1976d2'; this.style.transform='translateY(0)';\">"
-            f"<i class='fas fa-file-pdf' style='font-size:16px;'></i> PDF İndir</button></li>"
-        )
-        output += ilan_html
+        # Tablo satırı
+        output += f"""
+        <tr>
+            <td>
+                <strong>{baslik}</strong><br>
+                <small>İlan No: {ilan_no}</small>
+            </td>
+            <td>{lokasyon_str}</td>
+            <td><strong>{fiyat_str}</strong></td>
+            <td>{ozellikler_str}</td>
+            <td>
+                <a href="https://sibelgpt-backend.onrender.com/generate-property-pdf/{ilan_no}" target="_blank" class="btn-pdf">
+                    <i class="fas fa-file-pdf" style="margin-right: 5px;"></i> PDF İndir
+                </a>
+            </td>
+        </tr>
+        """
     
-    output += "</ul>"
+    # Tablo sonu
+    output += """
+        </tbody>
+    </table>
+    """
     
-    # İlan ID'lerini log için ekle
+    # İlan ID'leri (debugging için, isterseniz kaldırabilirsiniz)
     real_ids = [listing.get('ilan_id') for listing in listings_to_format if listing.get('ilan_id')]
     output += f"<p><strong>VERİTABANINDAKİ GERÇEK İLAN NUMARALARI: {', '.join(real_ids)}</strong></p>"
     
-    output += "<p>Bu ilanların doğruluğunu kontrol ettim. Farklı bir arama yapmak isterseniz, lütfen kriterleri belirtiniz.</p>"
+    output += "<p>Farklı bir arama yapmak isterseniz, lütfen kriterleri belirtiniz.</p>"
     
     return output
 
