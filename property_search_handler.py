@@ -160,7 +160,7 @@ async def hybrid_property_search(question: str) -> List[Dict]:
                     fiyat = float(fiyat_temiz)
                     if fiyat <= max_fiyat:
                         fiyat = float(fiyat_temiz)
-                            filtered_listings.append(l)
+                         filtered_listings.append(l)
                 except (ValueError, TypeError) as err:
                     print(f"Fiyat float dönüştürme hatası: {fiyat_str} -> {fiyat_temiz} ({err})")
                     print(traceback.format_exc())
