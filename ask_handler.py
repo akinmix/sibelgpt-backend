@@ -352,7 +352,11 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
         # Ham yanıtı logla
         print(f"🔮 Supabase RPC yanıtı: {type(response)}")
         
-        all_results = response.data if hasattr(response, "data") and response.data is not None else []
+        all_results = response.data if hasattr(response, "data") and response.data is not None else [] 
+        # Alan adlarını düzelt (ilan_no -> ilan_id)
+        for r in all_results:
+            if isinstance(r, dict) and 'ilan_no' in r and 'ilan_id' not in r:
+                r['ilan_id'] = r['ilan_no']  # ilan_no'yu ilan_id olarak kopyala
 
         # İlk sonuçta hangi alanların olduğunu kontrol et
         if all_results and len(all_results) > 0:
