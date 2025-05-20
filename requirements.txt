@@ -21,5 +21,6 @@ reportlab                 # PDF oluşturma kütüphanesi - versiyon belirtmeden
 # --- İsteğe bağlı: hızlı dosya servis / health (Backend API için) ---
 aiofiles==24.1.0          # FastAPI statik servis ederken dosya okuma
 Pillow
-elevenlabs==0.2.27  
+elevenlabs==0.2.27
 
+numpy
