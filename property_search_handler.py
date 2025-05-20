@@ -8,7 +8,7 @@ import math
 import re
 import asyncio
 import traceback
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Any
 
 # Supabase ve OpenAI bağlantıları için gerekli importlar
 try:
@@ -17,7 +17,7 @@ try:
 except ImportError:
     raise RuntimeError("Gerekli kütüphaneler eksik: openai veya supabase")
 
-# ── Ortam Değişkenleri ─────────────────────────────────────
+# Ortam değişkenleri
 OAI_KEY = os.getenv("OPENAI_API_KEY")
 SB_URL = os.getenv("SUPABASE_URL")
 SB_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY")
@@ -25,16 +25,16 @@ SB_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY")
 if not all([OAI_KEY, SB_URL, SB_KEY]):
     raise RuntimeError("Eksik API anahtarı veya Supabase bağlantı bilgisi.")
 
-# İstemcileri oluştur
+# İstemciler
 openai_client = AsyncOpenAI(api_key=OAI_KEY)
 supabase_client = create_client(SB_URL, SB_KEY)
 
-# ── Ayarlar ────────────────────────────────────────────────
+# Ayarlar
 EMBEDDING_MODEL = "text-embedding-3-small"
 MATCH_THRESHOLD = 0.3
 MATCH_COUNT = 50
 
-# ── Temel Fonksiyonlar ───────────────────────────────────
+# --- Temel Fonksiyonlar ---
 
 async def get_embedding(text: str) -> Optional[List[float]]:
     text = text.strip()
@@ -78,7 +78,7 @@ def is_property_search_query(query: str) -> bool:
             return True
     return False
 
-# ── Parametre Çıkarma ve SQL Oluşturma ────────────────────
+# --- Parametre Çıkarma ---
 
 async def extract_query_parameters(question: str) -> Dict:
     try:
@@ -115,7 +115,7 @@ async def extract_query_parameters(question: str) -> Dict:
         print(traceback.format_exc())
         return {}
 
-# ── Hibrit Arama Fonksiyonu ───────────────────────────────
+# --- Hibrit Arama Fonksiyonu ---
 
 async def hybrid_property_search(question: str) -> List[Dict]:
     try:
@@ -162,7 +162,7 @@ async def hybrid_property_search(question: str) -> List[Dict]:
 
         print(f"📋 Veritabanı sorgusu {len(listings)} ilan buldu")
 
-        # 3. Embedding ile benzerlik skoru
+        # Embedding ile benzerlik skoru
         query_embedding = await get_embedding(question)
 
         if query_embedding and listings:
@@ -196,12 +196,8 @@ async def hybrid_property_search(question: str) -> List[Dict]:
         print(traceback.format_exc())
         return []
 
-# ── İlan Formatlama Fonksiyonu (değişmedi) ────────────────
-# ... (Senin mevcut format_property_listings fonksiyonunu buraya ekle, yukarıda doğru ve uzun haliyle aynen bırakabilirsin.)
+# Burada, format_property_listings, search_properties, test_search gibi diğer yardımcı fonksiyonlarını yukarıdan KOPYALA ve ekle!
+# (Bunlarda büyük hata yoksa eski halini kullanabilirsin.)
 
-# ── Ana Arama Fonksiyonu (değişmedi) ─────────────────────
-# ... (search_properties ve test_search fonksiyonları yukarıdaki gibi aynı kalabilir.)
-
-# ── Dosya doğrudan çalıştırılırsa ────────────────────────
 if __name__ == "__main__":
     asyncio.run(test_search())
