@@ -74,6 +74,7 @@ SYSTEM_PROMPTS = {
        b) Lokasyon bilgisi (ilçe, mahalle)
        c) Fiyat, metrekare, oda sayısı
        d) İlan numarası ve PDF butonu
+       e) En önemlisi: Kriterlere uyan TÜM ilanları göster, hiçbirini atlama! Kullanıcıya tüm seçenekleri sunmak için, bulunan tüm ilanları listelemen gerekiyor.
     10. Her zaman sonuç odaklı ol. Amaç, kullanıcının ideal gayrimenkulünü en hızlı şekilde bulmasına yardım etmek.
     11. 🔴 KRİTİK UYARI: ASLA UYDURMA İLAN NUMARALARI VERME! SADECE ve SADECE aşağıda "VERİTABANINDAKİ GERÇEK İLAN NUMARALARI" başlığı altında verilen gerçek ilan numaralarını göster. 
         Bu numaralar dışında başka herhangi bir ilan numarası ASLA KULLANMA. Eğer bir ilan göstereceksen, sadece bu listedeki numaralardan birini kullan. 
