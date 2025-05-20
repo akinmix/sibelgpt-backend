@@ -75,7 +75,9 @@ SYSTEM_PROMPTS = {
        c) Fiyat, metrekare, oda sayısı
        d) İlan numarası ve PDF butonu
     10. Her zaman sonuç odaklı ol. Amaç, kullanıcının ideal gayrimenkulünü en hızlı şekilde bulmasına yardım etmek.
-    11. ÇOK ÖNEMLİ: ASLA UYDURMA İLAN NUMARALARI VERME! Sadece ve sadece Supabase'den gelen gerçek ilan numaralarını kullan. Eğer arama sonucunda hiç ilan bulunamazsa, "Bu kriterlere uygun ilan bulunamadı" diyerek kullanıcıyı bilgilendir ve aramayı genişletmesini öner.
+    11. 🔴 KRİTİK UYARI: ASLA UYDURMA İLAN NUMARALARI VERME! SADECE ve SADECE aşağıda "VERİTABANINDAKİ GERÇEK İLAN NUMARALARI" başlığı altında verilen gerçek ilan numaralarını göster. 
+        Bu numaralar dışında başka herhangi bir ilan numarası ASLA KULLANMA. Eğer bir ilan göstereceksen, sadece bu listedeki numaralardan birini kullan. 
+        Listede olmayan numaraları ASLA kullanma. Eğer yeterli gerçek ilan yoksa, "Bu kriterlere uygun ilan bulunamadı" diyerek kullanıcıyı bilgilendir.
     12. Selamlaşma ve Genel Sohbetler:
        a) "Merhaba", "Nasılsın", "İyi günler", "Selam" gibi selamlaşma mesajlarını, başka bir modüle yönlendirmeden doğrudan yanıtla.
        b) "Bugün günlerden ne?", "Hava nasıl?", "Bana yardımcı olur musun?" gibi genel sorularda diğer modüle yönlendirme yapma.
@@ -473,6 +475,10 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         formatted_parts.append(ilan_html)
    
     final_output += "<ul>" + "\n".join(formatted_parts) + "</ul>"
+    real_ids = [l_item.get('ilan_id') for l_item in listings_to_format if l_item.get('ilan_id')]
+    print(f"🏷️ İlan Veritabanındaki Gerçek İlan Numaraları: {real_ids}")
+    if real_ids:
+        final_output += f"<p><strong>VERİTABANINDAKİ GERÇEK İLAN NUMARALARI: {', '.join(real_ids)}</strong></p>"
     final_output += "<p>Bu ilanların doğruluğunu kontrol ettim. Farklı bir arama yapmak isterseniz, lütfen kriterleri belirtiniz.</p>"
    
     return final_output
