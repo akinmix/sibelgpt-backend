@@ -1,9 +1,9 @@
 # property_search_handler.py
-# SibelGPT Emlak İlan Arama Modülü
+# SibelGPT için: Maksimum log, maksimum sağlamlık!
 
 import numpy as np
 import os
-import json 
+import json
 import math
 import re
 import asyncio
@@ -16,7 +16,6 @@ try:
 except ImportError:
     raise RuntimeError("Gerekli kütüphaneler eksik: openai veya supabase")
 
-# Ortam değişkenleri
 OAI_KEY = os.getenv("OPENAI_API_KEY")
 SB_URL = os.getenv("SUPABASE_URL")
 SB_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY")
@@ -31,8 +30,7 @@ EMBEDDING_MODEL = "text-embedding-3-small"
 MATCH_THRESHOLD = 0.3
 MATCH_COUNT = 50
 
-# --- Temel Fonksiyonlar ---
-
+# --- Embedding çekme ---
 async def get_embedding(text: str) -> Optional[List[float]]:
     text = text.strip()
     if not text:
@@ -48,6 +46,7 @@ async def get_embedding(text: str) -> Optional[List[float]]:
         print(traceback.format_exc())
         return None
 
+# --- Benzerlik hesaplama ---
 def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
     try:
         dot_product = sum(a * b for a, b in zip(vec1, vec2))
@@ -61,6 +60,7 @@ def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
         print(traceback.format_exc())
         return 0
 
+# --- Sorgu tipi anlama (opsiyonel, ana fonksiyon için değil) ---
 def is_property_search_query(query: str) -> bool:
     try:
         query_lower = query.lower()
@@ -87,7 +87,6 @@ def is_property_search_query(query: str) -> bool:
         return False
 
 # --- Parametre Çıkarma ---
-
 async def extract_query_parameters(question: str) -> Dict:
     try:
         print(f"🔍 Sorgudan parametreler çıkarılıyor: {question}")
@@ -123,8 +122,7 @@ async def extract_query_parameters(question: str) -> Dict:
         print(traceback.format_exc())
         return {}
 
-# --- Hibrit Arama Fonksiyonu ---
-
+# --- Ana Arama Fonksiyonu ---
 async def hybrid_property_search(question: str) -> List[Dict]:
     try:
         params = await extract_query_parameters(question)
@@ -137,7 +135,6 @@ async def hybrid_property_search(question: str) -> List[Dict]:
             query = query.ilike("ilce", f"%{lokasyon}%")
             result = query.execute()
             listings = result.data if result.data else []
-
             if not listings:
                 query = supabase_client.table("remax_ilanlar").select("*")
                 query = query.ilike("mahalle", f"%{lokasyon}%")
@@ -173,7 +170,6 @@ async def hybrid_property_search(question: str) -> List[Dict]:
 
         # Embedding ile benzerlik skoru
         query_embedding = await get_embedding(question)
-
         if query_embedding and listings:
             query_embedding_np = np.array(query_embedding, dtype=np.float32)
             for listing in listings:
@@ -211,7 +207,31 @@ async def hybrid_property_search(question: str) -> List[Dict]:
         print(traceback.format_exc())
         return []
 
-# (Buraya diğer yardımcı fonksiyonları ekle — search_properties, test_search, vs.)
+# --- Sonuçları HTML tabloya çevir ---
+def format_property_listings(listings: list) -> str:
+    if not listings:
+        return "<p>Hiç ilan bulunamadı.</p>"
+    html = "<table><tr><th>Başlık</th><th>Lokasyon</th><th>Fiyat</th><th>Oda</th></tr>"
+    for ilan in listings[:10]:
+        html += f"<tr><td>{ilan.get('baslik','')}</td><td>{ilan.get('lokasyon','')}</td><td>{ilan.get('fiyat','')}</td><td>{ilan.get('oda_sayisi','')}</td></tr>"
+    html += "</table>"
+    return html
+
+# --- Ana arama fonksiyonu: Dışarıdan çağrılır ---
+async def search_properties(query: str) -> str:
+    try:
+        listings = await hybrid_property_search(query)
+        return format_property_listings(listings)
+    except Exception as e:
+        print(f"❌ search_properties hatası: {e}")
+        print(traceback.format_exc())
+        return "<p>Bir hata oluştu.</p>"
+
+# --- Kendi başına test etmek istersen ---
+async def test_search():
+    soru = "Kadıköy'de 20 milyona kadar 3+1 daire"
+    html = await search_properties(soru)
+    print(html)
 
 if __name__ == "__main__":
     asyncio.run(test_search())
