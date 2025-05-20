@@ -157,35 +157,60 @@ async def hybrid_property_search(question: str) -> List[Dict]:
         # 1. Sorgudan parametreleri çıkar
         params = await extract_query_parameters(question)
         
-        # 2. Supabase sorgusu oluştur
+        print(f"🔍 Çıkarılan parametreler: {params}")
+        
+        # 2. Basit SQL sorgusu oluştur
+        # Supabase'in filtreleme fonksiyonlarını kullanarak sorgu yapalım
         query = supabase_client.table("remax_ilanlar").select("*")
         
         # Lokasyon filtresi
         if params.get('lokasyon'):
             lokasyon = params['lokasyon'].lower()
-            # OR koşulu ile ilçe, mahalle veya lokasyon alanlarında ara
-            query = query.or_(f"ilce.ilike.%{lokasyon}%,mahalle.ilike.%{lokasyon}%,lokasyon.ilike.%{lokasyon}%")
-        
+            # İlçe'de ara
+            query = query.ilike("ilce", f"%{lokasyon}%")
+            
+            # Sonuçları çek
+            result = query.execute()
+            listings = result.data
+            
+            # Eğer ilçede sonuç bulunamadıysa, mahallede ara
+            if not listings:
+                query = supabase_client.table("remax_ilanlar").select("*")
+                query = query.ilike("mahalle", f"%{lokasyon}%")
+                result = query.execute()
+                listings = result.data
+            
+        else:
+            # Lokasyon yoksa tüm ilanları getir (limit ile)
+            result = query.limit(50).execute()
+            listings = result.data if result.data else []
+            
         # Oda sayısı filtresi
-        if params.get('oda_sayisi'):
+        if params.get('oda_sayisi') and listings:
+            # Oda sayısı filtresini memory'de yapalım
             oda_sayisi = params['oda_sayisi'].lower()
-            query = query.eq("oda_sayisi", oda_sayisi)
+            listings = [l for l in listings if l.get('oda_sayisi', '').lower() == oda_sayisi]
         
-        # Diğer filtreleri ekleyelim
-        
-        # Maksimum fiyat filtresi (en sık kullanılan)
-        if params.get('max_fiyat'):
-            # Supabase'de tam bir metinsel fiyat karşılaştırması yapamıyoruz
-            # Basit bir yaklaşımla, en büyük fiyat değerinden az olan ilanları getirelim
-            # Bu tam doğru olmayabilir, ama bir yaklaşımdır
-            pass  # Supabase'in metinsel fiyat karşılaştırmasını desteklemediği için devre dışı bırakıyoruz
-        
-        # Sorguyu çalıştır
-        result = query.execute()
-        
-        # SQL sonuçlarını al
-        listings = result.data if hasattr(result, 'data') and result.data else []
-        
+        # Max fiyat filtresi (eğer varsa)
+        if params.get('max_fiyat') and listings:
+            max_fiyat = params.get('max_fiyat')
+            # Basit bir yaklaşımla memory'de filtreleyelim
+            filtered_listings = []
+            for l in listings:
+                try:
+                    fiyat_str = l.get('fiyat', '0')
+                    # Rakam ve nokta dışındaki karakterleri kaldır
+                    fiyat_temiz = re.sub(r'[^0-9.]', '', fiyat_str.replace(',', '.'))
+                    if fiyat_temiz:
+                        fiyat = float(fiyat_temiz)
+                        if fiyat <= max_fiyat:
+                            filtered_listings.append(l)
+                except (ValueError, TypeError):
+                    # Hatalı fiyat verisi varsa, ilanı dahil et
+                    filtered_listings.append(l)
+            
+            listings = filtered_listings
+            
         print(f"📋 Veritabanı sorgusu {len(listings)} ilan buldu")
         
         # 3. Embedding'i hesapla ve sonuçları sırala
