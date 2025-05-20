@@ -334,6 +334,7 @@ async def get_embedding(text: str) -> Optional[List[float]]:
 async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict]:
     """Remax ilanlar tablosundan arama yapar."""
     if query_embedding is None:
+         print("⚠️ Query embedding boş, arama yapılamıyor!")
         return []
     
     try:
@@ -347,23 +348,51 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
                 "match_count": MATCH_COUNT
             }
         ).execute()
+
+        # Ham yanıtı logla
+        print(f"🔮 Supabase RPC yanıtı: {type(response)}")
         
         all_results = response.data if hasattr(response, "data") and response.data is not None else []
+
+        # İlk sonuçta hangi alanların olduğunu kontrol et
+        if all_results and len(all_results) > 0:
+            first_result = all_results[0]
+            print(f"📋 İlk sonuç tüm alanlar: {first_result.keys() if isinstance(first_result, dict) else 'dict değil'}")
+            print(f"📋 İlk sonuç içeriği: {first_result}")
+            # İlan ID kontrolü
+            ilan_id = first_result.get('ilan_id') if isinstance(first_result, dict) else None
+            print(f"📋 İlk sonuç ilan_id: {ilan_id}")
+
+        # Filtreleme yaparken alanların varlığını kontrol et
+        valid_results = []
+        for i, r in enumerate(all_results[:10]):  # İlk 10 sonucu göster
+            print(f"📌 Sonuç #{i}: Tüm alanlar - {r.keys() if isinstance(r, dict) else 'dict değil'}")
+            similarity = r.get('similarity', 0) if isinstance(r, dict) else 0
+            print(f"📌 Sonuç #{i}: Similarity - {similarity}")
+            ilan_id = r.get('ilan_id') if isinstance(r, dict) else None
+            print(f"📌 Sonuç #{i}: ilan_id - {ilan_id}")
+            
+            if isinstance(r, dict) and r.get('similarity', 0) > MATCH_THRESHOLD:
+                valid_results.append(r)
+                
+          print(f"✅ İlanlar sorgulandı: Toplam {len(valid_results)} gerçek ilişkili ilan bulundu")  
+
+         # Geçerli sonuçlardaki ilan_id'leri kontrol et
+        if valid_results:
+            valid_ids = [r.get('ilan_id') for r in valid_results if r.get('ilan_id')]
+            print(f"🏷️ Geçerli ilan ID'leri: {valid_ids[:5]}... (ilk 5)")
         
-        # Düzeltilmiş Girinti: Bu satırlar 'try' bloğunun içinde olmalı
-        valid_results = [r for r in all_results if r.get('similarity', 0) > MATCH_THRESHOLD]
-       
-        print(f"✅ İlanlar sorgulandı: Toplam {len(valid_results)} gerçek ilişkili ilan bulundu")
-       
         if not valid_results:
             print("⚠️ Hiç ilan bulunamadı!")
-       
+        
         return valid_results
-       
-    except Exception as exc: # Düzeltilmiş Girinti: 'except' 'try' ile aynı hizada olmalı
-        print("❌ Arama işleminde hata:", exc)
+        
+    except Exception as exc:
+        print(f"❌ Arama işleminde hata: {exc}")
+        import traceback
+        print(f"🔥 Hata detayı: {traceback.format_exc()}")
         return []
-
+        
 # ── Formatlama Fonksiyonu ─────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     if not listings:
