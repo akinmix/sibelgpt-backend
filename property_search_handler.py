@@ -219,16 +219,25 @@ async def hybrid_property_search(question: str) -> List[Dict]:
         if query_embedding and listings:
             # Her listing için benzerlik skoru hesapla
             for listing in listings:
-                if 'embedding' in listing and listing['embedding']:
-                    listing_embedding = listing['embedding']
-                    
-                    # Kosinüs benzerliği hesapla
-                    query_embedding = np.array(query_embedding, dtype=np.float32)
-                    listing_embedding = np.array(listing_embedding, dtype=np.float32)
-                    similarity = cosine_similarity(query_embedding, listing_embedding)
-                    listing['similarity'] = similarity
-                else:
-                    listing['similarity'] = 0
+        if 'embedding' in listing and listing['embedding']:
+        embedding_raw = listing['embedding']
+        # Embedding string mi? Diziye çevir!
+        if isinstance(embedding_raw, str):
+            try:
+                listing_embedding = json.loads(embedding_raw)
+            except Exception as e:
+                print("Embedding JSON decode hatası:", e)
+                listing_embedding = []
+        else:
+            listing_embedding = embedding_raw
+
+        query_embedding = np.array(query_embedding, dtype=np.float32)
+        listing_embedding = np.array(listing_embedding, dtype=np.float32)
+        similarity = cosine_similarity(query_embedding, listing_embedding)
+        listing['similarity'] = similarity
+    else:
+        listing['similarity'] = 0
+
             
             # Benzerliklere göre sırala
             listings = sorted(listings, key=lambda x: x.get('similarity', 0), reverse=True)
