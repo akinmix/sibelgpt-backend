@@ -6,7 +6,8 @@ import re
 from datetime import datetime
 from typing import Dict, List, Optional
 from pathlib import Path
-from fastapi import APIRouter, Response, HTTPException, from fastapi.responses import StreamingResponse 
+from fastapi import APIRouter, Response, HTTPException 
+from fastapi.responses import StreamingResponse 
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
