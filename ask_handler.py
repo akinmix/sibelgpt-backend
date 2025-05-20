@@ -375,7 +375,7 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
             if isinstance(r, dict) and r.get('similarity', 0) > MATCH_THRESHOLD:
                 valid_results.append(r)
                 
-          print(f"✅ İlanlar sorgulandı: Toplam {len(valid_results)} gerçek ilişkili ilan bulundu")  
+            print(f"✅ İlanlar sorgulandı: Toplam {len(valid_results)} gerçek ilişkili ilan bulundu")  
 
          # Geçerli sonuçlardaki ilan_id'leri kontrol et
         if valid_results:
