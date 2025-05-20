@@ -224,7 +224,7 @@ async def hybrid_property_search(question: str) -> List[Dict]:
                     
                     # Kosinüs benzerliği hesapla
                     query_embedding = np.array(query_embedding, dtype=np.float32)
-                    listing_embedding = np.array(listing_embedding, dtype=np.float32
+                    listing_embedding = np.array(listing_embedding, dtype=np.float32)
                     similarity = cosine_similarity(query_embedding, listing_embedding)
                     listing['similarity'] = similarity
                 else:
