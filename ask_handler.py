@@ -365,7 +365,7 @@ async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict
 # ── Formatlama Fonksiyonu ─────────────────────────────────
 def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     if not listings:
-        return "🔍 Uygun ilan bulunamadı."
+        return "🔍 Uygun ilan bulunamadı. Lütfen farklı arama kriterleri deneyin."
 
     try:
         locale.setlocale(locale.LC_ALL, 'tr_TR.UTF-8')
@@ -377,6 +377,8 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
 
     MAX_LISTINGS_TO_SHOW = 10
     listings_to_format = listings[:MAX_LISTINGS_TO_SHOW]
+    if not listings_to_format:
+        return "🔍 Belirtilen kriterlere uygun ilan bulunamadı. Lütfen aramanızı genişletin."
    
     final_output = "<p><strong>📞 Sorgunuzla ilgili ilanlar burada listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
    
