@@ -212,54 +212,84 @@ def format_property_listings(listings: list) -> str:
     if not listings:
         return "<p>Hiç ilan bulunamadı.</p>"
     
-    # Modern bir tablo stili ekleyelim
+    # Güncellenmiş stil - font boyutları düzeltildi, hizalama iyileştirildi
     css_style = """
     <style>
     .property-table {
         width: 100%;
         border-collapse: collapse;
         margin: 20px 0;
-        font-size: 15px;
+        font-size: 13px; /* Font boyutu küçültüldü */
         border-radius: 8px;
         overflow: hidden;
-        box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        table-layout: fixed; /* Sütun genişliklerini sabitler */
     }
     .property-table thead tr {
         background-color: #1976d2;
         color: white;
         text-align: left;
-        font-weight: bold;
+        font-weight: 600;
+        font-size: 12px; /* Başlık font boyutu küçültüldü */
+        text-transform: uppercase; /* Başlıkları büyük harfle gösterir */
+        letter-spacing: 0.5px; /* Harfler arası boşluk */
     }
     .property-table th,
     .property-table td {
-        padding: 12px 15px;
-        border-bottom: 1px solid #dddddd;
+        padding: 10px 8px; /* Padding azaltıldı */
+        text-align: left;
+        border-bottom: 1px solid #e0e0e0;
+        overflow: hidden;
+        text-overflow: ellipsis; /* Uzun metinleri kırpar */
+        white-space: nowrap; /* Tek satırda kalmasını sağlar */
     }
+    /* Sütun genişlikleri ayarlandı */
+    .property-table th:nth-child(1), .property-table td:nth-child(1) { width: 10%; } /* İlan No */
+    .property-table th:nth-child(2), .property-table td:nth-child(2) { width: 30%; } /* Başlık */
+    .property-table th:nth-child(3), .property-table td:nth-child(3) { width: 20%; } /* Lokasyon */
+    .property-table th:nth-child(4), .property-table td:nth-child(4) { width: 12%; } /* Fiyat */
+    .property-table th:nth-child(5), .property-table td:nth-child(5) { width: 8%; } /* Oda */
+    .property-table th:nth-child(6), .property-table td:nth-child(6) { width: 15%; } /* İşlem */
+    
     .property-table tbody tr {
-        border-bottom: 1px solid #dddddd;
+        border-bottom: 1px solid #e0e0e0;
     }
     .property-table tbody tr:nth-of-type(even) {
-        background-color: #f3f3f3;
-    }
-    .property-table tbody tr:last-of-type {
-        border-bottom: 2px solid #1976d2;
+        background-color: #f9f9f9;
     }
     .property-table tbody tr:hover {
-        background-color: #ddd;
+        background-color: #f0f7ff;
     }
     .pdf-btn {
-        background-color: #d32f2f;
+        background-color: #d32f2f; /* Kırmızı renk */
         color: white;
-        padding: 5px 10px;
+        padding: 4px 8px;
         border: none;
         border-radius: 4px;
         cursor: pointer;
-        font-size: 12px;
+        font-size: 11px;
         display: inline-block;
         text-decoration: none;
+        text-align: center;
+        font-weight: 500;
+        transition: background-color 0.2s;
     }
     .pdf-btn:hover {
-        background-color: #b71c1c;
+        background-color: #b71c1c; /* Hover durumunda daha koyu kırmızı */
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    /* Mobil cihazlar için düzenlemeler */
+    @media screen and (max-width: 768px) {
+        .property-table {
+            font-size: 11px;
+        }
+        .property-table th, .property-table td {
+            padding: 8px 4px;
+        }
+        .pdf-btn {
+            padding: 3px 6px;
+            font-size: 10px;
+        }
     }
     </style>
     """
@@ -284,19 +314,34 @@ def format_property_listings(listings: list) -> str:
     for ilan in listings[:10]:
         ilan_id = ilan.get('ilan_id', '')
         baslik = ilan.get('baslik', '')
-        lokasyon = ilan.get('ilce', '') if ilan.get('ilce') else ''
+        # Lokasyon bilgisini düzgün formatla
+        lokasyon = ""
+        if ilan.get('ilce'):
+            lokasyon += f"Kadıköy, " if "kadıköy" in ilan.get('ilce', '').lower() else f"{ilan.get('ilce')}, "
         if ilan.get('mahalle'):
-            lokasyon += f", {ilan.get('mahalle')}"
+            lokasyon += f"Suadiye Mah." if "suadiye" in ilan.get('mahalle', '').lower() else f"{ilan.get('mahalle')}"
+        # Fiyat formatlama - binlik ayırıcı ekle
         fiyat = ilan.get('fiyat', '')
+        try:
+            if isinstance(fiyat, (int, float)):
+                fiyat = f"{fiyat:,.0f}₺".replace(",", ".")
+            elif isinstance(fiyat, str) and fiyat.strip():
+                # Sadece sayısal değerleri al
+                fiyat_temiz = re.sub(r'[^\d]', '', fiyat)
+                if fiyat_temiz:
+                    fiyat = f"{int(fiyat_temiz):,.0f}₺".replace(",", ".")
+        except:
+            pass
+            
         oda_sayisi = ilan.get('oda_sayisi', '')
         
-        # PDF butonu - mevcut PDF endpointini kullan
+        # PDF butonu - kırmızı renkte
         pdf_button = ""
         if ilan_id:
             pdf_url = f"https://sibelgpt-backend.onrender.com/generate-property-pdf/{ilan_id}"
             pdf_button = f"""
             <a href="{pdf_url}" target="_blank" class="pdf-btn">
-                <i class="fas fa-file-pdf"></i> PDF İndir
+                PDF İndir
             </a>
             """
         
