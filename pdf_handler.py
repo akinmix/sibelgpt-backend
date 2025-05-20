@@ -5,13 +5,18 @@ import io
 import re
 from datetime import datetime
 from typing import Dict, List, Optional
-from fastapi import APIRouter, Response, HTTPException
+from pathlib import Path
+from fastapi import APIRouter, Response, HTTPException, FileResponse
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 from reportlab.lib.colors import HexColor
 from PIL import Image
 
+# ---- PDF Saklama Dizini ----
+APP_ROOT = Path(__file__).parent
+PDF_STORAGE_DIR = Path('./pdf_storage')
+os.makedirs(PDF_STORAGE_DIR, exist_ok=True)
 router = APIRouter()
 
 # FireCrawl API ayarları
@@ -311,8 +316,25 @@ async def create_compact_pdf(property_data: Dict) -> bytes:
 async def generate_property_pdf(property_id: str):
     """REMAX ilan ID'si ile PDF oluşturur"""
     
-    # 1. FireCrawl ile veriyi çek
+    # PDF'in depolama yolunu belirle
+    pdf_path = PDF_STORAGE_DIR / f"{property_id}.pdf"
+    
+    # PDF var mı kontrol et
+    if pdf_path.exists():
+        # PDF varsa doğrudan döndür
+        print(f"✅ Önceden oluşturulmuş PDF bulundu: {property_id}.pdf")
+        return FileResponse(
+            str(pdf_path),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={property_id}_ilan.pdf"
+            }
+        )
+    
+    # PDF yoksa oluştur ve kaydet
     try:
+        print(f"🔍 PDF bulunamadı, yeni PDF oluşturuluyor: {property_id}")
+        # 1. FireCrawl ile veriyi çek
         firecrawl_data = await scrape_property_with_firecrawl(property_id)
     except HTTPException as e:
         raise e
@@ -331,7 +353,15 @@ async def generate_property_pdf(property_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"PDF oluşturma hatası: {str(e)}")
     
-    # 4. PDF'i döndür
+    # 4. PDF'i dosyaya kaydet
+    try:
+        with open(pdf_path, "wb") as f:
+            f.write(pdf_bytes)
+        print(f"💾 PDF başarıyla kaydedildi: {property_id}.pdf")
+    except Exception as e:
+        print(f"❌ PDF kaydetme hatası: {str(e)}")
+    
+    # 5. PDF'i döndür
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
