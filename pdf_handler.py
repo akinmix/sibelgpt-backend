@@ -6,7 +6,7 @@ import re
 from datetime import datetime
 from typing import Dict, List, Optional
 from pathlib import Path
-from fastapi import APIRouter, Response, HTTPException, FileResponse
+from fastapi import APIRouter, Response, HTTPException, from fastapi.responses import StreamingResponse 
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
@@ -323,8 +323,10 @@ async def generate_property_pdf(property_id: str):
     if pdf_path.exists():
         # PDF varsa doğrudan döndür
         print(f"✅ Önceden oluşturulmuş PDF bulundu: {property_id}.pdf")
-        return FileResponse(
-            str(pdf_path),
+        with open(pdf_path, 'rb') as f:
+            content = f.read()
+        return StreamingResponse(
+            io.BytesIO(content),
             media_type="application/pdf",
             headers={
                 "Content-Disposition": f"attachment; filename={property_id}_ilan.pdf"
