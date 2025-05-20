@@ -211,10 +211,111 @@ async def hybrid_property_search(question: str) -> List[Dict]:
 def format_property_listings(listings: list) -> str:
     if not listings:
         return "<p>Hiç ilan bulunamadı.</p>"
-    html = "<table><tr><th>Başlık</th><th>Lokasyon</th><th>Fiyat</th><th>Oda</th></tr>"
+    
+    # Modern bir tablo stili ekleyelim
+    css_style = """
+    <style>
+    .property-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+        font-size: 15px;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+    }
+    .property-table thead tr {
+        background-color: #1976d2;
+        color: white;
+        text-align: left;
+        font-weight: bold;
+    }
+    .property-table th,
+    .property-table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #dddddd;
+    }
+    .property-table tbody tr {
+        border-bottom: 1px solid #dddddd;
+    }
+    .property-table tbody tr:nth-of-type(even) {
+        background-color: #f3f3f3;
+    }
+    .property-table tbody tr:last-of-type {
+        border-bottom: 2px solid #1976d2;
+    }
+    .property-table tbody tr:hover {
+        background-color: #ddd;
+    }
+    .pdf-btn {
+        background-color: #d32f2f;
+        color: white;
+        padding: 5px 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        display: inline-block;
+        text-decoration: none;
+    }
+    .pdf-btn:hover {
+        background-color: #b71c1c;
+    }
+    </style>
+    """
+    
+    # Tablo başlangıcı
+    html = css_style + '<table class="property-table">'
+    html += """
+    <thead>
+        <tr>
+            <th>İlan No</th>
+            <th>Başlık</th>
+            <th>Lokasyon</th>
+            <th>Fiyat</th>
+            <th>Oda</th>
+            <th>İşlem</th>
+        </tr>
+    </thead>
+    <tbody>
+    """
+    
+    # Her ilan için satır oluştur
     for ilan in listings[:10]:
-        html += f"<tr><td>{ilan.get('baslik','')}</td><td>{ilan.get('lokasyon','')}</td><td>{ilan.get('fiyat','')}</td><td>{ilan.get('oda_sayisi','')}</td></tr>"
-    html += "</table>"
+        ilan_id = ilan.get('ilan_id', '')
+        baslik = ilan.get('baslik', '')
+        lokasyon = ilan.get('ilce', '') if ilan.get('ilce') else ''
+        if ilan.get('mahalle'):
+            lokasyon += f", {ilan.get('mahalle')}"
+        fiyat = ilan.get('fiyat', '')
+        oda_sayisi = ilan.get('oda_sayisi', '')
+        
+        # PDF butonu - mevcut PDF endpointini kullan
+        pdf_button = ""
+        if ilan_id:
+            pdf_url = f"https://sibelgpt-backend.onrender.com/generate-property-pdf/{ilan_id}"
+            pdf_button = f"""
+            <a href="{pdf_url}" target="_blank" class="pdf-btn">
+                <i class="fas fa-file-pdf"></i> PDF İndir
+            </a>
+            """
+        
+        html += f"""
+        <tr>
+            <td>{ilan_id}</td>
+            <td>{baslik}</td>
+            <td>{lokasyon}</td>
+            <td>{fiyat}</td>
+            <td>{oda_sayisi}</td>
+            <td>{pdf_button}</td>
+        </tr>
+        """
+    
+    html += """
+    </tbody>
+    </table>
+    """
+    
     return html
 
 # --- Ana arama fonksiyonu: Dışarıdan çağrılır ---
