@@ -537,21 +537,28 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
         if redirection_key in REDIRECTION_MESSAGES:
             return REDIRECTION_MESSAGES[redirection_key]
    
-    query_emb = await get_embedding(question)
-   
     context = ""
     if mode == "real-estate":
-        if query_emb: # Sadece embedding başarılıysa ilan ara
-            listings = await search_listings_in_supabase(query_emb)
-            context = format_context_for_sibelgpt(listings)
+        # İlan araması olup olmadığını kontrol et
+        if property_search_handler.is_property_search_query(question):
+            print("📢 İlan araması tespit edildi, yeni arama modülü kullanılıyor...")
+            # Yeni arama modülünü kullan
+            context = await property_search_handler.search_properties(question)
         else:
-            context = "<p>Sorunuzu işlerken bir sorun oluştu, lütfen tekrar deneyin veya farklı bir soru sorun.</p>"
+            # Eski yöntemi kullan
+            print("📢 Normal soru tespit edildi, standart arama kullanılıyor...")
+            query_emb = await get_embedding(question)
+            if query_emb:
+                listings = await search_listings_in_supabase(query_emb)
+                context = format_context_for_sibelgpt(listings)
+            else:
+                context = "<p>Sorunuzu işlerken bir sorun oluştu, lütfen tekrar deneyin veya farklı bir soru sorun.</p>"
    
     system_prompt = SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["real-estate"])
    
     # Mesajları oluştur - sistem mesajını ekle
     messages = [
-        {"role": "system", "content": f"{system_prompt}<br><br>İLGİLİ İLANLAR:<br>{context if context else 'Uygun ilan bulunamadı veya bu mod için ilan aranmıyor.'}"}
+        {"role": "system", "content": f"{system_prompt}<br><br>İLGİLİ İLANLAR:<br>{context if context else 'Uygun ilan bulunamadı veya bu mod için ilan aranmıyor.'}<br><br>ÖNEMLİ: Bu ilanları olduğu gibi göster, filtreleme yapma! Tüm ilanları kullanıcıya sunmalısın!"}
     ]
     
     # Eğer sohbet geçmişi varsa ekle
@@ -565,7 +572,7 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
 
     try:
         resp = await openai_client.chat.completions.create(
-            model="gpt-4o-mini", # Model adı doğru olmalı, örn: "gpt-4o-mini"
+            model="gpt-4o-mini",
             messages=messages,
             temperature=0.7,
             max_tokens=4096
@@ -573,7 +580,6 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
         return resp.choices[0].message.content.strip()
     except Exception as exc:
         print("❌ Chat yanıt hatası:", exc)
-        # Kullanıcıya daha anlamlı bir hata mesajı verilebilir.
         return "Üzgünüm, isteğinizi işlerken beklenmedik bir sorun oluştu. Lütfen daha sonra tekrar deneyin."
 
 # ── Terminalden Test ──────────────────────────────────────
