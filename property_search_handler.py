@@ -1,6 +1,6 @@
 # property_search_handler.py
 # SibelGPT için: Maksimum log, maksimum sağlamlık!
- 
+
 import numpy as np
 import os
 import json
@@ -149,7 +149,7 @@ async def hybrid_property_search(question: str) -> List[Dict]:
             oda_sayisi = params['oda_sayisi'].lower()
             listings = [l for l in listings if l.get('oda_sayisi', '').lower() == oda_sayisi]
 
-        # Max fiyat filtresi
+        # Max fiyat filtresi (GİRİNTİ HATASI DÜZELTİLDİ)
         if params.get('max_fiyat') and listings:
             max_fiyat = params.get('max_fiyat')
             filtered_listings = []
@@ -160,11 +160,10 @@ async def hybrid_property_search(question: str) -> List[Dict]:
                     fiyat = float(fiyat_temiz)
                     if fiyat <= max_fiyat:
                         filtered_listings.append(l)
-                 except (ValueError, TypeError) as err:
-                     print(f"Fiyat float dönüştürme hatası: {fiyat_str} -> {fiyat_temiz} ({err})")
-                     print(traceback.format_exc())
+                except (ValueError, TypeError) as err:
+                    print(f"Fiyat float dönüştürme hatası: {fiyat_str} -> {fiyat_temiz} ({err})")
+                    print(traceback.format_exc())
             listings = filtered_listings
-
 
         print(f"📋 Veritabanı sorgusu {len(listings)} ilan buldu")
 
