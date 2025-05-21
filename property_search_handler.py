@@ -8,6 +8,9 @@ import math
 import re
 import asyncio
 import traceback
+import hashlib
+import pickle
+from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any
 
 try:
@@ -16,6 +19,12 @@ try:
 except ImportError:
     raise RuntimeError("Gerekli kütüphaneler eksik: openai veya supabase")
 
+# ---- Cache Mekanizması Ayarları ----
+CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
+CACHE_TTL = timedelta(hours=2)  # 2 saat süreyle önbellekte tut
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+# ---- Ortam Değişkenleri ve API Bağlantıları ----
 OAI_KEY = os.getenv("OPENAI_API_KEY")
 SB_URL = os.getenv("SUPABASE_URL")
 SB_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY")
@@ -29,6 +38,54 @@ supabase_client = create_client(SB_URL, SB_KEY)
 EMBEDDING_MODEL = "text-embedding-3-small"
 MATCH_THRESHOLD = 0.3
 MATCH_COUNT = 50
+
+# ---- Cache İşlemleri için Fonksiyonlar ----
+def get_cache_key(query: str) -> str:
+    """Sorgu için benzersiz bir cache anahtarı oluştur"""
+    return hashlib.md5(query.encode('utf-8')).hexdigest()
+
+def get_cache_path(cache_key: str) -> str:
+    """Cache dosyasının tam yolunu al"""
+    return os.path.join(CACHE_DIR, f"{cache_key}.pkl")
+
+def check_cache(query: str) -> list:
+    """Cache'te ilgili sorgu sonucu var mı kontrol et, varsa döndür"""
+    cache_key = get_cache_key(query)
+    cache_path = get_cache_path(cache_key)
+    
+    if not os.path.exists(cache_path):
+        return None
+    
+    try:
+        # Cache dosyasının yaşını kontrol et
+        file_modified = datetime.fromtimestamp(os.path.getmtime(cache_path))
+        if datetime.now() - file_modified > CACHE_TTL:
+            print(f"🕒 Cache süresi dolmuş: {query}")
+            return None
+        
+        # Cache'ten oku
+        with open(cache_path, 'rb') as f:
+            cached_data = pickle.load(f)
+            print(f"✅ Cache'ten sonuç alındı: {query}")
+            return cached_data
+    except Exception as e:
+        print(f"⚠️ Cache okuma hatası: {e}")
+        return None
+
+def save_to_cache(query: str, data: list) -> None:
+    """Sorgu sonucunu cache'e kaydet"""
+    if not data:
+        return  # Boş sonuçları önbelleğe alma
+    
+    cache_key = get_cache_key(query)
+    cache_path = get_cache_path(cache_key)
+    
+    try:
+        with open(cache_path, 'wb') as f:
+            pickle.dump(data, f)
+            print(f"💾 Sonuç cache'e kaydedildi: {query}")
+    except Exception as e:
+        print(f"⚠️ Cache yazma hatası: {e}")
 
 # --- Embedding çekme ---
 async def get_embedding(text: str) -> Optional[List[float]]:
@@ -60,7 +117,7 @@ def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
         print(traceback.format_exc())
         return 0
 
-# --- Sorgu tipi anlama (opsiyonel, ana fonksiyon için değil) ---
+# --- Sorgu tipi anlama ---
 def is_property_search_query(query: str) -> bool:
     try:
         query_lower = query.lower()
@@ -125,10 +182,22 @@ async def extract_query_parameters(question: str) -> Dict:
 # --- Ana Arama Fonksiyonu ---
 async def hybrid_property_search(question: str) -> List[Dict]:
     try:
-        params = await extract_query_parameters(question)
+        # Parametreleri çıkarma ve embedding oluşturmayı paralel yap
+        params_task = extract_query_parameters(question)
+        embedding_task = get_embedding(question)
+        
+        # Her iki görevi de bekleyelim
+        params, query_embedding = await asyncio.gather(params_task, embedding_task)
+        
         print(f"🔍 Çıkarılan parametreler: {params}")
-
+        
+        if not query_embedding:
+            print("⚠️ Embedding oluşturulamadı!")
+            return []
+            
+        # Veritabanı sorgusuna devam
         query = supabase_client.table("remax_ilanlar").select("*")
+        
         # Lokasyon filtresi
         if params.get('lokasyon'):
             lokasyon = params['lokasyon'].lower()
@@ -149,7 +218,7 @@ async def hybrid_property_search(question: str) -> List[Dict]:
             oda_sayisi = params['oda_sayisi'].lower()
             listings = [l for l in listings if l.get('oda_sayisi', '').lower() == oda_sayisi]
 
-        # Max fiyat filtresi (GİRİNTİ HATASI DÜZELTİLDİ)
+        # Max fiyat filtresi
         if params.get('max_fiyat') and listings:
             max_fiyat = params.get('max_fiyat')
             filtered_listings = []
@@ -169,8 +238,7 @@ async def hybrid_property_search(question: str) -> List[Dict]:
         print(f"📋 Veritabanı sorgusu {len(listings)} ilan buldu")
 
         # Embedding ile benzerlik skoru
-        query_embedding = await get_embedding(question)
-        if query_embedding and listings:
+        if listings:
             query_embedding_np = np.array(query_embedding, dtype=np.float32)
             for listing in listings:
                 if 'embedding' in listing and listing['embedding']:
@@ -197,8 +265,10 @@ async def hybrid_property_search(question: str) -> List[Dict]:
             listings = sorted(listings, key=lambda x: x.get('similarity', 0), reverse=True)
 
         print(f"✅ Hibrit arama sonuçları: {len(listings)} ilan bulundu")
-        ilan_ids = [listing.get('ilan_id') for listing in listings[:10] if listing.get('ilan_id')]
-        print(f"🏷️ Bulunan ilk 10 ilan ID: {ilan_ids}")
+        
+        if listings:
+            ilan_ids = [listing.get('ilan_id') for listing in listings[:10] if listing.get('ilan_id')]
+            print(f"🏷️ Bulunan ilk 10 ilan ID: {ilan_ids}")
 
         return listings
 
@@ -270,10 +340,23 @@ def format_property_listings(listings: list) -> str:
     html += "<p style='color: #333;'>Bu ilanların doğruluğunu kontrol ettim. Farklı bir arama yapmak isterseniz, lütfen kriterleri belirtiniz.</p>"
     
     return html
+
 # --- Ana arama fonksiyonu: Dışarıdan çağrılır ---
 async def search_properties(query: str) -> str:
     try:
+        # Önce cache'i kontrol et
+        cached_listings = check_cache(query)
+        if cached_listings is not None:
+            print(f"🚀 Önbellekten hızlı yanıt: {query}")
+            return format_property_listings(cached_listings)
+        
+        print(f"🔎 Önbellekte bulunamadı, arama yapılıyor: {query}")
+        # Cache'te yoksa normal aramayı yap
         listings = await hybrid_property_search(query)
+        
+        # Sonuçları cache'e kaydet
+        save_to_cache(query, listings)
+        
         return format_property_listings(listings)
     except Exception as e:
         print(f"❌ search_properties hatası: {e}")
