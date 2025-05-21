@@ -207,166 +207,96 @@ async def hybrid_property_search(question: str) -> List[Dict]:
         print(traceback.format_exc())
         return []
 
-# --- Sonuçları HTML tabloya çevir ---
 def format_property_listings(listings: list) -> str:
+    """İlan sonuçlarını profesyonel bir HTML tablosuna dönüştürür"""
+    
     if not listings:
         return "<p>Hiç ilan bulunamadı.</p>"
     
-    # Çerçeveli tablo stili
-    css_style = """
-    <style>
-    .property-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 20px 0;
-        font-size: 13px;
-        border: 2px solid #1976d2; /* Dış çerçeve eklendi */
-        border-radius: 4px;
-        overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        table-layout: fixed;
-    }
-    .property-table thead tr {
-        background-color: #1976d2;
-        color: white;
-        text-align: center; /* Başlıklar ortalandı */
-        font-weight: 600;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .property-table th,
-    .property-table td {
-        padding: 10px 8px;
-        text-align: left;
-        border: 1px solid #ccc; /* Tüm hücrelere çizgi eklendi */
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    .property-table thead th {
-        border-bottom: 2px solid #0d47a1; /* Başlık altına kalın çizgi */
-    }
-    /* Sütun genişlikleri */
-    .property-table th:nth-child(1), .property-table td:nth-child(1) { width: 10%; } /* İlan No */
-    .property-table th:nth-child(2), .property-table td:nth-child(2) { width: 30%; } /* Başlık */
-    .property-table th:nth-child(3), .property-table td:nth-child(3) { width: 20%; } /* Lokasyon */
-    .property-table th:nth-child(4), .property-table td:nth-child(4) { width: 12%; } /* Fiyat */
-    .property-table th:nth-child(5), .property-table td:nth-child(5) { width: 8%; } /* Oda */
-    .property-table th:nth-child(6), .property-table td:nth-child(6) { width: 15%; } /* İşlem */
+    # Maksimum gösterilecek ilan sayısı
+    max_listings = 50
     
-    .property-table tbody tr {
-        border-bottom: 1px solid #e0e0e0;
-    }
-    .property-table tbody tr:nth-of-type(even) {
-        background-color: #f5f5f5;
-    }
-    .property-table tbody tr:hover {
-        background-color: #e3f2fd; /* Hover rengi değiştirildi */
-    }
-    .pdf-btn {
-        background-color: #d32f2f;
-        color: white;
-        padding: 5px 10px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 11px;
-        display: inline-block;
-        text-decoration: none;
-        text-align: center;
-        font-weight: 500;
-        width: 100%; /* Butonu hücreye tam sığdır */
-        box-sizing: border-box;
-        transition: background-color 0.2s;
-    }
-    .pdf-btn:hover {
-        background-color: #b71c1c;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    }
-    /* Mobil cihazlar için düzenlemeler */
-    @media screen and (max-width: 768px) {
-        .property-table {
-            font-size: 11px;
-            border-width: 1px; /* Mobilde daha ince çerçeve */
-        }
-        .property-table th, .property-table td {
-            padding: 6px 4px;
-        }
-        .pdf-btn {
-            padding: 3px 6px;
-            font-size: 10px;
-        }
-    }
-    </style>
+    # Sonuç başlığı oluştur
+    html = f"""
+    <div style="margin-bottom: 20px;">
+        <h3 style="margin-bottom: 10px; color: #1976d2;">Arama Sonuçları: {len(listings)} ilan bulundu</h3>
+        <p style="margin-bottom: 15px;"><strong>📞 Sorgunuzla ilgili ilanlar aşağıda listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>
+    </div>
     """
     
-    # Tablo başlangıcı
-    html = css_style + '<table class="property-table">'
+    # Profesyonel tablo başlangıcı
     html += """
-    <thead>
-        <tr>
-            <th>İlan No</th>
-            <th>Başlık</th>
-            <th>Lokasyon</th>
-            <th>Fiyat</th>
-            <th>Oda</th>
-            <th>İşlem</th>
-        </tr>
-    </thead>
-    <tbody>
+    <div style="overflow-x: auto; margin-bottom: 20px;">
+        <table style="width: 100%; border-collapse: collapse; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">
+            <thead>
+                <tr style="background: linear-gradient(135deg, #1976d2, #2196f3); color: white;">
+                    <th style="padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd;">İlan No</th>
+                    <th style="padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd;">Başlık</th>
+                    <th style="padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd;">Lokasyon</th>
+                    <th style="padding: 12px 15px; text-align: right; border-bottom: 1px solid #ddd;">Fiyat</th>
+                    <th style="padding: 12px 15px; text-align: center; border-bottom: 1px solid #ddd;">Oda</th>
+                    <th style="padding: 12px 15px; text-align: center; border-bottom: 1px solid #ddd;">İşlem</th>
+                </tr>
+            </thead>
+            <tbody>
     """
     
-    # Her ilan için satır oluştur
-    for ilan in listings[:10]:
-        ilan_id = ilan.get('ilan_id', '')
+    # Tablo satırlarını oluştur (tek/çift satır renklendirmesi ile)
+    for i, ilan in enumerate(listings[:max_listings]):
+        # Temel veri alanlarını al
+        ilan_no = ilan.get('ilan_id', ilan.get('ilan_no', ''))
         baslik = ilan.get('baslik', '')
-        # Lokasyon bilgisini düzgün formatla
-        lokasyon = ""
-        if ilan.get('ilce'):
-            lokasyon += f"Kadıköy, " if "kadıköy" in ilan.get('ilce', '').lower() else f"{ilan.get('ilce')}, "
-        if ilan.get('mahalle'):
-            lokasyon += f"Suadiye Mah." if "suadiye" in ilan.get('mahalle', '').lower() else f"{ilan.get('mahalle')}"
-        # Fiyat formatlama - binlik ayırıcı ekle
+        
+        # Lokasyon bilgisini birleştir
+        ilce = ilan.get('ilce', '')
+        mahalle = ilan.get('mahalle', '')
+        lokasyon = f"{ilce}, {mahalle}" if ilce and mahalle else ilan.get('lokasyon', ilce or mahalle or '')
+        
         fiyat = ilan.get('fiyat', '')
-        try:
-            if isinstance(fiyat, (int, float)):
-                fiyat = f"{fiyat:,.0f}₺".replace(",", ".")
-            elif isinstance(fiyat, str) and fiyat.strip():
-                # Sadece sayısal değerleri al
-                fiyat_temiz = re.sub(r'[^\d]', '', fiyat)
-                if fiyat_temiz:
-                    fiyat = f"{int(fiyat_temiz):,.0f}₺".replace(",", ".")
-        except:
-            pass
-            
         oda_sayisi = ilan.get('oda_sayisi', '')
         
-        # PDF butonu - kırmızı renkte
-        pdf_button = ""
-        if ilan_id:
-            pdf_url = f"https://sibelgpt-backend.onrender.com/generate-property-pdf/{ilan_id}"
-            pdf_button = f"""
-            <a href="{pdf_url}" target="_blank" class="pdf-btn">
-                PDF İndir
-            </a>
-            """
+        # Satır renklendirmesi için renk sınıfı
+        row_style = 'background-color: #f9f9f9;' if i % 2 == 0 else 'background-color: #ffffff;'
         
+        # PDF butonunun HTML'i
+        pdf_button = f"""
+        <a href="https://sibelgpt-backend.onrender.com/generate-property-pdf/{ilan_no}" target="_blank"
+           style="display: inline-block; padding: 6px 12px; background-color: #1976d2; color: white; 
+                  text-decoration: none; border-radius: 4px; font-size: 13px; text-align: center;
+                  box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.3s ease;"
+           onmouseover="this.style.backgroundColor='#0d47a1';" 
+           onmouseout="this.style.backgroundColor='#1976d2';">
+           <span style="display: inline-block; margin-right: 5px; font-size: 14px;">📄</span> PDF
+        </a>
+        """
+        
+        # Satırı tabloya ekle
         html += f"""
-        <tr>
-            <td>{ilan_id}</td>
-            <td>{baslik}</td>
-            <td>{lokasyon}</td>
-            <td>{fiyat}</td>
-            <td>{oda_sayisi}</td>
-            <td>{pdf_button}</td>
+        <tr style="{row_style}">
+            <td style="padding: 12px 15px; border-bottom: 1px solid #eee;">{ilan_no}</td>
+            <td style="padding: 12px 15px; border-bottom: 1px solid #eee;">{baslik}</td>
+            <td style="padding: 12px 15px; border-bottom: 1px solid #eee;">{lokasyon}</td>
+            <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: right;"><strong>{fiyat}</strong></td>
+            <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: center;">{oda_sayisi}</td>
+            <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: center;">{pdf_button}</td>
         </tr>
         """
     
+    # Tablo kapanışı
     html += """
-    </tbody>
-    </table>
+            </tbody>
+        </table>
+    </div>
     """
+    
+    # Kapanış mesajı
+    html += """
+    <p>Bu ilanların doğruluğunu kontrol ettim. Farklı bir arama yapmak isterseniz, lütfen kriterleri belirtiniz.</p>
+    """
+    
+    # Log: Gösterilen ilan ID'leri (debug için)
+    ilan_ids = [ilan.get('ilan_id', ilan.get('ilan_no', '?')) for ilan in listings[:max_listings]]
+    print(f"📋 Tabloda gösterilen ilan ID'leri: {ilan_ids}")
     
     return html
 
