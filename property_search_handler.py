@@ -336,6 +336,11 @@ def format_property_listings(listings: list) -> str:
     # Tabloyu kapat
     html += "</table>"
     
+    # GERÇEK İLAN NUMARALARI başlığını ekle
+    real_ids = [ilan.get('ilan_id') for ilan in listings if ilan.get('ilan_id')]
+    if real_ids:
+        html += f"<p><strong>VERİTABANINDAKİ GERÇEK İLAN NUMARALARI: {', '.join(real_ids)}</strong></p>"
+    
     # Kapanış metni
     html += "<p style='color: #333;'>Bu ilanların doğruluğunu kontrol ettim. Farklı bir arama yapmak isterseniz, lütfen kriterleri belirtiniz.</p>"
     
