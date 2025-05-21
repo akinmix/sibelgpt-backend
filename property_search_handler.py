@@ -208,41 +208,31 @@ async def hybrid_property_search(question: str) -> List[Dict]:
         return []
 
 def format_property_listings(listings: list) -> str:
-    """İlan sonuçlarını profesyonel bir HTML tablosuna dönüştürür"""
-    
+    """İlan sonuçlarını HTML tabloya çevir"""
     if not listings:
         return "<p>Hiç ilan bulunamadı.</p>"
     
-    # Maksimum gösterilecek ilan sayısı
-    max_listings = 50
+    # Başlık: Arama sonuçları sayısı
+    html = f"<h3 style='color: #1976d2;'>Arama Sonucu: {len(listings)} ilan bulundu</h3>"
     
-    # Sonuç başlığı oluştur
-    html = f"""
-    <div style="margin-bottom: 20px;">
-        <h3 style="margin-bottom: 10px; color: #1976d2;">Arama Sonuçları: {len(listings)} ilan bulundu</h3>
-        <p style="margin-bottom: 15px;"><strong>📞 Sorgunuzla ilgili ilanlar aşağıda listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>
-    </div>
-    """
+    # Telefon bilgisi - metin rengini belirtelim
+    html += "<p style='color: #333;'><strong>📞 Sorgunuzla ilgili ilanlar aşağıda listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
     
-    # Profesyonel tablo başlangıcı
+    # Tablo başlangıcı
     html += """
-    <div style="overflow-x: auto; margin-bottom: 20px;">
-        <table style="width: 100%; border-collapse: collapse; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">
-            <thead>
-                <tr style="background: linear-gradient(135deg, #1976d2, #2196f3); color: white;">
-                    <th style="padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd;">İlan No</th>
-                    <th style="padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd;">Başlık</th>
-                    <th style="padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd;">Lokasyon</th>
-                    <th style="padding: 12px 15px; text-align: right; border-bottom: 1px solid #ddd;">Fiyat</th>
-                    <th style="padding: 12px 15px; text-align: center; border-bottom: 1px solid #ddd;">Oda</th>
-                    <th style="padding: 12px 15px; text-align: center; border-bottom: 1px solid #ddd;">İşlem</th>
-                </tr>
-            </thead>
-            <tbody>
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+        <tr style="background: #1976d2; color: white;">
+            <th style="padding: 10px; text-align: left;">İlan No</th>
+            <th style="padding: 10px; text-align: left;">Başlık</th>
+            <th style="padding: 10px; text-align: left;">Lokasyon</th>
+            <th style="padding: 10px; text-align: right;">Fiyat</th>
+            <th style="padding: 10px; text-align: center;">Oda</th>
+            <th style="padding: 10px; text-align: center;">İşlem</th>
+        </tr>
     """
     
-    # Tablo satırlarını oluştur (tek/çift satır renklendirmesi ile)
-    for i, ilan in enumerate(listings[:max_listings]):
+    # Satırları ekle
+    for i, ilan in enumerate(listings[:50]):
         # Temel veri alanlarını al
         ilan_no = ilan.get('ilan_id', ilan.get('ilan_no', ''))
         baslik = ilan.get('baslik', '')
@@ -250,56 +240,36 @@ def format_property_listings(listings: list) -> str:
         # Lokasyon bilgisini birleştir
         ilce = ilan.get('ilce', '')
         mahalle = ilan.get('mahalle', '')
-        lokasyon = f"{ilce}, {mahalle}" if ilce and mahalle else ilan.get('lokasyon', ilce or mahalle or '')
+        lokasyon = f"{ilce}, {mahalle}" if ilce and mahalle else (ilce or mahalle or '')
         
         fiyat = ilan.get('fiyat', '')
         oda_sayisi = ilan.get('oda_sayisi', '')
         
-        # Satır renklendirmesi için renk sınıfı
-        row_style = 'background-color: #f9f9f9;' if i % 2 == 0 else 'background-color: #ffffff;'
+        # PDF butonu
+        pdf_link = f"<a href='https://sibelgpt-backend.onrender.com/generate-property-pdf/{ilan_no}' target='_blank' style='display: inline-block; padding: 6px 12px; background-color: #1976d2; color: white; text-decoration: none; border-radius: 4px;'>PDF</a>"
         
-        # PDF butonunun HTML'i
-        pdf_button = f"""
-        <a href="https://sibelgpt-backend.onrender.com/generate-property-pdf/{ilan_no}" target="_blank"
-           style="display: inline-block; padding: 6px 12px; background-color: #1976d2; color: white; 
-                  text-decoration: none; border-radius: 4px; font-size: 13px; text-align: center;
-                  box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.3s ease;"
-           onmouseover="this.style.backgroundColor='#0d47a1';" 
-           onmouseout="this.style.backgroundColor='#1976d2';">
-           <span style="display: inline-block; margin-right: 5px; font-size: 14px;">📄</span> PDF
-        </a>
-        """
+        # Satır arka plan rengi
+        row_bg = "#f8f9fa" if i % 2 == 0 else "#ffffff"
         
-        # Satırı tabloya ekle
+        # BURADA METİN RENGİNİ AÇIKÇA BELİRTİYORUZ: color: black;
         html += f"""
-        <tr style="{row_style}">
-            <td style="padding: 12px 15px; border-bottom: 1px solid #eee;">{ilan_no}</td>
-            <td style="padding: 12px 15px; border-bottom: 1px solid #eee;">{baslik}</td>
-            <td style="padding: 12px 15px; border-bottom: 1px solid #eee;">{lokasyon}</td>
-            <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: right;"><strong>{fiyat}</strong></td>
-            <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: center;">{oda_sayisi}</td>
-            <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: center;">{pdf_button}</td>
+        <tr style="background-color: {row_bg};">
+            <td style="padding: 10px; border-bottom: 1px solid #eee; color: black;">{ilan_no}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #eee; color: black;">{baslik}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #eee; color: black;">{lokasyon}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right; color: black;">{fiyat}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center; color: black;">{oda_sayisi}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">{pdf_link}</td>
         </tr>
         """
     
-    # Tablo kapanışı
-    html += """
-            </tbody>
-        </table>
-    </div>
-    """
+    # Tabloyu kapat
+    html += "</table>"
     
-    # Kapanış mesajı
-    html += """
-    <p>Bu ilanların doğruluğunu kontrol ettim. Farklı bir arama yapmak isterseniz, lütfen kriterleri belirtiniz.</p>
-    """
-    
-    # Log: Gösterilen ilan ID'leri (debug için)
-    ilan_ids = [ilan.get('ilan_id', ilan.get('ilan_no', '?')) for ilan in listings[:max_listings]]
-    print(f"📋 Tabloda gösterilen ilan ID'leri: {ilan_ids}")
+    # Kapanış metni
+    html += "<p style='color: #333;'>Bu ilanların doğruluğunu kontrol ettim. Farklı bir arama yapmak isterseniz, lütfen kriterleri belirtiniz.</p>"
     
     return html
-
 # --- Ana arama fonksiyonu: Dışarıdan çağrılır ---
 async def search_properties(query: str) -> str:
     try:
