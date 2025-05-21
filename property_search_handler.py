@@ -213,7 +213,7 @@ def format_property_listings(listings: list) -> str:
         return "<p>Hiç ilan bulunamadı.</p>"
     
     # Başlık: Arama sonuçları sayısı
-    html = f"<h3 style='color: #1976d2;'>Arama Sonucu: {len(listings)} ilan bulundu</h3>"
+    html = f"<h3 style='color: #f44336;'>Arama Sonucu: {len(listings)} ilan bulundu</h3>"
     
     # Telefon bilgisi - metin rengini belirtelim
     html += "<p style='color: #333;'><strong>📞 Sorgunuzla ilgili ilanlar aşağıda listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
