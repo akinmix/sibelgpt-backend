@@ -558,7 +558,7 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
    
     # Mesajları oluştur - sistem mesajını ekle
     messages = [
-        {"role": "system", "content": f"{system_prompt}<br><br>İLGİLİ İLANLAR:<br>{context if context else 'Uygun ilan bulunamadı veya bu mod için ilan aranmıyor.'}<br><br>ÖNEMLİ: Bu ilanları olduğu gibi göster, filtreleme yapma! Tüm ilanları kullanıcıya sunmalısın!"}
+        {"role": "system", "content": f"{system_prompt}<br><br>İLGİLİ İLANLAR:<br>{context if context else 'Uygun ilan bulunamadı veya bu mod için ilan aranmıyor.'}<br><br>Bu HTML formatındaki ilanları OLDUĞU GİBİ kullanıcıya göster, HİÇBİR DEĞİŞİKLİK yapma! Sadece ekle, filtreleme, özetleme veya değiştirme YAPMA! Tüm ilanlar olduğu gibi kullanıcıya gösterilmeli!"}
     ]
     
     # Eğer sohbet geçmişi varsa ekle
