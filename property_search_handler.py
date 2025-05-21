@@ -125,88 +125,60 @@ async def extract_query_parameters(question: str) -> Dict:
 # --- Ana Arama Fonksiyonu ---
 async def hybrid_property_search(question: str) -> List[Dict]:
     try:
+        # Parametreleri çıkar
         params = await extract_query_parameters(question)
         print(f"🔍 Çıkarılan parametreler: {params}")
-
-        query = supabase_client.table("remax_ilanlar").select("*")
-        # Lokasyon filtresi
-        if params.get('lokasyon'):
-            lokasyon = params['lokasyon'].lower()
-            query = query.ilike("ilce", f"%{lokasyon}%")
-            result = query.execute()
-            listings = result.data if result.data else []
-            if not listings:
-                query = supabase_client.table("remax_ilanlar").select("*")
-                query = query.ilike("mahalle", f"%{lokasyon}%")
-                result = query.execute()
-                listings = result.data if result.data else []
-        else:
-            result = query.limit(50).execute()
-            listings = result.data if result.data else []
-
-        # Oda sayısı filtresi
-        if params.get('oda_sayisi') and listings:
-            oda_sayisi = params['oda_sayisi'].lower()
-            listings = [l for l in listings if l.get('oda_sayisi', '').lower() == oda_sayisi]
-
-        # Max fiyat filtresi (GİRİNTİ HATASI DÜZELTİLDİ)
-        if params.get('max_fiyat') and listings:
-            max_fiyat = params.get('max_fiyat')
-            filtered_listings = []
-            for l in listings:
-                try:
-                    fiyat_str = l.get('fiyat', '0')
-                    fiyat_temiz = re.sub(r'[^\d]', '', fiyat_str)
-                    print(f"↪️ temiz fiyat: {fiyat_temiz!r}")
-                    fiyat = float(fiyat_temiz)
-                    if fiyat <= max_fiyat:
-                        filtered_listings.append(l)
-                except (ValueError, TypeError) as err:
-                    print(f"Fiyat float dönüştürme hatası: {fiyat_str!r} -> {fiyat_temiz!r} ({err})")
-                    print(traceback.format_exc())
-            listings = filtered_listings
-
-        print(f"📋 Veritabanı sorgusu {len(listings)} ilan buldu")
-
-        # Embedding ile benzerlik skoru
+        
+        # Embedding oluştur
         query_embedding = await get_embedding(question)
-        if query_embedding and listings:
-            query_embedding_np = np.array(query_embedding, dtype=np.float32)
-            for listing in listings:
-                if 'embedding' in listing and listing['embedding']:
-                    embedding_raw = listing['embedding']
-                    if isinstance(embedding_raw, str):
-                        try:
-                            listing_embedding = json.loads(embedding_raw)
-                        except Exception as e:
-                            print("Embedding JSON decode hatası:", e)
-                            print(traceback.format_exc())
-                            listing_embedding = []
-                    else:
-                        listing_embedding = embedding_raw
-                    try:
-                        listing_embedding_np = np.array(listing_embedding, dtype=np.float32)
-                        similarity = cosine_similarity(query_embedding_np, listing_embedding_np)
-                        listing['similarity'] = similarity
-                    except Exception as emb_err:
-                        print(f"Benzerlik hesaplama hatası: {emb_err}")
-                        print(traceback.format_exc())
-                        listing['similarity'] = 0
-                else:
-                    listing['similarity'] = 0
-            listings = sorted(listings, key=lambda x: x.get('similarity', 0), reverse=True)
-
+        if not query_embedding:
+            print("⚠️ Embedding oluşturulamadı!")
+            return []
+        
+        # SQL fonksiyonu için parametreleri hazırla
+        lokasyon = params.get('lokasyon', '')
+        
+        sql_params = {
+            "p_ilce": lokasyon,  # Lokasyon bilgisini ilçe olarak kullan
+            "p_mahalle": None,   # Gerekirse bu değeri ayarlayabilirsiniz
+            "p_min_fiyat": params.get('min_fiyat'),
+            "p_max_fiyat": params.get('max_fiyat'),
+            "p_oda_sayisi": params.get('oda_sayisi'),
+            "p_query_embedding": query_embedding,
+            "p_match_threshold": MATCH_THRESHOLD,
+            "p_match_count": MATCH_COUNT
+        }
+        
+        # None değerleri temizle
+        sql_params = {k: v for k, v in sql_params.items() if v is not None}
+        
+        print(f"🔍 SQL fonksiyonu çağrılıyor. Parametreler: {sql_params}")
+        
+        # Supabase SQL fonksiyonunu çağır
+        try:
+            response = supabase_client.rpc(
+                "hybrid_property_search",
+                sql_params
+            ).execute()
+            
+            listings = response.data if response.data else []
+        except Exception as sql_error:
+            print(f"❌ SQL fonksiyonu çağrı hatası: {sql_error}")
+            print(traceback.format_exc())
+            return []
+        
         print(f"✅ Hibrit arama sonuçları: {len(listings)} ilan bulundu")
-        ilan_ids = [listing.get('ilan_id') for listing in listings[:10] if listing.get('ilan_id')]
-        print(f"🏷️ Bulunan ilk 10 ilan ID: {ilan_ids}")
-
+        
+        if listings:
+            ilan_ids = [listing.get('ilan_id', '') for listing in listings[:10]]
+            print(f"🏷️ Bulunan ilk 10 ilan ID: {ilan_ids}")
+        
         return listings
 
     except Exception as e:
         print(f"❌ Hibrit arama hatası: {e}")
         print(traceback.format_exc())
         return []
-
 def format_property_listings(listings: list) -> str:
     """İlan sonuçlarını HTML tabloya çevir"""
     if not listings:
