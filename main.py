@@ -177,6 +177,27 @@ async def not_found_handler(request, exc):
 @app.exception_handler(500)
 async def server_error_handler(request, exc):
     return JSONResponse(status_code=500, content={"error": str(exc)})
+    
+@app.get("/test-trading-widget", tags=["test"])
+async def test_trading_widget():
+    """Trading widget konfigürasyonunu test eder"""
+    try:
+        from trading_widget_config import TradingWidgetConfig
+        
+        config = TradingWidgetConfig.get_main_tickers_config()
+        html = TradingWidgetConfig.generate_ticker_html()
+        
+        return {
+            "status": "success",
+            "message": "Trading widget config çalışıyor!",
+            "config": config,
+            "html_length": len(html)
+        }
+    except Exception as e:
+        return {
+            "status": "error", 
+            "message": f"Hata: {str(e)}"
+        }
 
 # ---- Ana Program ----
 if __name__ == "__main__":
