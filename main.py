@@ -1,20 +1,18 @@
-# main.py - SibelGPT Backend - v7.0.0 (FIXED VERSION)
 import os
 import json
 import time
-import asyncio
+import hashlib
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Dict
-from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, Request, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from elevenlabs_handler import router as elevenlabs_router
 
 # Supabase import kontrolü
 try:
@@ -27,110 +25,13 @@ except ImportError:
 # Ortam değişkenlerini yükle
 load_dotenv()
 
-# ============= FIXED PERFORMANCE MIDDLEWARE =============
-async def performance_middleware(request: Request, call_next):
-    """Fixed middleware function - correct signature"""
-    start_time = time.time()
-    
-    # Request ID for tracking
-    request_id = id(request)
-    
-    response = await call_next(request)
-    
-    process_time = time.time() - start_time
-    response.headers["X-Process-Time"] = str(process_time)
-    response.headers["X-Request-ID"] = str(request_id)
-    
-    # Log slow requests (>2 seconds)
-    if process_time > 2.0:
-        print(f"⚠️  Slow request: {request.method} {request.url} - {process_time:.2f}s")
-    
-    return response
+# Dahili modüller
+from image_handler import router as image_router
+from pdf_handler import router as pdf_router
+import ask_handler
+import search_handler
 
-# ============= SIMPLIFIED STARTUP/SHUTDOWN =============
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    print("\n🚀 SibelGPT Backend v7.0.0 - Starting...")
-    
-    # Initialize Supabase if available
-    if SUPABASE_AVAILABLE:
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_KEY")
-        
-        if supabase_url and supabase_key:
-            try:
-                app.state.supabase_client = create_client(supabase_url, supabase_key)
-                print("✅ Supabase client initialized")
-            except Exception as e:
-                print(f"❌ Supabase error: {e}")
-                app.state.supabase_client = None
-        else:
-            app.state.supabase_client = None
-    else:
-        app.state.supabase_client = None
-    
-    print("✅ Startup complete")
-    
-    yield
-    
-    # Shutdown
-    print("🔄 Shutting down...")
-    print("👋 SibelGPT Backend shutdown complete")
-
-# ============= FASTAPI APP INITIALIZATION =============
-app = FastAPI(
-    title="SibelGPT Backend",
-    version="7.0.0",
-    description="SibelGPT AI Assistant Backend API - Fixed Version",
-    lifespan=lifespan,
-)
-
-# ============= MIDDLEWARE STACK =============
-# 1. Performance monitoring (FIXED)
-app.middleware("http")(performance_middleware)
-
-# 2. GZIP compression
-app.add_middleware(GZipMiddleware, minimum_size=1000)
-
-# 3. CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ============= SIMPLE RATE LIMITING =============
-from collections import defaultdict
-
-rate_limit_store = defaultdict(list)
-RATE_LIMIT_REQUESTS = 60
-RATE_LIMIT_WINDOW = 60
-
-async def rate_limit_check(request: Request):
-    """Simple rate limiting"""
-    client_ip = request.client.host
-    current_time = time.time()
-    
-    # Clean old entries
-    rate_limit_store[client_ip] = [
-        timestamp for timestamp in rate_limit_store[client_ip]
-        if current_time - timestamp < RATE_LIMIT_WINDOW
-    ]
-    
-    # Check limit
-    if len(rate_limit_store[client_ip]) >= RATE_LIMIT_REQUESTS:
-        raise HTTPException(
-            status_code=429,
-            detail="Rate limit exceeded"
-        )
-    
-    # Add current request
-    rate_limit_store[client_ip].append(current_time)
-
-# ============= MODELS =============
+# ---- Modeller ----
 class ChatRequest(BaseModel):
     question: str
     mode: str = "real-estate"
@@ -140,15 +41,92 @@ class WebSearchRequest(BaseModel):
     question: str
     mode: str = "real-estate"
 
-# ============= DEPENDENCY =============
-async def get_supabase_client(request: Request) -> Optional[Client]:
-    return getattr(request.app.state, 'supabase_client', None)
+# ---- FastAPI Uygulaması ----
+app = FastAPI(
+    title="SibelGPT Backend",
+    version="7.0.0",
+    description="SibelGPT AI Assistant Backend API - Güvenlik Güncellemesi"
+)
 
-# ============= STATIC FILES =============
+# ---- CORS Middleware ----
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ---- Rate Limiting için basit kontrol ----
+request_counts = {}
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    # Sadece chat endpoint'i için
+    if request.url.path == "/chat":
+        client_ip = request.client.host
+        current_time = int(time.time())
+        
+        # IP başına dakikalık sayaç
+        key = f"{client_ip}:{current_time // 60}"
+        
+        if key in request_counts:
+            if request_counts[key] > 30:  # Dakikada max 30 istek
+                return JSONResponse(
+                    status_code=429,
+                    content={"error": "Çok fazla istek. Lütfen biraz bekleyin."}
+                )
+            request_counts[key] += 1
+        else:
+            request_counts[key] = 1
+            
+        # Eski kayıtları temizle
+        old_time = current_time - 120  # 2 dakika öncesi
+        for k in list(request_counts.keys()):
+            try:
+                if int(k.split(':')[1]) < old_time // 60:
+                    del request_counts[k]
+            except:
+                pass
+    
+    response = await call_next(request)
+    return response
+
+# ---- Static Files ----
 if os.path.exists("public"):
     app.mount("/static", StaticFiles(directory="public"), name="static")
 
-# ============= ENDPOINTS =============
+# ---- Startup Event ----
+@app.on_event("startup")
+async def startup_event():
+    """Uygulama başlangıcında çalışır"""
+    print("\n=== SibelGPT Backend v7.0.0 Başlatılıyor ===")
+    
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_KEY")
+    
+    if SUPABASE_AVAILABLE and supabase_url and supabase_key:
+        try:
+            app.state.supabase_client = create_client(supabase_url, supabase_key)
+            print("✅ Supabase istemcisi oluşturuldu")
+        except Exception as e:
+            print(f"❌ Supabase hatası: {e}")
+            app.state.supabase_client = None
+    else:
+        app.state.supabase_client = None
+    
+    print("=== Başlatma Tamamlandı ===\n")
+
+# ---- Dependency ----
+async def get_supabase_client(request: Request) -> Optional[Client]:
+    return getattr(request.app.state, 'supabase_client', None)
+
+# ---- Router Kaydı ----
+app.include_router(image_router, prefix="", tags=["image"])
+app.include_router(pdf_router, prefix="", tags=["pdf"])
+app.include_router(elevenlabs_router, prefix="", tags=["speech"])
+
+# ---- Ana Endpoint ----
 @app.get("/", tags=["meta"])
 async def root():
     return {
@@ -157,85 +135,62 @@ async def root():
         "version": "7.0.0"
     }
 
+# ---- Health Check ----
 @app.get("/health", tags=["meta"])
 async def health_check(db_client = Depends(get_supabase_client)):
     return {
         "status": "healthy",
         "version": "7.0.0",
-        "supabase": db_client is not None,
-        "timestamp": datetime.utcnow().isoformat()
+        "supabase": db_client is not None
     }
 
-@app.post("/chat", tags=["chat"])
-async def chat(
-    payload: ChatRequest, 
-    background_tasks: BackgroundTasks,
-    db_client = Depends(get_supabase_client),
-    _rate_limit = Depends(rate_limit_check)
-):
-    """Chat endpoint"""
-    start_time = time.time()
+# ---- Güvenli Supabase Config Endpoint ----
+@app.get("/api/config", tags=["config"])
+async def get_public_config():
+    """Frontend için güvenli konfigürasyon"""
+    # Backend URL'i belirle
+    backend_url = os.getenv("BACKEND_URL", "https://sibelgpt-backend.onrender.com")
     
+    # Sadece public (anon) key'i gönder
+    return {
+        "supabaseUrl": os.getenv("SUPABASE_URL"),
+        "supabaseAnonKey": os.getenv("SUPABASE_KEY"),  # Bu zaten anon key
+        "backendUrl": backend_url
+    }
+
+# ---- Chat Endpoint ----
+@app.post("/chat", tags=["chat"])
+async def chat(payload: ChatRequest, db_client = Depends(get_supabase_client)):
     try:
-        import ask_handler
-        
         answer = await ask_handler.answer_question(
             payload.question, 
             payload.mode, 
             payload.conversation_history
         )
-        
-        # Log slow queries in background
-        duration = time.time() - start_time
-        if duration > 1.0:
-            print(f"📊 Slow chat query: {duration:.2f}s - Mode: {payload.mode}")
-        
         return {"reply": answer}
-        
     except Exception as e:
-        print(f"❌ Chat error: {str(e)}")
-        return JSONResponse(
-            status_code=500, 
-            content={"error": f"Chat processing failed: {str(e)}"}
-        )
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
+# ---- Web Araması Endpoint ----
 @app.post("/web-search", tags=["search"])
-async def web_search(
-    payload: WebSearchRequest,
-    background_tasks: BackgroundTasks,
-    _rate_limit = Depends(rate_limit_check)
-):
-    """Web search endpoint"""
-    start_time = time.time()
-    
+async def web_search(payload: WebSearchRequest):
     try:
-        import search_handler
-        
         answer = await search_handler.web_search_answer(payload.question, payload.mode)
-        
-        duration = time.time() - start_time
-        if duration > 2.0:
-            print(f"📊 Slow web search: {duration:.2f}s")
-        
         return {"reply": answer}
-        
     except Exception as e:
-        print(f"❌ Web search error: {str(e)}")
-        return JSONResponse(
-            status_code=500, 
-            content={"error": f"Web search failed: {str(e)}"}
-        )
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
-# ============= STATISTICS ENDPOINT =============
+# ---- SABİT İSTATİSTİKLER (SQL'den alınan gerçek veriler) ----
 @app.get("/statistics/simple", tags=["statistics"])
 async def get_simple_statistics():
-    """Dashboard statistics"""
+    """Dashboard istatistikleri - SQL'den alınan sabit veriler"""
+    
     return {
         "status": "success",
         "statistics": {
             "genel_ozet": {
                 "toplam_ilan": 5047,
-                "ortalama_fiyat": 13051170.53,
+                "ortalama_fiyat": 13051170.53,  # Tahminî değer
                 "en_cok_ilan_ilce": "Kadıköy"
             },
             "ilce_dagilimi": [
@@ -254,7 +209,7 @@ async def get_simple_statistics():
         }
     }
 
-# ============= DASHBOARD =============
+# ---- Dashboard HTML ----
 @app.get("/dashboard", tags=["frontend"])
 async def serve_dashboard():
     dashboard_path = Path("public") / "dashboard.html"
@@ -264,7 +219,7 @@ async def serve_dashboard():
     
     return JSONResponse(status_code=404, content={"error": "Dashboard bulunamadı"})
 
-# ============= ERROR HANDLERS =============
+# ---- Error Handlers ----
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
     return JSONResponse(status_code=404, content={"error": "Sayfa bulunamadı"})
@@ -272,45 +227,29 @@ async def not_found_handler(request, exc):
 @app.exception_handler(500)
 async def server_error_handler(request, exc):
     return JSONResponse(status_code=500, content={"error": str(exc)})
-
-# ============= ROUTER LOADING =============
-@app.on_event("startup")
-async def setup_routers():
-    """Load routers after startup"""
+    
+@app.get("/test-trading-widget", tags=["test"])
+async def test_trading_widget():
+    """Trading widget konfigürasyonunu test eder"""
     try:
-        from image_handler import router as image_router
-        from pdf_handler import router as pdf_router
-        from elevenlabs_handler import router as elevenlabs_router
+        from trading_widget_config import TradingWidgetConfig
         
-        app.include_router(image_router, prefix="", tags=["image"])
-        app.include_router(pdf_router, prefix="", tags=["pdf"])
-        app.include_router(elevenlabs_router, prefix="", tags=["speech"])
+        config = TradingWidgetConfig.get_main_tickers_config()
+        html = TradingWidgetConfig.generate_ticker_html()
         
-        print("✅ All routers loaded")
-    except Exception as e:
-        print(f"⚠️  Router loading error: {e}")
-
-# ============= PERFORMANCE ENDPOINT =============
-@app.get("/performance", tags=["monitoring"])
-async def get_performance_stats():
-    """Performance statistics"""
-    return {
-        "status": "active",
-        "rate_limiting": {
-            "active_ips": len(rate_limit_store),
-            "limit_per_minute": RATE_LIMIT_REQUESTS
-        },
-        "system": {
-            "version": "7.0.0",
-            "uptime": "Available after full startup"
+        return {
+            "status": "success",
+            "message": "Trading widget config çalışıyor!",
+            "config": config,
+            "html_length": len(html)
         }
-    }
+    except Exception as e:
+        return {
+            "status": "error", 
+            "message": f"Hata: {str(e)}"
+        }
 
-# ============= MAIN EXECUTION =============
+# ---- Ana Program ----
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        app, 
-        host="0.0.0.0", 
-        port=int(os.getenv("PORT", 10000))
-    )
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
