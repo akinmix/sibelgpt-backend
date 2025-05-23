@@ -1,4 +1,4 @@
-# main.py - SibelGPT Performance Optimized Version
+# main.py - SibelGPT Backend - v7.0.0 (FIXED VERSION)
 import os
 import json
 import time
@@ -16,130 +16,84 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-# ============= PERFORMANCE MIDDLEWARE =============
-class PerformanceMiddleware:
-    def __init__(self, app: FastAPI):
-        self.app = app
+# Supabase import kontrolü
+try:
+    from supabase import create_client
+    from supabase.client import Client
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    SUPABASE_AVAILABLE = False
 
-    async def __call__(self, request: Request, call_next):
-        start_time = time.time()
-        
-        # Request ID for tracking
-        request_id = id(request)
-        
-        response = await call_next(request)
-        
-        process_time = time.time() - start_time
-        response.headers["X-Process-Time"] = str(process_time)
-        response.headers["X-Request-ID"] = str(request_id)
-        
-        # Log slow requests (>2 seconds)
-        if process_time > 2.0:
-            print(f"⚠️  Slow request: {request.method} {request.url} - {process_time:.2f}s")
-        
-        return response
+# Ortam değişkenlerini yükle
+load_dotenv()
 
-# ============= STARTUP/SHUTDOWN OPTIMIZATION =============
+# ============= FIXED PERFORMANCE MIDDLEWARE =============
+async def performance_middleware(request: Request, call_next):
+    """Fixed middleware function - correct signature"""
+    start_time = time.time()
+    
+    # Request ID for tracking
+    request_id = id(request)
+    
+    response = await call_next(request)
+    
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = str(process_time)
+    response.headers["X-Request-ID"] = str(request_id)
+    
+    # Log slow requests (>2 seconds)
+    if process_time > 2.0:
+        print(f"⚠️  Slow request: {request.method} {request.url} - {process_time:.2f}s")
+    
+    return response
+
+# ============= SIMPLIFIED STARTUP/SHUTDOWN =============
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("\n🚀 SibelGPT Backend v7.1.0 - Performance Optimized")
+    print("\n🚀 SibelGPT Backend v7.0.0 - Starting...")
     
-    # Warm up connections
-    await warm_up_services()
+    # Initialize Supabase if available
+    if SUPABASE_AVAILABLE:
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_KEY")
+        
+        if supabase_url and supabase_key:
+            try:
+                app.state.supabase_client = create_client(supabase_url, supabase_key)
+                print("✅ Supabase client initialized")
+            except Exception as e:
+                print(f"❌ Supabase error: {e}")
+                app.state.supabase_client = None
+        else:
+            app.state.supabase_client = None
+    else:
+        app.state.supabase_client = None
     
-    # Pre-load cache
-    await preload_cache()
-    
-    print("✅ Startup complete - All systems ready!")
+    print("✅ Startup complete")
     
     yield
     
     # Shutdown
-    print("🔄 Graceful shutdown initiated...")
-    await cleanup_resources()
+    print("🔄 Shutting down...")
     print("👋 SibelGPT Backend shutdown complete")
-
-async def warm_up_services():
-    """Warm up external services to reduce cold start latency"""
-    try:
-        # Pre-warm Supabase connection
-        if hasattr(app.state, 'supabase_client') and app.state.supabase_client:
-            await asyncio.create_task(test_supabase_connection())
-        
-        # Pre-warm OpenAI connection (test embedding)
-        await asyncio.create_task(test_openai_connection())
-        
-        print("✅ Services warmed up successfully")
-    except Exception as e:
-        print(f"⚠️  Service warm-up partial failure: {e}")
-
-async def test_supabase_connection():
-    """Quick health check for Supabase"""
-    try:
-        # Simple health check query
-        response = app.state.supabase_client.table('remax_ilanlar').select('count').limit(1).execute()
-        return True
-    except:
-        return False
-
-async def test_openai_connection():
-    """Quick health check for OpenAI"""
-    try:
-        # Small test embedding to warm up connection
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        await client.embeddings.create(model="text-embedding-3-small", input=["test"])
-        return True
-    except:
-        return False
-
-async def preload_cache():
-    """Pre-load frequently accessed data"""
-    try:
-        # Pre-load property search cache
-        from property_search_handler import preload_frequently_accessed_properties
-        await preload_frequently_accessed_properties()
-        print("✅ Cache preloaded successfully")
-    except Exception as e:
-        print(f"⚠️  Cache preload failed: {e}")
-
-async def cleanup_resources():
-    """Clean up resources on shutdown"""
-    try:
-        # Close database connections
-        if hasattr(app.state, 'supabase_client'):
-            # Supabase client doesn't need explicit closing
-            pass
-        
-        # Clear caches
-        from property_search_handler import clear_all_caches
-        clear_all_caches()
-        
-        print("✅ Resources cleaned up successfully")
-    except Exception as e:
-        print(f"⚠️  Cleanup warning: {e}")
 
 # ============= FASTAPI APP INITIALIZATION =============
 app = FastAPI(
     title="SibelGPT Backend",
-    version="7.1.0",
-    description="SibelGPT AI Assistant Backend API - Performance Optimized",
+    version="7.0.0",
+    description="SibelGPT AI Assistant Backend API - Fixed Version",
     lifespan=lifespan,
-    # Performance optimizations
-    docs_url="/docs" if os.getenv("ENVIRONMENT") != "production" else None,
-    redoc_url="/redoc" if os.getenv("ENVIRONMENT") != "production" else None,
-    generate_unique_id_function=lambda route: f"sibelgpt_{route.name}",
 )
 
-# ============= MIDDLEWARE STACK (Order matters!) =============
-# 1. Performance monitoring (should be first)
-app.add_middleware(PerformanceMiddleware)
+# ============= MIDDLEWARE STACK =============
+# 1. Performance monitoring (FIXED)
+app.middleware("http")(performance_middleware)
 
-# 2. GZIP compression for responses >1KB
+# 2. GZIP compression
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# 3. CORS (after compression)
+# 3. CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -148,132 +102,69 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ============= OPTIMIZED RATE LIMITING =============
+# ============= SIMPLE RATE LIMITING =============
 from collections import defaultdict
-from time import time
 
-# In-memory rate limiting (production should use Redis)
 rate_limit_store = defaultdict(list)
-RATE_LIMIT_REQUESTS = 60  # requests per minute
-RATE_LIMIT_WINDOW = 60    # seconds
+RATE_LIMIT_REQUESTS = 60
+RATE_LIMIT_WINDOW = 60
 
 async def rate_limit_check(request: Request):
-    """Optimized rate limiting with sliding window"""
+    """Simple rate limiting"""
     client_ip = request.client.host
-    current_time = time()
+    current_time = time.time()
     
-    # Clean old entries (sliding window)
+    # Clean old entries
     rate_limit_store[client_ip] = [
         timestamp for timestamp in rate_limit_store[client_ip]
         if current_time - timestamp < RATE_LIMIT_WINDOW
     ]
     
-    # Check if limit exceeded
+    # Check limit
     if len(rate_limit_store[client_ip]) >= RATE_LIMIT_REQUESTS:
         raise HTTPException(
             status_code=429,
-            detail={
-                "error": "Rate limit exceeded",
-                "retry_after": RATE_LIMIT_WINDOW,
-                "current_requests": len(rate_limit_store[client_ip])
-            }
+            detail="Rate limit exceeded"
         )
     
     # Add current request
     rate_limit_store[client_ip].append(current_time)
 
-# ============= OPTIMIZED MODELS =============
+# ============= MODELS =============
 class ChatRequest(BaseModel):
     question: str
     mode: str = "real-estate"
     conversation_history: List[Dict] = []
-    
-    class Config:
-        # Performance optimization
-        arbitrary_types_allowed = True
-        use_enum_values = True
 
 class WebSearchRequest(BaseModel):
     question: str
     mode: str = "real-estate"
-    
-    class Config:
-        arbitrary_types_allowed = True
-        use_enum_values = True
 
-# ============= BACKGROUND TASKS FOR PERFORMANCE =============
-async def log_slow_query(endpoint: str, duration: float, details: dict):
-    """Background task to log slow queries without blocking response"""
-    print(f"📊 Slow Query Alert: {endpoint} took {duration:.2f}s - {details}")
+# ============= DEPENDENCY =============
+async def get_supabase_client(request: Request) -> Optional[Client]:
+    return getattr(request.app.state, 'supabase_client', None)
 
-async def cache_warmup_task():
-    """Background task to warm up cache periodically"""
-    try:
-        from property_search_handler import refresh_cache_background
-        await refresh_cache_background()
-    except Exception as e:
-        print(f"⚠️  Cache warmup task failed: {e}")
-
-# ============= OPTIMIZED DEPENDENCY INJECTION =============
-async def get_supabase_client(request: Request) -> Optional:
-    """Cached Supabase client dependency"""
-    if not hasattr(request.app.state, 'supabase_client'):
-        # Initialize on first access
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_KEY")
-        
-        if supabase_url and supabase_key:
-            try:
-                from supabase import create_client
-                request.app.state.supabase_client = create_client(supabase_url, supabase_key)
-            except Exception as e:
-                print(f"❌ Supabase client creation failed: {e}")
-                request.app.state.supabase_client = None
-        else:
-            request.app.state.supabase_client = None
-    
-    return request.app.state.supabase_client
-
-# ============= STATIC FILES WITH CACHING =============
+# ============= STATIC FILES =============
 if os.path.exists("public"):
-    app.mount("/static", StaticFiles(directory="public", html=True), name="static")
+    app.mount("/static", StaticFiles(directory="public"), name="static")
 
-# ============= OPTIMIZED ENDPOINTS =============
-
+# ============= ENDPOINTS =============
 @app.get("/", tags=["meta"])
 async def root():
     return {
-        "status": "ready",
+        "status": "ok",
         "service": "SibelGPT Backend",
-        "version": "7.1.0",
-        "performance": "optimized"
+        "version": "7.0.0"
     }
 
 @app.get("/health", tags=["meta"])
 async def health_check(db_client = Depends(get_supabase_client)):
-    """Enhanced health check with performance metrics"""
-    start_time = time.time()
-    
-    health_status = {
+    return {
         "status": "healthy",
-        "version": "7.1.0",
-        "timestamp": datetime.utcnow().isoformat(),
-        "services": {
-            "supabase": db_client is not None,
-            "openai": os.getenv("OPENAI_API_KEY") is not None,
-        },
-        "performance": {
-            "response_time_ms": 0,  # Will be set below
-            "cache_status": "active",
-            "rate_limiting": "active"
-        }
+        "version": "7.0.0",
+        "supabase": db_client is not None,
+        "timestamp": datetime.utcnow().isoformat()
     }
-    
-    # Calculate response time
-    response_time = (time.time() - start_time) * 1000
-    health_status["performance"]["response_time_ms"] = round(response_time, 2)
-    
-    return health_status
 
 @app.post("/chat", tags=["chat"])
 async def chat(
@@ -282,11 +173,10 @@ async def chat(
     db_client = Depends(get_supabase_client),
     _rate_limit = Depends(rate_limit_check)
 ):
-    """Optimized chat endpoint with performance monitoring"""
+    """Chat endpoint"""
     start_time = time.time()
     
     try:
-        # Import lazily to reduce startup time
         import ask_handler
         
         answer = await ask_handler.answer_question(
@@ -297,24 +187,13 @@ async def chat(
         
         # Log slow queries in background
         duration = time.time() - start_time
-        if duration > 1.0:  # Log queries >1 second
-            background_tasks.add_task(
-                log_slow_query, 
-                "chat", 
-                duration, 
-                {"mode": payload.mode, "question_length": len(payload.question)}
-            )
+        if duration > 1.0:
+            print(f"📊 Slow chat query: {duration:.2f}s - Mode: {payload.mode}")
         
         return {"reply": answer}
         
     except Exception as e:
-        duration = time.time() - start_time
-        background_tasks.add_task(
-            log_slow_query, 
-            "chat_error", 
-            duration, 
-            {"error": str(e), "mode": payload.mode}
-        )
+        print(f"❌ Chat error: {str(e)}")
         return JSONResponse(
             status_code=500, 
             content={"error": f"Chat processing failed: {str(e)}"}
@@ -326,41 +205,33 @@ async def web_search(
     background_tasks: BackgroundTasks,
     _rate_limit = Depends(rate_limit_check)
 ):
-    """Optimized web search with caching"""
+    """Web search endpoint"""
     start_time = time.time()
     
     try:
-        # Import lazily
         import search_handler
         
         answer = await search_handler.web_search_answer(payload.question, payload.mode)
         
-        # Background performance logging
         duration = time.time() - start_time
-        if duration > 2.0:  # Web search is expected to be slower
-            background_tasks.add_task(
-                log_slow_query,
-                "web_search",
-                duration,
-                {"mode": payload.mode, "question": payload.question[:50]}
-            )
+        if duration > 2.0:
+            print(f"📊 Slow web search: {duration:.2f}s")
         
         return {"reply": answer}
         
     except Exception as e:
+        print(f"❌ Web search error: {str(e)}")
         return JSONResponse(
             status_code=500, 
             content={"error": f"Web search failed: {str(e)}"}
         )
 
-# ============= OPTIMIZED STATISTICS ENDPOINT =============
+# ============= STATISTICS ENDPOINT =============
 @app.get("/statistics/simple", tags=["statistics"])
 async def get_simple_statistics():
-    """Cached statistics with faster response"""
-    # Pre-computed statistics (updated periodically)
+    """Dashboard statistics"""
     return {
         "status": "success",
-        "cached_at": datetime.utcnow().isoformat(),
         "statistics": {
             "genel_ozet": {
                 "toplam_ilan": 5047,
@@ -383,54 +254,29 @@ async def get_simple_statistics():
         }
     }
 
-# ============= PERFORMANCE MONITORING ENDPOINT =============
-@app.get("/performance", tags=["monitoring"])
-async def get_performance_stats():
-    """Real-time performance statistics"""
-    return {
-        "cache_stats": {
-            "hit_rate": "85%",  # Example metrics
-            "memory_usage": "45MB",
-            "total_requests": len(rate_limit_store)
-        },
-        "rate_limiting": {
-            "active_ips": len(rate_limit_store),
-            "limit_per_minute": RATE_LIMIT_REQUESTS
-        },
-        "system": {
-            "uptime": "Available on startup",
-            "version": "7.1.0"
-        }
-    }
+# ============= DASHBOARD =============
+@app.get("/dashboard", tags=["frontend"])
+async def serve_dashboard():
+    dashboard_path = Path("public") / "dashboard.html"
+    
+    if dashboard_path.exists():
+        return FileResponse(dashboard_path, media_type="text/html")
+    
+    return JSONResponse(status_code=404, content={"error": "Dashboard bulunamadı"})
 
 # ============= ERROR HANDLERS =============
 @app.exception_handler(404)
-async def not_found_handler(request: Request, exc):
-    return JSONResponse(
-        status_code=404, 
-        content={
-            "error": "Endpoint not found",
-            "path": str(request.url.path),
-            "available_endpoints": ["/docs", "/health", "/chat", "/web-search"]
-        }
-    )
+async def not_found_handler(request, exc):
+    return JSONResponse(status_code=404, content={"error": "Sayfa bulunamadı"})
 
 @app.exception_handler(500)
-async def server_error_handler(request: Request, exc):
-    return JSONResponse(
-        status_code=500, 
-        content={
-            "error": "Internal server error",
-            "message": "Please try again later or contact support",
-            "request_id": getattr(request, "request_id", "unknown")
-        }
-    )
+async def server_error_handler(request, exc):
+    return JSONResponse(status_code=500, content={"error": str(exc)})
 
-# ============= IMPORT ROUTERS (Lazy loading) =============
-# Only import routers when actually needed to reduce startup time
+# ============= ROUTER LOADING =============
 @app.on_event("startup")
 async def setup_routers():
-    """Setup routers after startup for better performance"""
+    """Load routers after startup"""
     try:
         from image_handler import router as image_router
         from pdf_handler import router as pdf_router
@@ -440,9 +286,25 @@ async def setup_routers():
         app.include_router(pdf_router, prefix="", tags=["pdf"])
         app.include_router(elevenlabs_router, prefix="", tags=["speech"])
         
-        print("✅ All routers loaded successfully")
+        print("✅ All routers loaded")
     except Exception as e:
         print(f"⚠️  Router loading error: {e}")
+
+# ============= PERFORMANCE ENDPOINT =============
+@app.get("/performance", tags=["monitoring"])
+async def get_performance_stats():
+    """Performance statistics"""
+    return {
+        "status": "active",
+        "rate_limiting": {
+            "active_ips": len(rate_limit_store),
+            "limit_per_minute": RATE_LIMIT_REQUESTS
+        },
+        "system": {
+            "version": "7.0.0",
+            "uptime": "Available after full startup"
+        }
+    }
 
 # ============= MAIN EXECUTION =============
 if __name__ == "__main__":
@@ -450,9 +312,5 @@ if __name__ == "__main__":
     uvicorn.run(
         app, 
         host="0.0.0.0", 
-        port=int(os.getenv("PORT", 10000)),
-        # Performance settings
-        workers=1,  # Render free tier limitation
-        access_log=False,  # Disable for better performance
-        use_colors=True,
+        port=int(os.getenv("PORT", 10000))
     )
