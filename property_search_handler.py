@@ -1,7 +1,7 @@
 # property_search_handler.py - PERFORMANCE OPTIMIZED VERSION
 # SibelGPT için: Maksimum hız, maksimum verimlilik!
 
-import numpy as np
+import numpy as np 
 import os
 import json
 import math
