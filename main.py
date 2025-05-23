@@ -1,6 +1,7 @@
-# main.py - SibelGPT Backend - v7.0.0 (SABİT VERİLER)
 import os
 import json
+import time
+import hashlib
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Dict
@@ -44,7 +45,7 @@ class WebSearchRequest(BaseModel):
 app = FastAPI(
     title="SibelGPT Backend",
     version="7.0.0",
-    description="SibelGPT AI Assistant Backend API - Sabit Veriler"
+    description="SibelGPT AI Assistant Backend API - Güvenlik Güncellemesi"
 )
 
 # ---- CORS Middleware ----
@@ -55,6 +56,41 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---- Rate Limiting için basit kontrol ----
+request_counts = {}
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    # Sadece chat endpoint'i için
+    if request.url.path == "/chat":
+        client_ip = request.client.host
+        current_time = int(time.time())
+        
+        # IP başına dakikalık sayaç
+        key = f"{client_ip}:{current_time // 60}"
+        
+        if key in request_counts:
+            if request_counts[key] > 30:  # Dakikada max 30 istek
+                return JSONResponse(
+                    status_code=429,
+                    content={"error": "Çok fazla istek. Lütfen biraz bekleyin."}
+                )
+            request_counts[key] += 1
+        else:
+            request_counts[key] = 1
+            
+        # Eski kayıtları temizle
+        old_time = current_time - 120  # 2 dakika öncesi
+        for k in list(request_counts.keys()):
+            try:
+                if int(k.split(':')[1]) < old_time // 60:
+                    del request_counts[k]
+            except:
+                pass
+    
+    response = await call_next(request)
+    return response
 
 # ---- Static Files ----
 if os.path.exists("public"):
@@ -106,6 +142,20 @@ async def health_check(db_client = Depends(get_supabase_client)):
         "status": "healthy",
         "version": "7.0.0",
         "supabase": db_client is not None
+    }
+
+# ---- Güvenli Supabase Config Endpoint ----
+@app.get("/api/config", tags=["config"])
+async def get_public_config():
+    """Frontend için güvenli konfigürasyon"""
+    # Backend URL'i belirle
+    backend_url = os.getenv("BACKEND_URL", "https://sibelgpt-backend.onrender.com")
+    
+    # Sadece public (anon) key'i gönder
+    return {
+        "supabaseUrl": os.getenv("SUPABASE_URL"),
+        "supabaseAnonKey": os.getenv("SUPABASE_KEY"),  # Bu zaten anon key
+        "backendUrl": backend_url
     }
 
 # ---- Chat Endpoint ----
