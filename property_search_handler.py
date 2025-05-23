@@ -2,7 +2,7 @@
 # SibelGPT için: Maksimum hız, maksimum performans!
 
 import numpy as np
-import os
+import os 
 import json
 import math
 import re
