@@ -1,5 +1,5 @@
 # property_search_handler.py
-# SibelGPT için: Maksimum log, maksimum sağlamlık!
+# SibelGPT için: Maksimum hız, maksimum performans!
 
 import numpy as np
 import os
@@ -19,11 +19,6 @@ try:
 except ImportError:
     raise RuntimeError("Gerekli kütüphaneler eksik: openai veya supabase")
 
-# ---- Cache Mekanizması Ayarları ----
-CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
-CACHE_TTL = timedelta(hours=2)  # 2 saat süreyle önbellekte tut
-os.makedirs(CACHE_DIR, exist_ok=True)
-
 # ---- Ortam Değişkenleri ve API Bağlantıları ----
 OAI_KEY = os.getenv("OPENAI_API_KEY")
 SB_URL = os.getenv("SUPABASE_URL")
@@ -39,56 +34,61 @@ EMBEDDING_MODEL = "text-embedding-3-small"
 MATCH_THRESHOLD = 0.3
 MATCH_COUNT = 50
 
-# ---- Cache İşlemleri için Fonksiyonlar ----
-def get_cache_key(query: str) -> str:
-    """Sorgu için benzersiz bir cache anahtarı oluştur"""
-    return hashlib.md5(query.encode('utf-8')).hexdigest()
+# ===== HIZLANDIRMA İÇİN CACHE SİSTEMİ =====
+# Cache klasörü
+CACHE_DIR = os.path.join(os.path.dirname(__file__), "listings_cache")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
-def get_cache_path(cache_key: str) -> str:
-    """Cache dosyasının tam yolunu al"""
-    return os.path.join(CACHE_DIR, f"{cache_key}.pkl")
+# Global cache değişkenleri
+ALL_LISTINGS_CACHE = None
+CACHE_LOADED_TIME = None
+CACHE_LOCK = asyncio.Lock()
 
-def check_cache(query: str) -> list:
-    """Cache'te ilgili sorgu sonucu var mı kontrol et, varsa döndür"""
-    cache_key = get_cache_key(query)
-    cache_path = get_cache_path(cache_key)
+async def load_all_listings_to_memory():
+    """Tüm ilanları belleğe yükle - HIZLI ERİŞİM İÇİN"""
+    global ALL_LISTINGS_CACHE, CACHE_LOADED_TIME
     
-    if not os.path.exists(cache_path):
-        return None
-    
-    try:
-        # Cache dosyasının yaşını kontrol et
-        file_modified = datetime.fromtimestamp(os.path.getmtime(cache_path))
-        if datetime.now() - file_modified > CACHE_TTL:
-            print(f"🕒 Cache süresi dolmuş: {query}")
-            return None
+    async with CACHE_LOCK:
+        print("🔄 İlanlar belleğe yükleniyor...")
         
-        # Cache'ten oku
-        with open(cache_path, 'rb') as f:
-            cached_data = pickle.load(f)
-            print(f"✅ Cache'ten sonuç alındı: {query}")
-            return cached_data
-    except Exception as e:
-        print(f"⚠️ Cache okuma hatası: {e}")
-        return None
+        cache_file = os.path.join(CACHE_DIR, "all_listings.pkl")
+        
+        # Önce cache dosyasını kontrol et
+        if os.path.exists(cache_file):
+            file_time = datetime.fromtimestamp(os.path.getmtime(cache_file))
+            if datetime.now() - file_time < timedelta(hours=12):
+                try:
+                    with open(cache_file, 'rb') as f:
+                        ALL_LISTINGS_CACHE = pickle.load(f)
+                        CACHE_LOADED_TIME = datetime.now()
+                        print(f"✅ {len(ALL_LISTINGS_CACHE)} ilan cache'den yüklendi!")
+                        return
+                except Exception as e:
+                    print(f"⚠️ Cache okuma hatası: {e}")
+        
+        # Cache yoksa veya eskiyse veritabanından çek
+        try:
+            result = supabase_client.table("remax_ilanlar").select("*").execute()
+            ALL_LISTINGS_CACHE = result.data if result.data else []
+            CACHE_LOADED_TIME = datetime.now()
+            
+            # Cache'e kaydet
+            with open(cache_file, 'wb') as f:
+                pickle.dump(ALL_LISTINGS_CACHE, f)
+            
+            print(f"✅ {len(ALL_LISTINGS_CACHE)} ilan veritabanından yüklendi ve cache'e kaydedildi!")
+            
+        except Exception as e:
+            print(f"❌ Veritabanı hatası: {e}")
+            ALL_LISTINGS_CACHE = []
 
-def save_to_cache(query: str, data: list) -> None:
-    """Sorgu sonucunu cache'e kaydet"""
-    if not data:
-        return  # Boş sonuçları önbelleğe alma
-    
-    cache_key = get_cache_key(query)
-    cache_path = get_cache_path(cache_key)
-    
-    try:
-        with open(cache_path, 'wb') as f:
-            pickle.dump(data, f)
-            print(f"💾 Sonuç cache'e kaydedildi: {query}")
-    except Exception as e:
-        print(f"⚠️ Cache yazma hatası: {e}")
+# Uygulama başlarken otomatik yükle
+print("🚀 İlan cache sistemi başlatılıyor...")
+asyncio.create_task(load_all_listings_to_memory())
 
-# --- Embedding çekme ---
+# ---- Yardımcı Fonksiyonlar ----
 async def get_embedding(text: str) -> Optional[List[float]]:
+    """OpenAI ile embedding oluştur"""
     text = text.strip()
     if not text:
         return None
@@ -103,8 +103,8 @@ async def get_embedding(text: str) -> Optional[List[float]]:
         print(traceback.format_exc())
         return None
 
-# --- Benzerlik hesaplama ---
 def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
+    """İki vektör arasındaki benzerliği hesapla"""
     try:
         dot_product = sum(a * b for a, b in zip(vec1, vec2))
         magnitude1 = math.sqrt(sum(a * a for a in vec1))
@@ -117,8 +117,8 @@ def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
         print(traceback.format_exc())
         return 0
 
-# --- Sorgu tipi anlama ---
 def is_property_search_query(query: str) -> bool:
+    """Sorgunun emlak araması olup olmadığını kontrol et"""
     try:
         query_lower = query.lower()
         search_terms = [
@@ -143,8 +143,8 @@ def is_property_search_query(query: str) -> bool:
         print(traceback.format_exc())
         return False
 
-# --- Parametre Çıkarma ---
 async def extract_query_parameters(question: str) -> Dict:
+    """Sorgudaki arama parametrelerini çıkar"""
     try:
         print(f"🔍 Sorgudan parametreler çıkarılıyor: {question}")
         resp = await openai_client.chat.completions.create(
@@ -179,104 +179,6 @@ async def extract_query_parameters(question: str) -> Dict:
         print(traceback.format_exc())
         return {}
 
-# --- Ana Arama Fonksiyonu ---
-async def hybrid_property_search(question: str) -> List[Dict]:
-    try:
-        # Parametreleri çıkarma ve embedding oluşturmayı paralel yap
-        params_task = extract_query_parameters(question)
-        embedding_task = get_embedding(question)
-        
-        # Her iki görevi de bekleyelim
-        params, query_embedding = await asyncio.gather(params_task, embedding_task)
-        
-        print(f"🔍 Çıkarılan parametreler: {params}")
-        
-        if not query_embedding:
-            print("⚠️ Embedding oluşturulamadı!")
-            return []
-            
-        # Veritabanı sorgusuna devam
-        query = supabase_client.table("remax_ilanlar").select("*")
-        
-        # Lokasyon filtresi
-        if params.get('lokasyon'):
-            lokasyon = params['lokasyon'].lower()
-            query = query.ilike("ilce", f"%{lokasyon}%")
-            result = query.execute()
-            listings = result.data if result.data else []
-            if not listings:
-                query = supabase_client.table("remax_ilanlar").select("*")
-                query = query.ilike("mahalle", f"%{lokasyon}%")
-                result = query.execute()
-                listings = result.data if result.data else []
-        else:
-            result = query.limit(50).execute()
-            listings = result.data if result.data else []
-
-        # Oda sayısı filtresi
-        if params.get('oda_sayisi') and listings:
-            oda_sayisi = params['oda_sayisi'].lower()
-            listings = [l for l in listings if l.get('oda_sayisi', '').lower() == oda_sayisi]
-
-        # Max fiyat filtresi
-        if params.get('max_fiyat') and listings:
-            max_fiyat = params.get('max_fiyat')
-            filtered_listings = []
-            for l in listings:
-                try:
-                    fiyat_str = l.get('fiyat', '0')
-                    fiyat_temiz = re.sub(r'[^\d]', '', fiyat_str)
-                    print(f"↪️ temiz fiyat: {fiyat_temiz!r}")
-                    fiyat = float(fiyat_temiz)
-                    if fiyat <= max_fiyat:
-                        filtered_listings.append(l)
-                except (ValueError, TypeError) as err:
-                    print(f"Fiyat float dönüştürme hatası: {fiyat_str!r} -> {fiyat_temiz!r} ({err})")
-                    print(traceback.format_exc())
-            listings = filtered_listings
-
-        print(f"📋 Veritabanı sorgusu {len(listings)} ilan buldu")
-
-        # Embedding ile benzerlik skoru
-        if listings:
-            query_embedding_np = np.array(query_embedding, dtype=np.float32)
-            for listing in listings:
-                if 'embedding' in listing and listing['embedding']:
-                    embedding_raw = listing['embedding']
-                    if isinstance(embedding_raw, str):
-                        try:
-                            listing_embedding = json.loads(embedding_raw)
-                        except Exception as e:
-                            print("Embedding JSON decode hatası:", e)
-                            print(traceback.format_exc())
-                            listing_embedding = []
-                    else:
-                        listing_embedding = embedding_raw
-                    try:
-                        listing_embedding_np = np.array(listing_embedding, dtype=np.float32)
-                        similarity = cosine_similarity(query_embedding_np, listing_embedding_np)
-                        listing['similarity'] = similarity
-                    except Exception as emb_err:
-                        print(f"Benzerlik hesaplama hatası: {emb_err}")
-                        print(traceback.format_exc())
-                        listing['similarity'] = 0
-                else:
-                    listing['similarity'] = 0
-            listings = sorted(listings, key=lambda x: x.get('similarity', 0), reverse=True)
-
-        print(f"✅ Hibrit arama sonuçları: {len(listings)} ilan bulundu")
-        
-        if listings:
-            ilan_ids = [listing.get('ilan_id') for listing in listings[:10] if listing.get('ilan_id')]
-            print(f"🏷️ Bulunan ilk 10 ilan ID: {ilan_ids}")
-
-        return listings
-
-    except Exception as e:
-        print(f"❌ Hibrit arama hatası: {e}")
-        print(traceback.format_exc())
-        return []
-
 def format_property_listings(listings: list) -> str:
     """İlan sonuçlarını HTML tabloya çevir"""
     if not listings:
@@ -285,7 +187,7 @@ def format_property_listings(listings: list) -> str:
     # Başlık: Arama sonuçları sayısı
     html = f"<h3 style='color: #f44336;'>Arama Sonucu: {len(listings)} ilan bulundu</h3>"
     
-    # Telefon bilgisi - metin rengini belirtelim
+    # Telefon bilgisi
     html += "<p style='color: #333;'><strong>📞 Sorgunuzla ilgili ilanlar aşağıda listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
     
     # Tablo başlangıcı
@@ -321,7 +223,6 @@ def format_property_listings(listings: list) -> str:
         # Satır arka plan rengi
         row_bg = "#f8f9fa" if i % 2 == 0 else "#ffffff"
         
-        # BURADA METİN RENGİNİ AÇIKÇA BELİRTİYORUZ: color: black;
         html += f"""
         <tr style="background-color: {row_bg};">
             <td style="padding: 10px; border-bottom: 1px solid #eee; color: black;">{ilan_no}</td>
@@ -346,30 +247,89 @@ def format_property_listings(listings: list) -> str:
     
     return html
 
-# --- Ana arama fonksiyonu: Dışarıdan çağrılır ---
+# ---- Ana Arama Fonksiyonu ----
 async def search_properties(query: str) -> str:
+    """HIZLANDIRILMIŞ ARAMA FONKSİYONU"""
     try:
-        # Önce cache'i kontrol et
-        cached_listings = check_cache(query)
-        if cached_listings is not None:
-            print(f"🚀 Önbellekten hızlı yanıt: {query}")
-            return format_property_listings(cached_listings)
+        # Cache kontrolü
+        if not ALL_LISTINGS_CACHE or not CACHE_LOADED_TIME:
+            await load_all_listings_to_memory()
         
-        print(f"🔎 Önbellekte bulunamadı, arama yapılıyor: {query}")
-        # Cache'te yoksa normal aramayı yap
-        listings = await hybrid_property_search(query)
+        # 6 saatten eski mi?
+        if datetime.now() - CACHE_LOADED_TIME > timedelta(hours=6):
+            await load_all_listings_to_memory()
         
-        # Sonuçları cache'e kaydet
-        save_to_cache(query, listings)
+        print(f"🔎 Arama yapılıyor: {query}")
+        print(f"📊 Bellekte {len(ALL_LISTINGS_CACHE)} ilan var")
         
-        return format_property_listings(listings)
+        # Parametreleri çıkar
+        params = await extract_query_parameters(query)
+        print(f"📝 Parametreler: {params}")
+        
+        # Bellekteki ilanları kopyala (orijinali bozma)
+        filtered = ALL_LISTINGS_CACHE.copy()
+        
+        # HIZLI FİLTRELEME
+        
+        # 1. Lokasyon filtresi
+        if params.get('lokasyon'):
+            lok = params['lokasyon'].lower()
+            filtered = [
+                ilan for ilan in filtered 
+                if lok in (str(ilan.get('ilce', '')).lower() + ' ' + 
+                          str(ilan.get('mahalle', '')).lower())
+            ]
+            print(f"📍 Lokasyon filtresi sonrası: {len(filtered)} ilan")
+        
+        # 2. Fiyat filtresi
+        if params.get('max_fiyat'):
+            max_fiyat = float(params['max_fiyat'])
+            temp = []
+            for ilan in filtered:
+                try:
+                    fiyat_str = re.sub(r'[^\d]', '', str(ilan.get('fiyat', '0')))
+                    if fiyat_str and float(fiyat_str) <= max_fiyat:
+                        temp.append(ilan)
+                except:
+                    continue
+            filtered = temp
+            print(f"💰 Fiyat filtresi sonrası: {len(filtered)} ilan")
+        
+        # 3. Oda sayısı filtresi  
+        if params.get('oda_sayisi'):
+            oda = params['oda_sayisi'].lower()
+            filtered = [
+                ilan for ilan in filtered 
+                if str(ilan.get('oda_sayisi', '')).lower() == oda
+            ]
+            print(f"🏠 Oda filtresi sonrası: {len(filtered)} ilan")
+        
+        # En fazla 50 ilan göster
+        filtered = filtered[:50]
+        
+        print(f"✅ Toplam {len(filtered)} ilan bulundu")
+        return format_property_listings(filtered)
+        
     except Exception as e:
-        print(f"❌ search_properties hatası: {e}")
-        print(traceback.format_exc())
-        return "<p>Bir hata oluştu.</p>"
+        print(f"❌ Arama hatası: {e}")
+        import traceback
+        traceback.print_exc()
+        return "<p>Arama sırasında bir hata oluştu. Lütfen tekrar deneyin.</p>"
 
-# --- Kendi başına test etmek istersen ---
+# ---- Hibrit Arama (Geriye dönük uyumluluk için) ----
+async def hybrid_property_search(question: str) -> List[Dict]:
+    """Eski fonksiyon - geriye dönük uyumluluk için"""
+    try:
+        html_result = await search_properties(question)
+        # HTML'den basit bir liste döndür
+        return ALL_LISTINGS_CACHE[:50] if ALL_LISTINGS_CACHE else []
+    except Exception as e:
+        print(f"❌ Hibrit arama hatası: {e}")
+        return []
+
+# ---- Test Fonksiyonu ----
 async def test_search():
+    """Test için örnek arama"""
     soru = "Kadıköy'de 20 milyona kadar 3+1 daire"
     html = await search_properties(soru)
     print(html)
