@@ -583,29 +583,46 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
     detected_topic_result = await detect_topic(question, mode)
     print(f"✓ Tespit edilen konu: {detected_topic_result}, Kullanıcının seçtiği mod: {mode}")
    
-    if detected_topic_result != mode:
+    # BURAYA YENİ KOD EKLE: Konu eşleşmezse ilan araması yapma
+    if detected_topic_result != mode and detected_topic_result != "general":
         redirection_key = f"{mode}-to-{detected_topic_result}"
         print(f"⟹ Yönlendirme anahtarı: {redirection_key}")
         
         if redirection_key in REDIRECTION_MESSAGES:
             return REDIRECTION_MESSAGES[redirection_key]
+    
+    # YENİ KONTROL: Genel konu (futbol vb.) tespiti yapıldıysa, ilan araması YAPMA
+    if detected_topic_result == "general":
+        print("⚠️ Genel konu tespit edildi, ilan araması YAPILMAYACAK")
+        # Doğrudan yanıt döndür, ilan araması yapma
+        return f"""
+        <h3>Bu soru {mode.title()} GPT'nin uzmanlık alanı dışında.</h3>
+        <p>Ben sadece {mode} konularında uzmanlaşmış bir yapay zeka asistanıyım.</p>
+        <p>Eğer {mode} ile ilgili bir sorunuz varsa, memnuniyetle yardımcı olabilirim.</p>
+        """
    
     context = ""
     if mode == "real-estate":
-        # İlan araması olup olmadığını kontrol et
-        if property_search_handler.is_property_search_query(question):
-            print("📢 İlan araması tespit edildi, yeni arama modülü kullanılıyor...")
-            # Yeni arama modülünü kullan
-            context = await property_search_handler.search_properties(question)
-        else:
-            # Eski yöntemi kullan
-            print("📢 Normal soru tespit edildi, standart arama kullanılıyor...")
-            query_emb = await get_embedding(question)
-            if query_emb:
-                listings = await search_listings_in_supabase(query_emb)
-                context = format_context_for_sibelgpt(listings)
+        # YENİ KONTROL: Konu real-estate ise, ilan araması yap
+        if detected_topic_result == "real-estate":
+            # İlan araması olup olmadığını kontrol et
+            if property_search_handler.is_property_search_query(question):
+                print("📢 İlan araması tespit edildi, yeni arama modülü kullanılıyor...")
+                # Yeni arama modülünü kullan
+                context = await property_search_handler.search_properties(question)
             else:
-                context = "<p>Sorunuzu işlerken bir sorun oluştu, lütfen tekrar deneyin veya farklı bir soru sorun.</p>"
+                # Eski yöntemi kullan
+                print("📢 Normal soru tespit edildi, standart arama kullanılıyor...")
+                query_emb = await get_embedding(question)
+                if query_emb:
+                    listings = await search_listings_in_supabase(query_emb)
+                    context = format_context_for_sibelgpt(listings)
+                else:
+                    context = "<p>Sorunuzu işlerken bir sorun oluştu, lütfen tekrar deneyin veya farklı bir soru sorun.</p>"
+        else:
+            # Konu real-estate DEĞİLSE, ilan araması YAPMA
+            print("⚠️ Gayrimenkul konusu tespit edilmedi, ilan araması YAPILMAYACAK")
+            context = "<p>Bu soru gayrimenkul ile ilgili değil. İlan araması yapılmayacak.</p>"
    
     system_prompt = SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["real-estate"])
    
