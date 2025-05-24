@@ -576,70 +576,74 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
 
 # ── Ana Fonksiyon ─────────────────────────────────────────
 async def answer_question(question: str, mode: str = "real-estate", conversation_history: List = None) -> str:
-    """Kullanıcının sorusuna yanıt verir ve gerektiğinde başka modüle yönlendirir."""
+    """
+    Kullanıcının sorusuna yanıt verir ve gerektiğinde başka modüle yönlendirir.
     
-    print(f"↪ Soru: {question}, Mod: {mode}")
-   
-    detected_topic_result = await detect_topic(question, mode)
-    print(f"✓ Tespit edilen konu: {detected_topic_result}, Kullanıcının seçtiği mod: {mode}")
-   
-    # BURAYA YENİ KOD EKLE: Konu eşleşmezse ilan araması yapma
-    if detected_topic_result != mode and detected_topic_result != "general":
-        redirection_key = f"{mode}-to-{detected_topic_result}"
-        print(f"⟹ Yönlendirme anahtarı: {redirection_key}")
+    Args:
+        question: Kullanıcının sorusu
+        mode: Mevcut GPT modülü ('real-estate', 'mind-coach', 'finance')
+        conversation_history: Önceki konuşma geçmişi
         
-        if redirection_key in REDIRECTION_MESSAGES:
-            return REDIRECTION_MESSAGES[redirection_key]
+    Returns:
+        str: Kullanıcıya verilecek yanıt
+    """
+    # Soru ve mod bilgisini logla
+    print(f"↪ Soru: {question}, Mod: {mode}")
     
-    # YENİ KONTROL: Genel konu (futbol vb.) tespiti yapıldıysa, ilan araması YAPMA
-    if detected_topic_result == "general":
-        print("⚠️ Genel konu tespit edildi, ilan araması YAPILMAYACAK")
-        # Doğrudan yanıt döndür, ilan araması yapma
-        return f"""
-        <h3>Bu soru {mode.title()} GPT'nin uzmanlık alanı dışında.</h3>
-        <p>Ben sadece {mode} konularında uzmanlaşmış bir yapay zeka asistanıyım.</p>
-        <p>Eğer {mode} ile ilgili bir sorunuz varsa, memnuniyetle yardımcı olabilirim.</p>
-        """
-   
+    # Sorunun hangi konuya ait olduğunu tespit et
+    detected_topic = await detect_topic(question, mode)
+    print(f"✓ Tespit edilen konu: {detected_topic}, Kullanıcının seçtiği mod: {mode}")
+    
+    # 1. KONU KONTROLÜ: Eğer konu mevcut modla eşleşmiyorsa
+    if detected_topic != mode:
+        # Eğer tespit edilen konu başka bir modüle aitse, yönlendirme yap
+        if detected_topic in ["real-estate", "mind-coach", "finance"]:
+            redirection_key = f"{mode}-to-{detected_topic}"
+            print(f"⟹ Yönlendirme anahtarı: {redirection_key}")
+            
+            if redirection_key in REDIRECTION_MESSAGES:
+                return REDIRECTION_MESSAGES[redirection_key]
+        
+        # Eğer tespit edilen konu tanımlı modüllerden biri değilse ("general" veya başka bir şey)
+        # Uzmanlık alanı dışı yanıt döndür ve aramayı atla
+        print("⚠️ Uzmanlık alanı dışı konu tespit edildi, arama yapılmayacak")
+        return get_out_of_scope_response(mode)
+    
+    # 2. İLAN ARAMASI: Sadece Gayrimenkul modunda ve konu eşleşiyorsa yapılacak
     context = ""
     if mode == "real-estate":
-        # YENİ KONTROL: Konu real-estate ise, ilan araması yap
-        if detected_topic_result == "real-estate":
-            # İlan araması olup olmadığını kontrol et
-            if property_search_handler.is_property_search_query(question):
-                print("📢 İlan araması tespit edildi, yeni arama modülü kullanılıyor...")
-                # Yeni arama modülünü kullan
-                context = await property_search_handler.search_properties(question)
-            else:
-                # Eski yöntemi kullan
-                print("📢 Normal soru tespit edildi, standart arama kullanılıyor...")
-                query_emb = await get_embedding(question)
-                if query_emb:
-                    listings = await search_listings_in_supabase(query_emb)
-                    context = format_context_for_sibelgpt(listings)
-                else:
-                    context = "<p>Sorunuzu işlerken bir sorun oluştu, lütfen tekrar deneyin veya farklı bir soru sorun.</p>"
+        # İlan araması mı, normal soru mu kontrolü
+        if property_search_handler.is_property_search_query(question):
+            print("📢 İlan araması tespit edildi, yeni arama modülü kullanılıyor...")
+            context = await property_search_handler.search_properties(question)
         else:
-            # Konu real-estate DEĞİLSE, ilan araması YAPMA
-            print("⚠️ Gayrimenkul konusu tespit edilmedi, ilan araması YAPILMAYACAK")
-            context = "<p>Bu soru gayrimenkul ile ilgili değil. İlan araması yapılmayacak.</p>"
-   
+            # Normal gayrimenkul sorusu
+            print("📢 Normal gayrimenkul sorusu tespit edildi, standart arama kullanılıyor...")
+            query_emb = await get_embedding(question)
+            if query_emb:
+                listings = await search_listings_in_supabase(query_emb)
+                context = format_context_for_sibelgpt(listings)
+            else:
+                context = "<p>Sorunuzu işlerken bir sorun oluştu, lütfen tekrar deneyin.</p>"
+    
+    # 3. SYSTEM PROMPTU HAZIRLA
     system_prompt = SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["real-estate"])
-   
-    # Mesajları oluştur - sistem mesajını ekle
+    
+    # 4. MESAJLARI OLUŞTUR
     messages = [
-        {"role": "system", "content": f"{system_prompt}<br><br>İLGİLİ İLANLAR:<br>{context if context else 'Uygun ilan bulunamadı veya bu mod için ilan aranmıyor.'}<br><br>Bu HTML formatındaki ilanları OLDUĞU GİBİ kullanıcıya göster, HİÇBİR DEĞİŞİKLİK yapma! Sadece ekle, filtreleme, özetleme veya değiştirme YAPMA! Tüm ilanlar olduğu gibi kullanıcıya gösterilmeli!"}
+        {"role": "system", "content": f"{system_prompt}<br><br>İLGİLİ İLANLAR:<br>{context if context else 'Uygun ilan bulunamadı veya bu mod için ilan aranmıyor.'}<br><br>"}
     ]
     
-    # Eğer sohbet geçmişi varsa ekle
+    # 5. KONUŞMA GEÇMİŞİNİ EKLE
     if conversation_history and len(conversation_history) > 0:
         for msg in conversation_history:
             if isinstance(msg, dict) and 'role' in msg and 'text' in msg:
                 messages.append({"role": msg['role'], "content": msg['text']})
     
-    # Kullanıcının yeni sorusunu ekle
+    # 6. KULLANICININ YENİ SORUSUNU EKLE
     messages.append({"role": "user", "content": question})
 
+    # 7. OPENAI API'YE İSTEK GÖNDER
     try:
         resp = await openai_client.chat.completions.create(
             model="gpt-4o-mini",
@@ -651,6 +655,34 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
     except Exception as exc:
         print("❌ Chat yanıt hatası:", exc)
         return "Üzgünüm, isteğinizi işlerken beklenmedik bir sorun oluştu. Lütfen daha sonra tekrar deneyin."
+
+def get_out_of_scope_response(mode):
+    """
+    Uzmanlık alanı dışı sorular için standart reddedilmiş yanıt oluşturur.
+    
+    Args:
+        mode: Mevcut GPT modülü ('real-estate', 'mind-coach', 'finance')
+        
+    Returns:
+        str: HTML formatında reddedilmiş yanıt
+    """
+    mode_names = {
+        "real-estate": "Gayrimenkul GPT",
+        "mind-coach": "Zihin Koçu GPT",
+        "finance": "Finans GPT"
+    }
+    
+    mode_topics = {
+        "real-estate": "gayrimenkul, emlak ve konut",
+        "mind-coach": "kişisel gelişim, psikoloji ve spiritüel konular",
+        "finance": "finans, yatırım ve ekonomi"
+    }
+    
+    return f"""
+    <h3>Bu soru {mode_names.get(mode, mode.title())} uzmanlık alanı dışındadır.</h3>
+    <p>Ben sadece {mode_topics.get(mode, mode)} konularında yardımcı olabiliyorum. 
+    Bu alanlarla ilgili bir sorunuz varsa memnuniyetle cevaplayabilirim.</p>
+    """
 
 # ── Terminalden Test ──────────────────────────────────────
 if __name__ == "__main__":
