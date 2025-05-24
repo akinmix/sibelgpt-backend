@@ -576,48 +576,38 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
 
 # ── Ana Fonksiyon ─────────────────────────────────────────
 async def answer_question(question: str, mode: str = "real-estate", conversation_history: List = None) -> str:
-    """
-    Kullanıcının sorusuna yanıt verir ve gerektiğinde başka modüle yönlendirir.
+    """Kullanıcının sorusuna yanıt verir ve gerektiğinde başka modüle yönlendirir."""
     
-    Args:
-        question: Kullanıcının sorusu
-        mode: Mevcut GPT modülü ('real-estate', 'mind-coach', 'finance')
-        conversation_history: Önceki konuşma geçmişi
-        
-    Returns:
-        str: Kullanıcıya verilecek yanıt
-    """
-    # Soru ve mod bilgisini logla
     print(f"↪ Soru: {question}, Mod: {mode}")
     
-    # Sorunun hangi konuya ait olduğunu tespit et
+    # 1. GPT kullanarak sorunun gerçekten gayrimenkul ile ilgili olup olmadığını tespit et
+    if mode == "real-estate":
+        is_real_estate_query = await check_if_real_estate_query(question)
+        if not is_real_estate_query:
+            print("⚠️ GPT tarafından gayrimenkul ile ilgisiz olarak tespit edildi, ilan araması yapılmayacak")
+            return get_out_of_scope_response(mode)
+    
+    # 2. Konu tespiti yap
     detected_topic = await detect_topic(question, mode)
     print(f"✓ Tespit edilen konu: {detected_topic}, Kullanıcının seçtiği mod: {mode}")
     
-    # 1. KONU KONTROLÜ: Eğer konu mevcut modla eşleşmiyorsa
+    # 3. Farklı bir konu ise yönlendir
     if detected_topic != mode:
-        # Eğer tespit edilen konu başka bir modüle aitse, yönlendirme yap
         if detected_topic in ["real-estate", "mind-coach", "finance"]:
             redirection_key = f"{mode}-to-{detected_topic}"
-            print(f"⟹ Yönlendirme anahtarı: {redirection_key}")
-            
             if redirection_key in REDIRECTION_MESSAGES:
                 return REDIRECTION_MESSAGES[redirection_key]
         
-        # Eğer tespit edilen konu tanımlı modüllerden biri değilse ("general" veya başka bir şey)
-        # Uzmanlık alanı dışı yanıt döndür ve aramayı atla
-        print("⚠️ Uzmanlık alanı dışı konu tespit edildi, arama yapılmayacak")
+        # Genel bir konu ise (general) konu dışı yanıt döndür
         return get_out_of_scope_response(mode)
     
-    # 2. İLAN ARAMASI: Sadece Gayrimenkul modunda ve konu eşleşiyorsa yapılacak
+    # 4. İlan araması veya normal yanıt oluşturma
     context = ""
     if mode == "real-estate":
-        # İlan araması mı, normal soru mu kontrolü
         if property_search_handler.is_property_search_query(question):
             print("📢 İlan araması tespit edildi, yeni arama modülü kullanılıyor...")
             context = await property_search_handler.search_properties(question)
         else:
-            # Normal gayrimenkul sorusu
             print("📢 Normal gayrimenkul sorusu tespit edildi, standart arama kullanılıyor...")
             query_emb = await get_embedding(question)
             if query_emb:
@@ -626,24 +616,21 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
             else:
                 context = "<p>Sorunuzu işlerken bir sorun oluştu, lütfen tekrar deneyin.</p>"
     
-    # 3. SYSTEM PROMPTU HAZIRLA
+    # 5. System prompt ve mesajları hazırla
     system_prompt = SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["real-estate"])
-    
-    # 4. MESAJLARI OLUŞTUR
     messages = [
         {"role": "system", "content": f"{system_prompt}<br><br>İLGİLİ İLANLAR:<br>{context if context else 'Uygun ilan bulunamadı veya bu mod için ilan aranmıyor.'}<br><br>"}
     ]
     
-    # 5. KONUŞMA GEÇMİŞİNİ EKLE
+    # 6. Konuşma geçmişi ve kullanıcı sorusu ekle
     if conversation_history and len(conversation_history) > 0:
         for msg in conversation_history:
             if isinstance(msg, dict) and 'role' in msg and 'text' in msg:
                 messages.append({"role": msg['role'], "content": msg['text']})
     
-    # 6. KULLANICININ YENİ SORUSUNU EKLE
     messages.append({"role": "user", "content": question})
-
-    # 7. OPENAI API'YE İSTEK GÖNDER
+    
+    # 7. Yanıt al ve döndür
     try:
         resp = await openai_client.chat.completions.create(
             model="gpt-4o-mini",
@@ -656,33 +643,53 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
         print("❌ Chat yanıt hatası:", exc)
         return "Üzgünüm, isteğinizi işlerken beklenmedik bir sorun oluştu. Lütfen daha sonra tekrar deneyin."
 
-def get_out_of_scope_response(mode):
-    """
-    Uzmanlık alanı dışı sorular için standart reddedilmiş yanıt oluşturur.
-    
-    Args:
-        mode: Mevcut GPT modülü ('real-estate', 'mind-coach', 'finance')
+# Yeni fonksiyon: GPT ile gayrimenkul ilgisi kontrolü
+async def check_if_real_estate_query(question: str) -> bool:
+    """GPT kullanarak sorunun gerçekten gayrimenkul ile ilgili olup olmadığını tespit eder"""
+    try:
+        resp = await openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+                    Bu bir soru sınıflandırma görevidir. Verilen soruyu analiz ederek, gayrimenkul/emlak 
+                    konusuyla doğrudan ilgili olup olmadığını belirle. Sadece "Evet" veya "Hayır" yanıtı ver.
+                    
+                    Gayrimenkul ile ilgili konular:
+                    - Ev, daire, konut, arsa alım-satımı
+                    - Kiralama, emlak piyasası
+                    - Tapu, ipotek, mortgage işlemleri
+                    - Müteahhit, inşaat, tadilat konuları
+                    - Oda sayısı, metrekare, site, bahçe gibi özellikler
+                    - Emlak vergisi, komisyon
+                    - Konut kredisi, faiz oranları (gayrimenkul bağlamında)
+                    
+                    Gayrimenkul ile ilgili OLMAYAN konular (örnekler):
+                    - "Kiralık katil" (emlak kiralama değil)
+                    - "Kat" kelimesi geçen ama gayrimenkul olmayan sorular
+                    - "Oda" kelimesi geçen ama ev odası olmayan konular
+                    - Astronomi, tarih, spor, bilim, genel kültür soruları
+                    - Günlük hayat, kişisel sorular
+                    
+                    Sadece "Evet" veya "Hayır" yanıtı ver, başka açıklama yapma.
+                    """
+                },
+                {"role": "user", "content": question}
+            ],
+            temperature=0.1,
+            max_tokens=10
+        )
         
-    Returns:
-        str: HTML formatında reddedilmiş yanıt
-    """
-    mode_names = {
-        "real-estate": "Gayrimenkul GPT",
-        "mind-coach": "Zihin Koçu GPT",
-        "finance": "Finans GPT"
-    }
-    
-    mode_topics = {
-        "real-estate": "gayrimenkul, emlak ve konut",
-        "mind-coach": "kişisel gelişim, psikoloji ve spiritüel konular",
-        "finance": "finans, yatırım ve ekonomi"
-    }
-    
-    return f"""
-    <h3>Bu soru {mode_names.get(mode, mode.title())} uzmanlık alanı dışındadır.</h3>
-    <p>Ben sadece {mode_topics.get(mode, mode)} konularında yardımcı olabiliyorum. 
-    Bu alanlarla ilgili bir sorunuz varsa memnuniyetle cevaplayabilirim.</p>
-    """
+        answer = resp.choices[0].message.content.strip().lower()
+        is_real_estate = "evet" in answer
+        print(f"📊 GPT gayrimenkul ilgi tespiti: {answer} → {is_real_estate}")
+        return is_real_estate
+        
+    except Exception as e:
+        print(f"❌ Gayrimenkul ilgi tespiti hatası: {e}")
+        # Hata durumunda güvenli mod - normal işleme devam et
+        return True
 
 # ── Terminalden Test ──────────────────────────────────────
 if __name__ == "__main__":
