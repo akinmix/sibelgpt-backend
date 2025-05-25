@@ -737,9 +737,40 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
     
     print(f"🚀 İYİLEŞTİRİLMİŞ SORGU BAŞLADI - Soru: {question[:50]}..., Mod: {mode}")
     
+    # SELAMLAŞMA KONTROLÜ - ÖNCELİKLİ!
+    # Selamlaşma kalıplarını kontrole al
+    selamlasma_kaliplari = [
+        "merhaba", "selam", "hello", "hi", "hey", "sa", "günaydın", "iyi günler", 
+        "iyi akşamlar", "nasılsın", "naber", "ne haber", "hoş geldin", "nasıl gidiyor"
+    ]
+    
+    # Soru basit bir selamlaşma mı kontrol et
+    clean_question = question.lower().strip()
+    is_greeting = False
+    
+    for kalip in selamlasma_kaliplari:
+        if kalip in clean_question:
+            is_greeting = True
+            print(f"✓ Selamlaşma mesajı tespit edildi: {kalip}")
+            break
+    
+    # Eğer selamlaşma ise, doğrudan yanıt ver
+    if is_greeting:
+        print("🤝 Selamlaşmaya doğrudan yanıt veriliyor")
+        
+        greeting_responses = {
+            "real-estate": f"Merhaba! Size gayrimenkul konusunda nasıl yardımcı olabilirim?",
+            "mind-coach": f"Merhaba! Size zihinsel ve ruhsal gelişim konularında nasıl yardımcı olabilirim?",
+            "finance": f"Merhaba! Size finans ve yatırım konularında nasıl yardımcı olabilirim?"
+        }
+        
+        return greeting_responses.get(mode, greeting_responses["real-estate"])
+    
     # 1. KONU TESPİTİ
     detected_topic = await detect_topic(question, mode)
     print(f"📊 Tespit edilen konu: {detected_topic}, Kullanıcının seçtiği mod: {mode}")
+    
+    # Diğer kodlar aynı kalsın...
     
     # 2. FARKLI KONU İSE YÖNLENDİR
     if detected_topic != mode:
