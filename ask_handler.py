@@ -430,6 +430,15 @@ async def check_if_real_estate_query(question: str) -> bool:
                     Bu bir soru sınıflandırma görevidir. Verilen soruyu analiz ederek, gayrimenkul/emlak 
                     konusuyla doğrudan ilgili olup olmadığını belirle. Sadece "Evet" veya "Hayır" yanıtı ver.
                     
+                    Gayrimenkul ile ilgili konular:
+                    - Ev, daire, konut, arsa alım-satımı
+                    - Kiralama, emlak piyasası
+                    - Tapu, ipotek, mortgage işlemleri
+                    - Müteahhit, inşaat, tadilat konuları
+                    - Oda sayısı, metrekare, site, bahçe gibi özellikler
+                    - Emlak vergisi, komisyon
+                    - Konut kredisi, faiz oranları (gayrimenkul bağlamında)
+                    
                     Gayrimenkul ile ilgili OLMAYAN konular (örnekler):
                     - "Kiralık katil" (emlak kiralama değil)
                     - "Kat" kelimesi geçen ama gayrimenkul olmayan sorular
@@ -620,25 +629,25 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
     final_output = "<p><strong>📞 Sorgunuzla ilgili ilanlar burada listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
    
     formatted_parts = []
-    for i, l_item in enumerate(listings_to_format, start=1): # 'l' Python'da 'lambda' için kullanılabileceğinden 'l_item' olarak değiştirdim
+    for i, l_item in enumerate(listings_to_format, start=1):
         ilan_no = l_item.get('ilan_id', l_item.get('ilan_no', str(i)))
         baslik = l_item.get('baslik', '(başlık yok)')
         lokasyon = l_item.get('lokasyon', '?')
         
         fiyat = "?"
         fiyat_raw = l_item.get('fiyat')
-        if fiyat_raw is not None: # None kontrolü eklendi
+        if fiyat_raw is not None:
             try:
                 # Fiyat string'ini temizleyip float'a çevirme
                 fiyat_str_cleaned = str(fiyat_raw).replace('.', '').replace(',', '.')
-                if fiyat_str_cleaned.replace('.', '', 1).isdigit(): # Sayısal olup olmadığını kontrol et
+                if fiyat_str_cleaned.replace('.', '', 1).isdigit():
                     fiyat_num = float(fiyat_str_cleaned)
-                    fiyat = f"{fiyat_num:,.0f} ₺".replace(',', '#').replace('.', ',').replace('#', '.') # Türk formatı
+                    fiyat = f"{fiyat_num:,.0f} ₺".replace(',', '#').replace('.', ',').replace('#', '.')
                 else:
-                    fiyat = str(fiyat_raw) # Eğer sayısal değilse olduğu gibi göster
-            except ValueError: # Sayıya çevirme hatası olursa
-                fiyat = str(fiyat_raw) # Orijinal değeri kullan
-            except Exception: # Diğer beklenmedik hatalar için
+                    fiyat = str(fiyat_raw)
+            except ValueError:
+                fiyat = str(fiyat_raw)
+            except Exception:
                  fiyat = str(fiyat_raw)
        
         ozellikler_liste = []
@@ -648,7 +657,6 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
        
         metrekare = l_item.get('metrekare', '')
         if metrekare:
-            # Metrekare değerinin sonunda " m²" yoksa ekle
             metrekare_str = str(metrekare).strip()
             if not metrekare_str.endswith("m²"):
                  ozellikler_liste.append(f"{metrekare_str} m²")
@@ -659,36 +667,26 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
         if bulundugu_kat_raw is not None and str(bulundugu_kat_raw).strip() != '':
             bulundugu_kat_str = str(bulundugu_kat_raw).strip()
             try:
-                # Sadece sayısal değerleri int'e çevirmeye çalış
-                if bulundugu_kat_str.replace('-', '', 1).isdigit(): # Negatif sayıları da kabul et
+                if bulundugu_kat_str.replace('-', '', 1).isdigit():
                     kat_no = int(bulundugu_kat_str)
                     if kat_no == 0:
                         ozellikler_liste.append("Giriş Kat")
                     elif kat_no < 0:
-                        ozellikler_liste.append(f"Bodrum Kat ({kat_no})") # veya sadece "Bodrum Kat"
+                        ozellikler_liste.append(f"Bodrum Kat ({kat_no})")
                     else:
                         ozellikler_liste.append(f"{kat_no}. Kat")
-                else: # Sayısal değilse olduğu gibi al, ". Kat" ekleme
+                else:
                     ozellikler_liste.append(bulundugu_kat_str)
-            except ValueError: # int'e çevirme hatası olursa
-                ozellikler_liste.append(bulundugu_kat_str) # Orijinal değeri kullan
+            except ValueError:
+                ozellikler_liste.append(bulundugu_kat_str)
        
         ozellikler_db = l_item.get('ozellikler')
-        if ozellikler_db and isinstance(ozellikler_db, str): # ozellikler string ise işle
+        if ozellikler_db and isinstance(ozellikler_db, str):
             ozellikler_parts_raw = ozellikler_db.split('|')
             ozellikler_parts_processed = []
             for part_raw in ozellikler_parts_raw:
                 part = part_raw.strip()
-                if re.match(r'^-?\d+ ile ilgili konular:
-                    - Ev, daire, konut, arsa alım-satımı
-                    - Kiralama, emlak piyasası
-                    - Tapu, ipotek, mortgage işlemleri
-                    - Müteahhit, inşaat, tadilat konuları
-                    - Oda sayısı, metrekare, site, bahçe gibi özellikler
-                    - Emlak vergisi, komisyon
-                    - Konut kredisi, faiz oranları (gayrimenkul bağlamında)
-                    
-                    Gayrimenkul, part): # Negatif dahil tam sayı kontrolü
+                if re.match(r'^-?\d+, part):
                     kat_no_oz = int(part)
                     if kat_no_oz == 0:
                         ozellikler_parts_processed.append("Giriş Kat")
@@ -699,7 +697,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
                 else:
                     ozellikler_parts_processed.append(part)
             ozellikler = " | ".join(ozellikler_parts_processed)
-        elif ozellikler_liste: # ozellikler string değilse veya boşsa, listeden oluştur
+        elif ozellikler_liste:
             ozellikler = " | ".join(ozellikler_liste)
         else:
             ozellikler = "(özellik bilgisi yok)"
@@ -832,13 +830,4 @@ if __name__ == "__main__":
             print(f"📝 Yanıt: {response[:200]}...")
             print("-" * 30)
 
-    asyncio.run(main()) ile ilgili konular:
-                    - Ev, daire, konut, arsa alım-satımı
-                    - Kiralama, emlak piyasası
-                    - Tapu, ipotek, mortgage işlemleri
-                    - Müteahhit, inşaat, tadilat konuları
-                    - Oda sayısı, metrekare, site, bahçe gibi özellikler
-                    - Emlak vergisi, komisyon
-                    - Konut kredisi, faiz oranları (gayrimenkul bağlamında)
-                    
-                    Gayrimenkul
+    asyncio.run(main())
