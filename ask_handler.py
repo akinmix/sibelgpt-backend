@@ -8,7 +8,6 @@ import property_search_handler
 
 try:
     from supabase import create_client
-    # from supabase.client import Client # Client doğrudan kullanılmıyor, kaldırılabilir.
 except ImportError:
     raise RuntimeError("supabase-py yüklü değil – `pip install supabase`")
 
@@ -25,8 +24,8 @@ supabase      = create_client(SB_URL, SB_KEY)
 
 # ── Ayarlar ────────────────────────────────────────────────
 EMBEDDING_MODEL = "text-embedding-3-small"
-MATCH_THRESHOLD =  0.3  # Orta seviyede bir değer
-MATCH_COUNT     =  50   # Maksimum 50 ilan ara, ama tümünü gösterme mecburiyeti yok
+MATCH_THRESHOLD =  0.3
+MATCH_COUNT     =  50
 
 # ── Modlara Göre System Prompts ────────────────────────────
 SYSTEM_PROMPTS = {
@@ -275,7 +274,7 @@ REDIRECTION_MESSAGES = {
     """
 }
 
-
+# ── Konu Tespiti ─────────────────────────────────────────
 async def detect_topic(question: str, mode: str = None) -> str:
     """Kullanıcının sorusunun hangi alana ait olduğunu tespit eder."""
     
@@ -322,9 +321,7 @@ async def detect_topic(question: str, mode: str = None) -> str:
             if keyword in clean_question:
                 matches[topic] += 1
     
-    max_matches = 0
-    if matches: # matches boş değilse max değerini al
-        max_matches = max(matches.values())
+    max_matches = max(matches.values()) if matches else 0
     
     if max_matches <= 1:
         if len(clean_question.split()) <= 5:
@@ -372,6 +369,153 @@ async def detect_topic(question: str, mode: str = None) -> str:
             return topic
     
     return mode if mode else "real-estate"
+
+# ── Yeni İyileştirme Fonksiyonları ─────────────────────────
+async def check_if_property_listing_query(question: str) -> bool:
+    """Sorunun gayrimenkul ile ilgili olup ilan araması gerektirip gerektirmediğini tespit eder"""
+    try:
+        resp = await openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+                    Bu soruyu analiz et ve sadece "Evet" veya "Hayır" yanıtı ver.
+                    
+                    SORU TİPLERİ:
+                    
+                    1. İLAN ARAMASI GEREKTİREN SORULAR (Evet):
+                       - "Kadıköy'de satılık daire bul"
+                       - "20 milyona kadar 3+1 daire arıyorum"
+                       - "Beşiktaş'ta ev var mı?"
+                       - "Maltepe'de villa göster"
+                       - "Hangi bölgede ucuz ev var?"
+                    
+                    2. İLAN ARAMASI GEREKTİRMEYEN SORULAR (Hayır):
+                       - "Ev alırken nelere dikkat etmeliyim?"
+                       - "Konut kredisi nasıl alınır?"
+                       - "Tapu işlemleri nasıl yapılır?"
+                       - "Emlak vergisi ne kadar?"
+                       - "Gayrimenkul piyasası nasıl?"
+                       - "Hangi bölge yatırım için iyi?"
+                    
+                    Sadece "Evet" veya "Hayır" yanıtı ver.
+                    """
+                },
+                {"role": "user", "content": question}
+            ],
+            temperature=0.1,
+            max_tokens=10
+        )
+        
+        answer = resp.choices[0].message.content.strip().lower()
+        is_listing_query = "evet" in answer
+        print(f"📊 İlan araması tespiti: {answer} → {is_listing_query}")
+        return is_listing_query
+        
+    except Exception as e:
+        print(f"❌ İlan araması tespiti hatası: {e}")
+        # Hata durumunda güvenli mod - eski sistemle devam et
+        return property_search_handler.is_property_search_query(question)
+
+async def check_if_real_estate_query(question: str) -> bool:
+    """GPT kullanarak sorunun gerçekten gayrimenkul ile ilgili olup olmadığını tespit eder"""
+    try:
+        resp = await openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+                    Bu bir soru sınıflandırma görevidir. Verilen soruyu analiz ederek, gayrimenkul/emlak 
+                    konusuyla doğrudan ilgili olup olmadığını belirle. Sadece "Evet" veya "Hayır" yanıtı ver.
+                    
+                    Gayrimenkul ile ilgili OLMAYAN konular (örnekler):
+                    - "Kiralık katil" (emlak kiralama değil)
+                    - "Kat" kelimesi geçen ama gayrimenkul olmayan sorular
+                    - "Oda" kelimesi geçen ama ev odası olmayan konular
+                    - Astronomi, tarih, spor, bilim, genel kültür soruları
+                    - Günlük hayat, kişisel sorular
+                    
+                    Sadece "Evet" veya "Hayır" yanıtı ver, başka açıklama yapma.
+                    """
+                },
+                {"role": "user", "content": question}
+            ],
+            temperature=0.1,
+            max_tokens=10
+        )
+        
+        answer = resp.choices[0].message.content.strip().lower()
+        is_real_estate = "evet" in answer
+        print(f"📊 GPT gayrimenkul ilgi tespiti: {answer} → {is_real_estate}")
+        return is_real_estate
+        
+    except Exception as e:
+        print(f"❌ Gayrimenkul ilgi tespiti hatası: {e}")
+        # Hata durumunda güvenli mod - normal işleme devam et
+        return True
+
+def get_out_of_scope_response(mode: str) -> str:
+    """Uzmanlık alanı dışı sorular için yanıt oluşturur"""
+    responses = {
+        "real-estate": """
+        <h3>🏠 Gayrimenkul GPT Uzmanlık Alanı</h3>
+        <p>Bu soru Gayrimenkul GPT'nin uzmanlık alanı dışındadır. Ben sadece gayrimenkul, 
+        emlak ve konut konularında yardımcı olabilirim.</p>
+        
+        <h4>Size yardımcı olabileceğim konular:</h4>
+        <ul>
+            <li><strong>Emlak Alım-Satım:</strong> Ev, daire, villa, arsa işlemleri</li>
+            <li><strong>Kiralama:</strong> Kiralık konut arama ve sözleşme süreçleri</li>
+            <li><strong>Yatırım:</strong> Gayrimenkul yatırımı ve değerlendirme</li>
+            <li><strong>Finansman:</strong> Konut kredisi, mortgage işlemleri</li>
+            <li><strong>Yasal Süreçler:</strong> Tapu, noter, emlak vergisi</li>
+            <li><strong>İnşaat:</strong> Yapı denetim, tadilat, dekorasyon</li>
+        </ul>
+        
+        <p>Bu alanlarla ilgili bir sorunuz varsa memnuniyetle cevaplayabilirim!</p>
+        """,
+        
+        "mind-coach": """
+        <h3>🧠 Zihin Koçu GPT Uzmanlık Alanı</h3>
+        <p>Bu soru Zihin Koçu GPT'nin uzmanlık alanı dışındadır. Ben sadece kişisel gelişim, 
+        psikoloji, numeroloji, astroloji ve spiritüel konularda yardımcı olabilirim.</p>
+        
+        <h4>Size yardımcı olabileceğim konular:</h4>
+        <ul>
+            <li><strong>Numeroloji:</strong> İsim ve doğum tarihi analizleri</li>
+            <li><strong>Astroloji:</strong> Burç yorumları ve gezegen etkileri</li>
+            <li><strong>Kişisel Gelişim:</strong> Motivasyon ve öz güven</li>
+            <li><strong>Ruh Sağlığı:</strong> Stres yönetimi, rahatlama teknikleri</li>
+            <li><strong>Thetahealing:</strong> Enerji çalışmaları ve şifa</li>
+            <li><strong>Meditasyon:</strong> Bilinçaltı ve farkındalık</li>
+        </ul>
+        
+        <p>Bu alanlarla ilgili bir sorunuz varsa memnuniyetle cevaplayabilirim!</p>
+        """,
+        
+        "finance": """
+        <h3>💰 Finans GPT Uzmanlık Alanı</h3>
+        <p>Bu soru Finans GPT'nin uzmanlık alanı dışındadır. Ben sadece borsa, yatırım, 
+        ekonomi, kripto para ve finans konularında yardımcı olabilirim.</p>
+        
+        <h4>Size yardımcı olabileceğim konular:</h4>
+        <ul>
+            <li><strong>Borsa:</strong> Hisse senetleri, BIST analizleri</li>
+            <li><strong>Teknik Analiz:</strong> Grafik okuma, göstergeler</li>
+            <li><strong>Temel Analiz:</strong> Şirket değerlendirme</li>
+            <li><strong>Kripto Para:</strong> Bitcoin, Ethereum, altcoin'ler</li>
+            <li><strong>Döviz:</strong> EUR/TRY, USD/TRY pariteler</li>
+            <li><strong>Emtia:</strong> Altın, gümüş, petrol</li>
+            <li><strong>Ekonomi:</strong> Makro/mikro ekonomik analizler</li>
+        </ul>
+        
+        <p>Bu alanlarla ilgili bir sorunuz varsa memnuniyetle cevaplayabilirim!</p>
+        """
+    }
+    
+    return responses.get(mode, responses["real-estate"])
 
 # ── Embedding Fonksiyonu ───────────────────────────────────
 async def get_embedding(text: str) -> Optional[List[float]]:
@@ -535,7 +679,16 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
             ozellikler_parts_processed = []
             for part_raw in ozellikler_parts_raw:
                 part = part_raw.strip()
-                if re.match(r'^-?\d+$', part): # Negatif dahil tam sayı kontrolü
+                if re.match(r'^-?\d+ ile ilgili konular:
+                    - Ev, daire, konut, arsa alım-satımı
+                    - Kiralama, emlak piyasası
+                    - Tapu, ipotek, mortgage işlemleri
+                    - Müteahhit, inşaat, tadilat konuları
+                    - Oda sayısı, metrekare, site, bahçe gibi özellikler
+                    - Emlak vergisi, komisyon
+                    - Konut kredisi, faiz oranları (gayrimenkul bağlamında)
+                    
+                    Gayrimenkul, part): # Negatif dahil tam sayı kontrolü
                     kat_no_oz = int(part)
                     if kat_no_oz == 0:
                         ozellikler_parts_processed.append("Giriş Kat")
@@ -574,89 +727,112 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
    
     return final_output
 
-# ── Ana Fonksiyon ─────────────────────────────────────────
+# ── Ana Fonksiyon - YENİLENMİŞ VE İYİLEŞTİRİLMİŞ ─────────
 async def answer_question(question: str, mode: str = "real-estate", conversation_history: List = None) -> str:
-    """Kullanıcının sorusuna yanıt verir ve gerektiğinde başka modüle yönlendirir."""
+    """
+    İyileştirilmiş Ana Fonksiyon:
+    1. Konu tespiti yapar
+    2. Uzmanlık alanı kontrolü yapar
+    3. Gayrimenkul modunda akıllı ilan araması yapar
+    4. Gereksiz veritabanı sorgularını önler
+    """
     
-    print(f"↪ Soru: {question}, Mod: {mode}")
+    print(f"🚀 İYİLEŞTİRİLMİŞ SORGU BAŞLADI - Soru: {question[:50]}..., Mod: {mode}")
     
-    # 1. GPT kullanarak sorunun gerçekten gayrimenkul ile ilgili olup olmadığını tespit et
-    if mode == "real-estate":
-        is_real_estate_query = await check_if_real_estate_query(question)
-        if not is_real_estate_query:
-            print("⚠️ GPT tarafından gayrimenkul ile ilgisiz olarak tespit edildi, ilan araması yapılmayacak")
-            return get_out_of_scope_response(mode)
-    
-    # 2. Konu tespiti yap
+    # 1. KONU TESPİTİ
     detected_topic = await detect_topic(question, mode)
-    print(f"✓ Tespit edilen konu: {detected_topic}, Kullanıcının seçtiği mod: {mode}")
+    print(f"📊 Tespit edilen konu: {detected_topic}, Kullanıcının seçtiği mod: {mode}")
     
-    # 3. Farklı bir konu ise yönlendir
+    # 2. FARKLI KONU İSE YÖNLENDİR
     if detected_topic != mode:
         if detected_topic in ["real-estate", "mind-coach", "finance"]:
             redirection_key = f"{mode}-to-{detected_topic}"
             if redirection_key in REDIRECTION_MESSAGES:
+                print(f"↪️ Farklı modüle yönlendiriliyor: {redirection_key}")
                 return REDIRECTION_MESSAGES[redirection_key]
         
-        # Genel bir konu ise (general) konu dışı yanıt döndür
+        # Genel konu ise uzmanlık alanı dışı yanıt ver
+        print(f"⚠️ Genel konu tespit edildi, uzmanlık alanı dışı yanıt veriliyor")
         return get_out_of_scope_response(mode)
     
-    # 4. İlan araması veya normal yanıt oluşturma
-    context = ""
+    # 3. UZMANLIK ALANI KONTROLLÜ (Sadece gayrimenkul modunda)
     if mode == "real-estate":
-        if property_search_handler.is_property_search_query(question):
-            print("📢 İlan araması tespit edildi, yeni arama modülü kullanılıyor...")
+        is_real_estate_query = await check_if_real_estate_query(question)
+        if not is_real_estate_query:
+            print("❌ GPT tarafından gayrimenkul ile ilgisiz olarak tespit edildi")
+            return get_out_of_scope_response(mode)
+    
+    # 4. İÇERİK HAZIRLAMA - AKILLI ARAMA
+    context = ""
+    
+    if mode == "real-estate":
+        # Gayrimenkul modunda akıllı arama
+        is_listing_query = await check_if_property_listing_query(question)
+        
+        if is_listing_query:
+            print("🏠 İlan araması tespit edildi - Hızlı arama modülü kullanılıyor")
             context = await property_search_handler.search_properties(question)
         else:
-            print("📢 Normal gayrimenkul sorusu tespit edildi, standart arama kullanılıyor...")
-            query_emb = await get_embedding(question)
-            if query_emb:
-                listings = await search_listings_in_supabase(query_emb)
-                context = format_context_for_sibelgpt(listings)
-            else:
-                context = "<p>Sorunuzu işlerken bir sorun oluştu, lütfen tekrar deneyin.</p>"
+            print("📚 Gayrimenkul genel bilgi sorusu - İlan araması yapılmıyor")
+            # Genel gayrimenkul bilgisi için ilan araması yapmıyoruz
+            context = ""
     
-    # 5. System prompt ve mesajları hazırla
+    # 5. SYSTEM PROMPT VE MESAJLARI HAZIRLA
     system_prompt = SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["real-estate"])
+    
     messages = [
-        {"role": "system", "content": f"{system_prompt}<br><br>İLGİLİ İLANLAR:<br>{context if context else 'Uygun ilan bulunamadı veya bu mod için ilan aranmıyor.'}<br><br>"}
+        {"role": "system", "content": f"{system_prompt}\n\nİLGİLİ İLANLAR:\n{context if context else 'Bu soru için ilan araması gerekmemektedir.'}\n"}
     ]
     
-    # 6. Konuşma geçmişi ve kullanıcı sorusu ekle
+    # 6. KONUŞMA GEÇMİŞİ EKLE
     if conversation_history and len(conversation_history) > 0:
         for msg in conversation_history:
             if isinstance(msg, dict) and 'role' in msg and 'text' in msg:
                 messages.append({"role": msg['role'], "content": msg['text']})
     
+    # 7. KULLANICI SORUSU EKLE
     messages.append({"role": "user", "content": question})
     
-    # 7. Yanıt al ve döndür
+    # 8. YANIT AL VE DÖNDÜR
     try:
+        print("🤖 OpenAI API'ye istek gönderiliyor...")
         resp = await openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages,
             temperature=0.7,
             max_tokens=4096
         )
-        return resp.choices[0].message.content.strip()
+        
+        answer = resp.choices[0].message.content.strip()
+        print(f"✅ İYİLEŞTİRİLMİŞ YANIT HAZIR - Uzunluk: {len(answer)} karakter")
+        return answer
+        
     except Exception as exc:
-        print("❌ Chat yanıt hatası:", exc)
+        print(f"❌ Chat yanıt hatası: {exc}")
         return "Üzgünüm, isteğinizi işlerken beklenmedik bir sorun oluştu. Lütfen daha sonra tekrar deneyin."
 
-# Yeni fonksiyon: GPT ile gayrimenkul ilgisi kontrolü
-async def check_if_real_estate_query(question: str) -> bool:
-    """GPT kullanarak sorunun gerçekten gayrimenkul ile ilgili olup olmadığını tespit eder"""
-    try:
-        resp = await openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": """
-                    Bu bir soru sınıflandırma görevidir. Verilen soruyu analiz ederek, gayrimenkul/emlak 
-                    konusuyla doğrudan ilgili olup olmadığını belirle. Sadece "Evet" veya "Hayır" yanıtı ver.
-                    
-                    Gayrimenkul ile ilgili konular:
+# ── Terminalden Test ──────────────────────────────────────
+if __name__ == "__main__":
+    async def main():
+        print("🧪 İYİLEŞTİRİLMİŞ ASK_HANDLER TEST MOD")
+        print("=" * 50)
+        
+        test_questions = [
+            "Merhaba nasılsın?",
+            "Kadıköy'de 20 milyona kadar 3+1 daire arıyorum",
+            "Ev alırken nelere dikkat etmeliyim?",
+            "Bugün hava nasıl?",
+            "Bitcoin fiyatı ne durumda?",
+            "Konut kredisi nasıl alınır?"
+        ]
+        
+        for i, q in enumerate(test_questions, 1):
+            print(f"\n🔍 Test {i}: {q}")
+            response = await answer_question(q, mode="real-estate", conversation_history=[])
+            print(f"📝 Yanıt: {response[:200]}...")
+            print("-" * 30)
+
+    asyncio.run(main()) ile ilgili konular:
                     - Ev, daire, konut, arsa alım-satımı
                     - Kiralama, emlak piyasası
                     - Tapu, ipotek, mortgage işlemleri
@@ -665,41 +841,4 @@ async def check_if_real_estate_query(question: str) -> bool:
                     - Emlak vergisi, komisyon
                     - Konut kredisi, faiz oranları (gayrimenkul bağlamında)
                     
-                    Gayrimenkul ile ilgili OLMAYAN konular (örnekler):
-                    - "Kiralık katil" (emlak kiralama değil)
-                    - "Kat" kelimesi geçen ama gayrimenkul olmayan sorular
-                    - "Oda" kelimesi geçen ama ev odası olmayan konular
-                    - Astronomi, tarih, spor, bilim, genel kültür soruları
-                    - Günlük hayat, kişisel sorular
-                    
-                    Sadece "Evet" veya "Hayır" yanıtı ver, başka açıklama yapma.
-                    """
-                },
-                {"role": "user", "content": question}
-            ],
-            temperature=0.1,
-            max_tokens=10
-        )
-        
-        answer = resp.choices[0].message.content.strip().lower()
-        is_real_estate = "evet" in answer
-        print(f"📊 GPT gayrimenkul ilgi tespiti: {answer} → {is_real_estate}")
-        return is_real_estate
-        
-    except Exception as e:
-        print(f"❌ Gayrimenkul ilgi tespiti hatası: {e}")
-        # Hata durumunda güvenli mod - normal işleme devam et
-        return True
-
-# ── Terminalden Test ──────────────────────────────────────
-if __name__ == "__main__":
-    async def main():
-        q = input("Soru: ")
-        # Varsayılan mod "real-estate" olarak ayarlandı, test için değiştirilebilir.
-        response = await answer_question(q, mode="real-estate", conversation_history=[]) 
-        print(response)
-
-    # asyncio.run() Python 3.7+ için daha modern bir yoldur.
-    # Eğer Python 3.6 veya daha eski bir sürüm kullanılıyorsa loop.run_until_complete() gerekir.
-    # Ancak kodda AsyncOpenAI kullanıldığı için Python 3.7+ varsayılabilir.
-    asyncio.run(main())
+                    Gayrimenkul
