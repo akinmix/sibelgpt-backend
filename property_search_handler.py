@@ -34,6 +34,16 @@ EMBEDDING_MODEL = "text-embedding-3-small"
 MATCH_THRESHOLD = 0.3
 MATCH_COUNT = 50
 
+# ===== CACHE OPTİMİZASYON AYARLARI =====
+CACHE_REFRESH_INTERVAL = timedelta(hours=2)  # 6 saat yerine 2 saat
+CACHE_MAX_SIZE = 10000  # Maksimum ilan sayısı
+CACHE_MEMORY_LIMIT = 100 * 1024 * 1024  # 100MB bellek sınırı
+
+# Cache performance metrikleri
+CACHE_HITS = 0
+CACHE_MISSES = 0
+CACHE_LAST_REFRESH = None
+
 # ===== HIZLANDIRMA İÇİN CACHE SİSTEMİ =====
 # Cache klasörü
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "listings_cache")
