@@ -82,9 +82,6 @@ async def load_all_listings_to_memory():
             print(f"❌ Veritabanı hatası: {e}")
             ALL_LISTINGS_CACHE = []
 
-# Uygulama başlarken otomatik yükle
-print("🚀 İlan cache sistemi başlatılıyor...")
-asyncio.create_task(load_all_listings_to_memory())
 
 # ---- Yardımcı Fonksiyonlar ----
 async def get_embedding(text: str) -> Optional[List[float]]:
