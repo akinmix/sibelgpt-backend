@@ -57,6 +57,16 @@ CACHE_LOCK = asyncio.Lock()
 async def load_all_listings_to_memory():
     """Tüm ilanları belleğe yükle - HIZLI ERİŞİM İÇİN"""
     global ALL_LISTINGS_CACHE, CACHE_LOADED_TIME
+    global CACHE_HITS, CACHE_MISSES, CACHE_LAST_REFRESH
+    
+    # Cache kontrol - Zaten güncel mi?
+    if (ALL_LISTINGS_CACHE and CACHE_LOADED_TIME and 
+        datetime.now() - CACHE_LOADED_TIME < CACHE_REFRESH_INTERVAL):
+        CACHE_HITS += 1
+        print(f"✅ Cache hit! {len(ALL_LISTINGS_CACHE)} ilan bellekte. Hit ratio: {CACHE_HITS}/{CACHE_HITS + CACHE_MISSES}")
+        return
+    
+    CACHE_MISSES += 1
     
     async with CACHE_LOCK:
         print("🔄 İlanlar belleğe yükleniyor...")
@@ -262,9 +272,18 @@ async def search_properties(query: str) -> str:
         if not ALL_LISTINGS_CACHE or not CACHE_LOADED_TIME:
             await load_all_listings_to_memory()
         
-        # 6 saatten eski mi?
-        if datetime.now() - CACHE_LOADED_TIME > timedelta(hours=6):
+        # Cache kontrol - Optimize edildi
+        if datetime.now() - CACHE_LOADED_TIME > CACHE_REFRESH_INTERVAL:
+            print(f"🔄 Cache süresi doldu, yenileniyor... (Son: {CACHE_LOADED_TIME})")
             await load_all_listings_to_memory()
+        
+        # Memory kontrol - Bellek sınırını aşmasın
+        if len(ALL_LISTINGS_CACHE) > CACHE_MAX_SIZE:
+            print(f"⚠️ Cache boyutu sınırı aşıldı: {len(ALL_LISTINGS_CACHE)} > {CACHE_MAX_SIZE}")
+            # En eski ilanları temizle
+            ALL_LISTINGS_CACHE = ALL_LISTINGS_CACHE[:CACHE_MAX_SIZE]
+        
+            
         
         print(f"🔎 Arama yapılıyor: {query}")
         print(f"📊 Bellekte {len(ALL_LISTINGS_CACHE)} ilan var")
