@@ -50,9 +50,14 @@ CACHE_DIR = os.path.join(os.path.dirname(__file__), "listings_cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 # Global cache değişkenleri
-ALL_LISTINGS_CACHE = None
+ALL_LISTINGS_CACHE = [] 
 CACHE_LOADED_TIME = None
 CACHE_LOCK = asyncio.Lock()
+
+# Cache performance metrikleri - Global olarak tanımla
+CACHE_HITS = 0
+CACHE_MISSES = 0
+CACHE_LAST_REFRESH = None
 
 async def load_all_listings_to_memory():
     """Tüm ilanları belleğe yükle - HIZLI ERİŞİM İÇİN"""
@@ -269,7 +274,7 @@ async def search_properties(query: str) -> str:
     """HIZLANDIRILMIŞ ARAMA FONKSİYONU"""
     try:
         # Cache kontrolü
-        if not ALL_LISTINGS_CACHE or not CACHE_LOADED_TIME:
+        if len(ALL_LISTINGS_CACHE) == 0 or not CACHE_LOADED_TIME:
             await load_all_listings_to_memory()
         
         # Cache kontrol - Optimize edildi
