@@ -17,4 +17,4 @@ async def test_format_search_results():
     mock_results = [{"title": "Test", "link": "https://example.com", "snippet": "Test snippet"}]
     formatted = format_search_results(mock_results)
     assert "Test" in formatted
-    assert "example.com" in formatted
+    assert "example.com" in formatted 
