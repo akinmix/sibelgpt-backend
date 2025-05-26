@@ -61,8 +61,7 @@ CACHE_LAST_REFRESH = None
 
 async def load_all_listings_to_memory():
     """Tüm ilanları belleğe yükle - HIZLI ERİŞİM İÇİN"""
-    global ALL_LISTINGS_CACHE, CACHE_LOADED_TIME
-    global CACHE_HITS, CACHE_MISSES, CACHE_LAST_REFRESH
+    global ALL_LISTINGS_CACHE, CACHE_LOADED_TIME, CACHE_HITS, CACHE_MISSES, CACHE_LAST_REFRESH
     
     # Cache kontrol - Zaten güncel mi?
     if (ALL_LISTINGS_CACHE and CACHE_LOADED_TIME and 
