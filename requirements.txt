@@ -33,3 +33,9 @@ pytest-cov==4.1.0
 # Test dependencies
 pytest-mock==3.11.1
 pytest-benchmark==4.0.0
+
+# Cache sistemi için yeni paketler
+redis==4.5.1                # Redis cache client
+fastapi-cache2[redis]==0.2.1 # FastAPI cache decorator
+diskcache==5.6.3            # Disk-based cache (Redis alternatifi)
+cachetools==5.3.1           # Memory cache utilities
