@@ -1,45 +1,50 @@
-# tests/unit/test_simple.py
-import pytest
+# run_simple_test.py - DOĞRUDAN TEST ÇALIŞTIRICI
+import sys
+import os
+import asyncio
+from pathlib import Path
 
-def test_basic_operations():
-    """Test basic Python operations"""
-    assert True
-    assert 1 + 1 == 2
-    assert "test" in "testing"
+# Path ayarlama
+project_root = Path(__file__).parent
+sys.path.insert(0, str(project_root))
 
-def test_sibelgpt_basics():
-    """Test SibelGPT related basics"""
-    modes = ["real-estate", "mind-coach", "finance"]
-    assert len(modes) == 3
-    assert "real-estate" in modes
+print("🚀 Basit Test Çalıştırıcı")
+print(f"📁 Proje dizini: {project_root}")
 
-def test_string_processing():
-    """Test string processing for property searches"""
-    test_queries = [
-        "Kadıköy'de ev",
-        "3+1 daire",
-        "satılık konut"
-    ]
-    
-    for query in test_queries:
-        assert isinstance(query, str)
-        assert len(query) > 0
+async def run_basic_test():
+    """Basit chat test"""
+    try:
+        # Test import
+        print("📦 ask_handler import ediliyor...")
+        from ask_handler import answer_question
+        print("✅ ask_handler başarıyla import edildi")
+        
+        # Basit test
+        print("🧪 Basit selamlaşma testi...")
+        result = await answer_question("Merhaba", "real-estate")
+        
+        print(f"✅ TEST SONUCU:")
+        print(f"📝 Yanıt uzunluğu: {len(result)} karakter")
+        print(f"📝 İlk 100 karakter: {result[:100]}...")
+        
+        # Test kontrolleri
+        assert isinstance(result, str), "Sonuç string olmalı"
+        assert len(result) > 0, "Boş yanıt olmamalı"
+        assert "merhaba" in result.lower(), "Selamlaşma yanıtı olmalı"
+        
+        print("🎉 TÜM TESTLER BAŞARILI!")
+        return True
+        
+    except Exception as e:
+        print(f"❌ TEST HATASI: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
-def test_price_formatting():
-    """Test basic price operations"""
-    price = 1000000
-    formatted = f"{price:,} ₺"
-    assert "1,000,000 ₺" in formatted
-
-class TestBasicValidation:
-    """Basic validation tests"""
-    
-    def test_mode_validation(self):
-        valid_modes = ["real-estate", "mind-coach", "finance"]
-        test_mode = "real-estate"
-        assert test_mode in valid_modes
-    
-    def test_property_fields(self):
-        property_fields = ["ilan_id", "baslik", "fiyat", "ilce", "mahalle"]
-        assert len(property_fields) == 5
-        assert "ilan_id" in property_fields
+if __name__ == "__main__":
+    success = asyncio.run(run_basic_test())
+    if success:
+        print("✅ TEST BAŞARILI - SİSTEM ÇALIŞIYOR!")
+    else:
+        print("❌ TEST BAŞARISIZ")
+        sys.exit(1)
