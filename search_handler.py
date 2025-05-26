@@ -315,21 +315,3 @@ async def web_search_answer(query: str, mode: str = "real-estate") -> str:
         else:
             return f"Üzgünüm, şu anda bir hata oluştu: {error_type}. Lütfen daha sonra tekrar deneyin."
 
-# ── Terminalden Test ──────────────────────────────────────
-if __name__ == "__main__":
-    try:
-        q = input("Arama yapmak istediğiniz sorguyu girin: ")
-        m = input("Modu seçin (real-estate, mind-coach, finance) [varsayılan: real-estate]: ") or "real-estate"
-        print("\n⏳ İşlem sürüyor, lütfen bekleyin...\n")
-        
-        loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(web_search_answer(q, m))
-        
-        print("\n" + "="*30 + " SONUÇ " + "="*30)
-        print(result)
-        print("="*67 + "\n")
-    except KeyboardInterrupt:
-        print("\n\n❌ İşlem kullanıcı tarafından iptal edildi.")
-    except Exception as e:
-        print(f"\n\n❌ Test sırasında beklenmeyen hata: {e}")
-        print(traceback.format_exc())
