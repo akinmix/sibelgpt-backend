@@ -840,25 +840,3 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
         print(f"❌ Chat yanıt hatası: {exc}")
         return "Üzgünüm, isteğinizi işlerken beklenmedik bir sorun oluştu. Lütfen daha sonra tekrar deneyin."
 
-# ── Terminalden Test ──────────────────────────────────────
-if __name__ == "__main__":
-    async def main():
-        print("🧪 İYİLEŞTİRİLMİŞ ASK_HANDLER TEST MOD")
-        print("=" * 50)
-        
-        test_questions = [
-            "Merhaba nasılsın?",
-            "Kadıköy'de 20 milyona kadar 3+1 daire arıyorum",
-            "Ev alırken nelere dikkat etmeliyim?",
-            "Bugün hava nasıl?",
-            "Bitcoin fiyatı ne durumda?",
-            "Konut kredisi nasıl alınır?"
-        ]
-        
-        for i, q in enumerate(test_questions, 1):
-            print(f"\n🔍 Test {i}: {q}")
-            response = await answer_question(q, mode="real-estate", conversation_history=[])
-            print(f"📝 Yanıt: {response[:200]}...")
-            print("-" * 30)
-
-    asyncio.run(main())
