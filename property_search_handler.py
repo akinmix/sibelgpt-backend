@@ -34,43 +34,19 @@ EMBEDDING_MODEL = "text-embedding-3-small"
 MATCH_THRESHOLD = 0.3
 MATCH_COUNT = 50
 
-# ===== CACHE OPTİMİZASYON AYARLARI =====
-CACHE_REFRESH_INTERVAL = timedelta(hours=2)  # 6 saat yerine 2 saat
-CACHE_MAX_SIZE = 10000  # Maksimum ilan sayısı
-CACHE_MEMORY_LIMIT = 100 * 1024 * 1024  # 100MB bellek sınırı
-
-# Cache performance metrikleri
-CACHE_HITS = 0
-CACHE_MISSES = 0
-CACHE_LAST_REFRESH = None
-
 # ===== HIZLANDIRMA İÇİN CACHE SİSTEMİ =====
 # Cache klasörü
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "listings_cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
-# Global cache değişkenleri
-ALL_LISTINGS_CACHE = [] 
+# 🔥 DÜZELTME: Global cache değişkenlerini başlangıçta tanımla
+ALL_LISTINGS_CACHE = []  # ✅ BOŞ LİSTE OLARAK BAŞLAT
 CACHE_LOADED_TIME = None
 CACHE_LOCK = asyncio.Lock()
 
-# Cache performance metrikleri - Global olarak tanımla
-CACHE_HITS = 0
-CACHE_MISSES = 0
-CACHE_LAST_REFRESH = None
-
 async def load_all_listings_to_memory():
     """Tüm ilanları belleğe yükle - HIZLI ERİŞİM İÇİN"""
-    global ALL_LISTINGS_CACHE, CACHE_LOADED_TIME, CACHE_HITS, CACHE_MISSES, CACHE_LAST_REFRESH
-    
-    # Cache kontrol - Zaten güncel mi?
-    if (ALL_LISTINGS_CACHE and CACHE_LOADED_TIME and 
-        datetime.now() - CACHE_LOADED_TIME < CACHE_REFRESH_INTERVAL):
-        CACHE_HITS += 1
-        print(f"✅ Cache hit! {len(ALL_LISTINGS_CACHE)} ilan bellekte. Hit ratio: {CACHE_HITS}/{CACHE_HITS + CACHE_MISSES}")
-        return
-    
-    CACHE_MISSES += 1
+    global ALL_LISTINGS_CACHE, CACHE_LOADED_TIME
     
     async with CACHE_LOCK:
         print("🔄 İlanlar belleğe yükleniyor...")
@@ -97,15 +73,17 @@ async def load_all_listings_to_memory():
             CACHE_LOADED_TIME = datetime.now()
             
             # Cache'e kaydet
-            with open(cache_file, 'wb') as f:
-                pickle.dump(ALL_LISTINGS_CACHE, f)
+            try:
+                with open(cache_file, 'wb') as f:
+                    pickle.dump(ALL_LISTINGS_CACHE, f)
+            except Exception as e:
+                print(f"⚠️ Cache kaydetme hatası: {e}")
             
-            print(f"✅ {len(ALL_LISTINGS_CACHE)} ilan veritabanından yüklendi ve cache'e kaydedildi!")
+            print(f"✅ {len(ALL_LISTINGS_CACHE)} ilan veritabanından yüklendi!")
             
         except Exception as e:
             print(f"❌ Veritabanı hatası: {e}")
-            ALL_LISTINGS_CACHE = []
-
+            ALL_LISTINGS_CACHE = []  # Hata durumunda boş liste
 
 # ---- Yardımcı Fonksiyonlar ----
 async def get_embedding(text: str) -> Optional[List[float]]:
@@ -270,27 +248,38 @@ def format_property_listings(listings: list) -> str:
 
 # ---- Ana Arama Fonksiyonu ----
 async def search_properties(query: str) -> str:
-    """HIZLANDIRILMIŞ ARAMA FONKSİYONU"""
+    """HIZLANDIRILMIŞ ARAMA FONKSİYONU - HATA KORUMASILI"""
+    global ALL_LISTINGS_CACHE, CACHE_LOADED_TIME  # Global değişkenleri belirt
+    
     try:
-        # Cache kontrolü
-        if len(ALL_LISTINGS_CACHE) == 0 or not CACHE_LOADED_TIME:
-            await load_all_listings_to_memory()
-        
-        # Cache kontrol - Optimize edildi
-        if datetime.now() - CACHE_LOADED_TIME > CACHE_REFRESH_INTERVAL:
-            print(f"🔄 Cache süresi doldu, yenileniyor... (Son: {CACHE_LOADED_TIME})")
-            await load_all_listings_to_memory()
-        
-        # Memory kontrol - Bellek sınırını aşmasın
-        if len(ALL_LISTINGS_CACHE) > CACHE_MAX_SIZE:
-            print(f"⚠️ Cache boyutu sınırı aşıldı: {len(ALL_LISTINGS_CACHE)} > {CACHE_MAX_SIZE}")
-            # En eski ilanları temizle
-            ALL_LISTINGS_CACHE = ALL_LISTINGS_CACHE[:CACHE_MAX_SIZE]
-        
+        # 🔥 DÜZELTME: Cache kontrolü - Global değişken kontrol ekle
+        if ALL_LISTINGS_CACHE is None:
+            ALL_LISTINGS_CACHE = []
             
+        if not ALL_LISTINGS_CACHE or not CACHE_LOADED_TIME:
+            print("📥 Cache boş, ilk yükleme yapılıyor...")
+            await load_all_listings_to_memory()
+        
+        # 6 saatten eski mi?
+        if CACHE_LOADED_TIME and datetime.now() - CACHE_LOADED_TIME > timedelta(hours=6):
+            print("🔄 Cache süresi dolmuş, yenileniyor...")
+            await load_all_listings_to_memory()
         
         print(f"🔎 Arama yapılıyor: {query}")
         print(f"📊 Bellekte {len(ALL_LISTINGS_CACHE)} ilan var")
+        
+        # Eğer cache hala boşsa, basit veritabanı sorgusu yap
+        if not ALL_LISTINGS_CACHE:
+            print("⚠️ Cache hala boş, doğrudan veritabanından arama yapılıyor...")
+            try:
+                result = supabase_client.table("remax_ilanlar").select("*").limit(50).execute()
+                if result.data:
+                    return format_property_listings(result.data)
+                else:
+                    return "<p>Veritabanında hiç ilan bulunamadı.</p>"
+            except Exception as e:
+                print(f"❌ Doğrudan veritabanı hatası: {e}")
+                return "<p>Arama sırasında teknik bir sorun oluştu. Lütfen daha sonra tekrar deneyin.</p>"
         
         # Parametreleri çıkar
         params = await extract_query_parameters(query)
@@ -357,3 +346,15 @@ async def hybrid_property_search(question: str) -> List[Dict]:
         print(f"❌ Hibrit arama hatası: {e}")
         return []
 
+# Uygulama başlarken cache'i yükle
+print("🚀 Property search handler başlatılıyor...")
+
+# Test fonksiyonu
+async def test_search():
+    """Test için örnek arama"""
+    soru = "Kadıköy'de 20 milyona kadar 3+1 daire"
+    html = await search_properties(soru)
+    print(html)
+
+if __name__ == "__main__":
+    asyncio.run(test_search())
