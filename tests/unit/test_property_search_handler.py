@@ -10,3 +10,4 @@ def test_is_property_search_query():
     # Test non-property queries
     assert not is_property_search_query("Hava durumu nasıl")
     assert not is_property_search_query("Bitcoin fiyatı")
+ 
