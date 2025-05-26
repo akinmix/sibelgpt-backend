@@ -740,7 +740,7 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
     # SELAMLAŞMA KONTROLÜ - ÖNCELİKLİ!
     # Selamlaşma kalıplarını kontrole al
     selamlasma_kaliplari = [
-        "merhaba", "selam", "hello", "hi", "hey", "sa", "günaydın", "iyi günler", 
+        "merhaba", "selam", "hello", "hi", "hey", "günaydın", "iyi günler", 
         "iyi akşamlar", "nasılsın", "naber", "ne haber", "hoş geldin", "nasıl gidiyor"
     ]
     
