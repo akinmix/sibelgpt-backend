@@ -32,13 +32,15 @@ class TestChatFunction:
         
         # Test et
         result = await ask_handler.answer_question(
-            question="Merhaba",
+            question="Kadıköy'de ev arıyorum",
             mode="real-estate"
         )
         
         # Kontrol et
         assert isinstance(result, str)
         assert len(result) > 0
+        # Selamlaşma mesajını da kabul et
+        assert any(word in result.lower() for word in ["test", "gayrimenkul", "yardımcı", "merhaba"])
         assert "Test yanıtı" in result
     
     @pytest.mark.skipif(not HAS_ASK_HANDLER, reason="ask_handler not available")
