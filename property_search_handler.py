@@ -327,12 +327,3 @@ async def hybrid_property_search(question: str) -> List[Dict]:
         print(f"❌ Hibrit arama hatası: {e}")
         return []
 
-# ---- Test Fonksiyonu ----
-async def test_search():
-    """Test için örnek arama"""
-    soru = "Kadıköy'de 20 milyona kadar 3+1 daire"
-    html = await search_properties(soru)
-    print(html)
-
-if __name__ == "__main__":
-    asyncio.run(test_search())
