@@ -279,7 +279,7 @@ async def detect_topic(question: str, mode: str = None) -> str:
     """Kullanıcının sorusunun hangi alana ait olduğunu tespit eder."""
     
     selamlasma_kaliplari = [
-        "merhaba", "selam", "hello", "hi", "hey", "sa", "günaydın", "iyi günler", 
+        "merhaba", "selam", "hello", "hi", "hey", "günaydın", "iyi günler", 
         "iyi akşamlar", "nasılsın", "naber", "ne haber", "hoş geldin", "nasıl gidiyor"
     ]
     
