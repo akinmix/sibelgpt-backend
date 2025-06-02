@@ -350,8 +350,8 @@ async def search_properties(query: str) -> str:
             ]
             print(f"🏠 Oda filtresi sonrası: {len(filtered)} ilan")
         
-        # En fazla 50 ilan göster
-        filtered = filtered[:50]
+        # En fazla 10 ilan göster (hız optimizasyonu)
+        filtered = filtered[:10]
         
         print(f"✅ Toplam {len(filtered)} ilan bulundu")
         debug_end = time.time()
