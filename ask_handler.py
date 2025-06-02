@@ -793,21 +793,21 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
     
     # 4. İÇERİK HAZIRLAMA - AKILLI ARAMA
     context = ""
-        if mode == "real-estate":
-    # ✅ OPTİMİZE EDİLMİŞ AKILLI ARAMA
-    is_listing_query = await check_if_property_listing_query(question)
+    if mode == "real-estate":
+        # ✅ OPTİMİZE EDİLMİŞ AKILLI ARAMA
+        is_listing_query = await check_if_property_listing_query(question)
     
-    if is_listing_query:
-        print("🏠 İlan araması tespit edildi - Cache'li hızlı arama kullanılıyor")
-        try:
-            context = await property_search_handler.search_properties(question)
-            print(f"✅ İlan araması tamamlandı: {len(context)} karakter")
-        except Exception as e:
-            print(f"❌ İlan araması hatası: {e}")
-            context = "İlan araması sırasında teknik sorun oluştu."
-    else:
-        print("📚 Gayrimenkul genel bilgi sorusu - VERİTABANI ATLANYOR")
-        context = "Bu soru için ilan araması gerekmemektedir."
+        if is_listing_query:
+            print("🏠 İlan araması tespit edildi - Cache'li hızlı arama kullanılıyor")
+            try:
+                context = await property_search_handler.search_properties(question)
+                print(f"✅ İlan araması tamamlandı: {len(context)} karakter")
+            except Exception as e:
+                print(f"❌ İlan araması hatası: {e}")
+                context = "İlan araması sırasında teknik sorun oluştu."
+         else:
+                print("📚 Gayrimenkul genel bilgi sorusu - VERİTABANI ATLANYOR")
+                context = "Bu soru için ilan araması gerekmemektedir."
     
     # 5. SYSTEM PROMPT VE MESAJLARI HAZIRLA
     system_prompt = SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["real-estate"])
