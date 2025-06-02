@@ -252,12 +252,16 @@ async def search_properties(query: str) -> str:
     global ALL_LISTINGS_CACHE, CACHE_LOADED_TIME  # Global değişkenleri belirt
     
     try:
-        # 🔥 DÜZELTME: Cache kontrolü - Global değişken kontrol ekle
+        # ✅ DÜZELTİLMİŞ CACHE KONTROLÜ
         if ALL_LISTINGS_CACHE is None:
-            ALL_LISTINGS_CACHE = []
-            
-        if not ALL_LISTINGS_CACHE or not CACHE_LOADED_TIME:
-            print("📥 Cache boş, ilk yükleme yapılıyor...")
+        ALL_LISTINGS_CACHE = []
+
+    # Cache sadece boşsa yükle (her seferinde değil!)
+        if not ALL_LISTINGS_CACHE:
+            print("📥 Cache ilk kez yükleniyor...")
+            await load_all_listings_to_memory()
+        elif CACHE_LOADED_TIME and datetime.now() - CACHE_LOADED_TIME > timedelta(hours=12):
+            print("🔄 Cache 12 saatlik, yenileniyor...")
             await load_all_listings_to_memory()
         
         # 6 saatten eski mi?
