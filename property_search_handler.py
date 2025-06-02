@@ -43,6 +43,9 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 ALL_LISTINGS_CACHE = []  # ✅ BOŞ LİSTE OLARAK BAŞLAT
 CACHE_LOADED_TIME = None
 CACHE_LOCK = asyncio.Lock()
+# ✅ EMBEDDING CACHE SİSTEMİ
+EMBEDDING_CACHE = {}  # Embedding'leri cache'le
+MAX_EMBEDDING_CACHE = 1000  # Maksimum cache boyutu
 
 async def load_all_listings_to_memory():
     """Tüm ilanları belleğe yükle - HIZLI ERİŞİM İÇİN"""
@@ -87,16 +90,32 @@ async def load_all_listings_to_memory():
 
 # ---- Yardımcı Fonksiyonlar ----
 async def get_embedding(text: str) -> Optional[List[float]]:
-    """OpenAI ile embedding oluştur"""
+    """OpenAI ile embedding oluştur - CACHE'Lİ VERSİYON"""
     text = text.strip()
     if not text:
         return None
+    
+    # ✅ CACHE KONTROLÜ
+    text_hash = hashlib.md5(text.encode('utf-8')).hexdigest()
+    if text_hash in EMBEDDING_CACHE:
+        print(f"🎯 Embedding cache'den alındı: {text[:30]}...")
+        return EMBEDDING_CACHE[text_hash]
+    
+    # Cache'de yoksa yeni embedding oluştur
     try:
+        print(f"🔄 Yeni embedding oluşturuluyor: {text[:30]}...")
         resp = await openai_client.embeddings.create(
             model=EMBEDDING_MODEL,
             input=[text]
         )
-        return resp.data[0].embedding
+        embedding = resp.data[0].embedding
+        
+        # ✅ CACHE'E KAYDET
+        if len(EMBEDDING_CACHE) < MAX_EMBEDDING_CACHE:
+            EMBEDDING_CACHE[text_hash] = embedding
+            print(f"💾 Embedding cache'e kaydedildi (toplam: {len(EMBEDDING_CACHE)})")
+        
+        return embedding
     except Exception as exc:
         print(f"❌ Embedding hatası: {exc}")
         print(traceback.format_exc())
