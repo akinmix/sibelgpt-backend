@@ -835,7 +835,7 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
             model=selected_model,
             messages=messages,
             temperature=0.7,
-            max_tokens=3072
+            max_tokens=4096
         )
         
         answer = resp.choices[0].message.content.strip()
