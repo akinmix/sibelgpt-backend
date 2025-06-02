@@ -831,10 +831,16 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
         # 🚀 AKILLI MODEL SEÇİMİ - İlan araması için hızlı model
         selected_model = "gpt-3.5-turbo" if (mode == "real-estate" and "Bu soru için ilan araması gerekmemektedir." in context) else "gpt-4o-mini"
         print(f"🤖 Kullanılan model: {selected_model}")
+        # 🌡️ AKILLI TEMPERATURE SEÇİMİ
+        if mode == "real-estate" and "Bu soru için ilan araması gerekmemektedir." not in context:
+            temp = 0.3  # İlan araması - tutarlı format
+        else:
+            temp = 0.6  # Genel sorular - yaratıcı yanıtlar
+        print(f"🌡️ Kullanılan temperature: {temp}")
         resp = await openai_client.chat.completions.create(
             model=selected_model,
             messages=messages,
-            temperature=0.7,
+            temperature=temp,
             max_tokens=4096
         )
         
