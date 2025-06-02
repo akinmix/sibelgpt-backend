@@ -793,7 +793,7 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
     
     # 4. İÇERİK HAZIRLAMA - AKILLI ARAMA
     context = ""
-    if mode == "real-estate":
+        if mode == "real-estate":
     # ✅ OPTİMİZE EDİLMİŞ AKILLI ARAMA
     is_listing_query = await check_if_property_listing_query(question)
     
