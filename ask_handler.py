@@ -829,7 +829,7 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
     try:
         print("🤖 OpenAI API'ye istek gönderiliyor...")
         # 🚀 AKILLI MODEL SEÇİMİ - İlan araması için hızlı model
-        selected_model = "gpt-3.5-turbo" if (mode == "real-estate" and "Bu soru için ilan araması gerekmemektedir." not in context) else "gpt-4o-mini"
+        selected_model = "gpt-3.5-turbo" if (mode == "real-estate" and "Bu soru için ilan araması gerekmemektedir." in context) else "gpt-4o-mini"
         print(f"🤖 Kullanılan model: {selected_model}")
         resp = await openai_client.chat.completions.create(
             model=selected_model,
