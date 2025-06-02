@@ -254,7 +254,7 @@ async def search_properties(query: str) -> str:
     try:
         # ✅ DÜZELTİLMİŞ CACHE KONTROLÜ
         if ALL_LISTINGS_CACHE is None:
-        ALL_LISTINGS_CACHE = []
+            ALL_LISTINGS_CACHE = []
 
     # Cache sadece boşsa yükle (her seferinde değil!)
         if not ALL_LISTINGS_CACHE:
