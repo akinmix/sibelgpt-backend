@@ -290,6 +290,10 @@ async def search_properties(query: str) -> str:
         
         print(f"🔎 Arama yapılıyor: {query}")
         print(f"📊 Bellekte {len(ALL_LISTINGS_CACHE)} ilan var")
+        # 🔍 PERFORMANS DEBUG
+        import time
+        debug_start = time.time()
+        print(f"⏱️ DEBUG: Arama başladı - {debug_start}")
         
         # Eğer cache hala boşsa, basit veritabanı sorgusu yap
         if not ALL_LISTINGS_CACHE:
@@ -350,10 +354,14 @@ async def search_properties(query: str) -> str:
         filtered = filtered[:50]
         
         print(f"✅ Toplam {len(filtered)} ilan bulundu")
+        debug_end = time.time()
+        print(f"⏱️ DEBUG: Arama bitti - Toplam süre: {debug_end - debug_start:.2f} saniye")
         return format_property_listings(filtered)
         
     except Exception as e:
         print(f"❌ Arama hatası: {e}")
+        debug_end = time.time()
+        print(f"⏱️ DEBUG: Hata durumu - Toplam süre: {debug_end - debug_start:.2f} saniye")
         import traceback
         traceback.print_exc()
         return "<p>Arama sırasında bir hata oluştu. Lütfen tekrar deneyin.</p>"
