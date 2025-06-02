@@ -322,8 +322,9 @@ async def search_properties(query: str) -> str:
             lok = params['lokasyon'].lower()
             filtered = [
                 ilan for ilan in filtered 
-                if lok in (str(ilan.get('ilce', '')).lower() + ' ' + 
-                          str(ilan.get('mahalle', '')).lower())
+                if (f" {lok} " in f" {str(ilan.get('ilce', '')).lower()} {str(ilan.get('mahalle', '')).lower()} " or
+                   f" {str(ilan.get('ilce', '')).lower()} ".startswith(f" {lok} ") or
+                   f" {str(ilan.get('mahalle', '')).lower()} ".startswith(f" {lok} "))
             ]
             print(f"📍 Lokasyon filtresi sonrası: {len(filtered)} ilan")
         
