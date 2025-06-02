@@ -805,7 +805,7 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
             except Exception as e:
                 print(f"❌ İlan araması hatası: {e}")
                 context = "İlan araması sırasında teknik sorun oluştu."
-         else:
+        else:
                 print("📚 Gayrimenkul genel bilgi sorusu - VERİTABANI ATLANYOR")
                 context = "Bu soru için ilan araması gerekmemektedir."
     
