@@ -123,7 +123,8 @@ SYSTEM_PROMPTS = {
     
     1. **SADECE AŞAĞIDAKİ KONULARDA CEVAP VER**:
        - Numeroloji ve isim/doğum tarihi analizleri
-       - Astroloji, burçlar ve gezegen yorumları
+       - Astroloji, burçlar, yıldızlar, gezegen yorumları, astrolojik analiz
+       - Astroloji nedir, astrolojinin temelleri, astrolojik kavramlar
        - Kadim bilgiler ve spiritüel konular
        - Psikoloji ve ruh sağlığı tavsiyeleri
        - Thetahealing ve enerji çalışmaları
