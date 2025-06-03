@@ -784,13 +784,7 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
         print(f"⚠️ Genel konu tespit edildi, uzmanlık alanı dışı yanıt veriliyor")
         return get_out_of_scope_response(mode)
     
-    # 3. UZMANLIK ALANI KONTROLLÜ (Sadece gayrimenkul modunda)
-    if mode == "real-estate":
-        is_real_estate_query = await check_if_real_estate_query(question)
-        if not is_real_estate_query:
-            print("❌ GPT tarafından gayrimenkul ile ilgisiz olarak tespit edildi")
-            return get_out_of_scope_response(mode)
-    
+              
     # 4. İÇERİK HAZIRLAMA - AKILLI ARAMA
     context = ""
     if mode == "real-estate":
