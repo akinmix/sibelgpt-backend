@@ -2,7 +2,7 @@ import os
 import asyncio 
 import locale
 import re
-from typing import List, Dict, Optional 
+from typing import List, Dict, Optional
 from openai import AsyncOpenAI
 import property_search_handler
 
@@ -903,7 +903,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
             ozellikler_parts_processed = []
             for part_raw in ozellikler_parts_raw:
                 part = part_raw.strip()
-                part.lstrip('-').isdigit()
+                if re.match(r'^-?\d+ , part):
                     kat_no_oz = int(part)
                     if kat_no_oz == 0:
                         ozellikler_parts_processed.append("Giriş Kat")
@@ -1102,4 +1102,4 @@ def validate_system_configuration():
 # Başlangıçta doğrulama yap
 print("🔧 Sistem başlatılıyor...")
 validate_system_configuration()
-print("✅ Ask Handler hazır!") 
+print("✅ Ask Handler hazır!")
