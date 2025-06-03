@@ -861,3 +861,233 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
     except Exception as exc:
         print(f"❌ Chat yanıt hatası: {exc}")
         return "Üzgünüm, isteğinizi işlerken beklenmedik bir sorun oluştu. Lütfen daha sonra tekrar deneyin."
+
+# ── Embedding Fonksiyonu ───────────────────────────────────
+async def get_embedding(text: str) -> Optional[List[float]]:
+    """OpenAI API kullanarak metin için embedding oluşturur"""
+    text = text.strip()
+    if not text:
+        return None
+    try:
+        resp = await openai_client.embeddings.create(
+            model=EMBEDDING_MODEL,
+            input=[text]
+        )
+        return resp.data[0].embedding
+    except Exception as exc:
+        print(f"❌ Embedding hatası: {exc}")
+        return None
+
+# ── Supabase Arama Fonksiyonu ───────────────────────────────────────
+async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict]:
+    """Remax ilanlar tablosundan semantic arama yapar."""
+    if query_embedding is None:
+         print("⚠️ Query embedding boş, arama yapılamıyor!")
+         return []
+    
+    try:
+        print("🔍 İlanlar sorgulanıyor...")
+        
+        response = supabase.rpc(
+            "match_remax_listings",
+            {
+                "query_embedding": query_embedding,
+                "match_threshold": MATCH_THRESHOLD,
+                "match_count": MATCH_COUNT
+            }
+        ).execute()
+
+        # Ham yanıtı logla
+        print(f"🔮 Supabase RPC yanıtı: {type(response)}")
+        
+        all_results = response.data if hasattr(response, "data") and response.data is not None else [] 
+        
+        # Alan adlarını düzelt (ilan_no -> ilan_id)
+        for r in all_results:
+            if isinstance(r, dict) and 'ilan_no' in r and 'ilan_id' not in r:
+                r['ilan_id'] = r['ilan_no']  # ilan_no'yu ilan_id olarak kopyala
+
+        # Threshold üzerindeki sonuçları filtrele
+        valid_results = []
+        for i, r in enumerate(all_results):
+            if isinstance(r, dict) and r.get('similarity', 0) > MATCH_THRESHOLD:
+                valid_results.append(r)
+                print(f"📌 Geçerli sonuç #{i}: ID={r.get('ilan_id')}, Similarity={r.get('similarity', 0):.3f}")
+                
+        print(f"✅ İlanlar sorgulandı: Toplam {len(valid_results)} gerçek ilişkili ilan bulundu")  
+
+        if not valid_results:
+            print("⚠️ Hiç ilan bulunamadı!")
+        
+        return valid_results
+        
+    except Exception as exc:
+        print(f"❌ Arama işleminde hata: {exc}")
+        import traceback
+        print(f"🔥 Hata detayı: {traceback.format_exc()}")
+        return []
+        
+# ── Formatlama Fonksiyonu ─────────────────────────────────
+def format_context_for_sibelgpt(listings: List[Dict]) -> str:
+    """İlan listesini SibelGPT için HTML formatında düzenler"""
+    if not listings:
+        return "🔍 Uygun ilan bulunamadı. Lütfen farklı arama kriterleri deneyin."
+
+    try:
+        locale.setlocale(locale.LC_ALL, 'tr_TR.UTF-8')
+    except locale.Error:
+        try:
+            locale.setlocale(locale.LC_ALL, 'tr_TR')
+        except locale.Error:
+            pass # Locale ayarlanamazsa devam et
+
+    MAX_LISTINGS_TO_SHOW = 20
+    listings_to_format = listings[:MAX_LISTINGS_TO_SHOW]
+    if not listings_to_format:
+        return "🔍 Belirtilen kriterlere uygun ilan bulunamadı. Lütfen aramanızı genişletin."
+   
+    final_output = "<p><strong>📞 Sorgunuzla ilgili ilanlar burada listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
+   
+    formatted_parts = []
+    for i, l_item in enumerate(listings_to_format, start=1):
+        ilan_no = l_item.get('ilan_id', l_item.get('ilan_no', str(i)))
+        baslik = l_item.get('baslik', '(başlık yok)')
+        
+        # Lokasyon bilgisi
+        ilce = l_item.get('ilce', '')
+        mahalle = l_item.get('mahalle', '')
+        lokasyon = f"{ilce}, {mahalle}" if ilce and mahalle else (ilce or mahalle or '?')
+        
+        # Fiyat formatı
+        fiyat = "?"
+        fiyat_raw = l_item.get('fiyat')
+        if fiyat_raw is not None:
+            try:
+                # Fiyat string'ini temizleyip formatla
+                fiyat_str_cleaned = str(fiyat_raw).replace('.', '').replace(',', '.')
+                if fiyat_str_cleaned.replace('.', '', 1).isdigit():
+                    fiyat_num = float(fiyat_str_cleaned)
+                    fiyat = f"{fiyat_num:,.0f} ₺".replace(',', '#').replace('.', ',').replace('#', '.')
+                else:
+                    fiyat = str(fiyat_raw)
+            except (ValueError, Exception):
+                fiyat = str(fiyat_raw)
+       
+        # Özellikler
+        ozellikler_liste = []
+        oda_sayisi = l_item.get('oda_sayisi', '')
+        if oda_sayisi:
+            ozellikler_liste.append(str(oda_sayisi))
+       
+        metrekare = l_item.get('metrekare', '')
+        if metrekare:
+            metrekare_str = str(metrekare).strip()
+            if not metrekare_str.endswith("m²"):
+                ozellikler_liste.append(f"{metrekare_str} m²")
+            else:
+                ozellikler_liste.append(metrekare_str)
+
+        # Kat bilgisi
+        bulundugu_kat_raw = l_item.get('bulundugu_kat')
+        if bulundugu_kat_raw is not None and str(bulundugu_kat_raw).strip() != '':
+            bulundugu_kat_str = str(bulundugu_kat_raw).strip()
+            try:
+                if bulundugu_kat_str.replace('-', '', 1).isdigit():
+                    kat_no = int(bulundugu_kat_str)
+                    if kat_no == 0:
+                        ozellikler_liste.append("Giriş Kat")
+                    elif kat_no < 0:
+                        ozellikler_liste.append(f"Bodrum Kat ({kat_no})")
+                    else:
+                        ozellikler_liste.append(f"{kat_no}. Kat")
+                else:
+                    ozellikler_liste.append(bulundugu_kat_str)
+            except ValueError:
+                ozellikler_liste.append(bulundugu_kat_str)
+       
+        # Veritabanından gelen ek özellikler
+        ozellikler_db = l_item.get('ozellikler')
+        if ozellikler_db and isinstance(ozellikler_db, str):
+            ozellikler_parts_raw = ozellikler_db.split('|')
+            ozellikler_parts_processed = []
+            for part_raw in ozellikler_parts_raw:
+                part = part_raw.strip()
+                if re.match(r'^-?\d+, part):
+                    kat_no_oz = int(part)
+                    if kat_no_oz == 0:
+                        ozellikler_parts_processed.append("Giriş Kat")
+                    elif kat_no_oz < 0:
+                        ozellikler_parts_processed.append(f"Bodrum Kat ({kat_no_oz})")
+                    else:
+                        ozellikler_parts_processed.append(f"{kat_no_oz}. Kat")
+                else:
+                    ozellikler_parts_processed.append(part)
+            ozellikler = " | ".join(ozellikler_parts_processed)
+        elif ozellikler_liste:
+            ozellikler = " | ".join(ozellikler_liste)
+        else:
+            ozellikler = "(özellik bilgisi yok)"
+       
+        # HTML formatında ilan satırı
+        ilan_html = (
+            f"<li><strong>{i}. {baslik}</strong><br>"
+            f"İlan No: {ilan_no} | Lokasyon: {lokasyon}<br>"
+            f"Fiyat: {fiyat} | {ozellikler}<br>"
+            f"<button onclick=\"window.open('https://sibelgpt-backend.onrender.com/generate-property-pdf/{ilan_no}', '_blank')\" "
+            f"style='margin-top:6px; padding:6px 15px; background:#1976d2; color:white; border:none; "
+            f"border-radius:25px; cursor:pointer; font-size:13px; font-weight:500; display:inline-flex; "
+            f"align-items:center; gap:5px; box-shadow:0 2px 5px rgba(0,0,0,0.1); transition:all 0.3s ease;' "
+            f"onmouseover=\"this.style.background='#115293'; this.style.transform='translateY(-1px)';\" "
+            f"onmouseout=\"this.style.background='#1976d2'; this.style.transform='translateY(0)';\">"
+            f"<i class='fas fa-file-pdf' style='font-size:16px;'></i> PDF İndir</button></li>"
+        )
+        formatted_parts.append(ilan_html)
+   
+    final_output += "<ul>" + "\n".join(formatted_parts) + "</ul>"
+    
+    # Gerçek ilan numaralarını listele
+    real_ids = [l_item.get('ilan_id') for l_item in listings_to_format if l_item.get('ilan_id')]
+    print(f"🏷️ İlan Veritabanındaki Gerçek İlan Numaraları: {real_ids}")
+    if real_ids:
+        final_output += f"<p><strong>VERİTABANINDAKİ GERÇEK İLAN NUMARALARI: {', '.join(real_ids)}</strong></p>"
+    
+    final_output += "<p>Bu ilanların doğruluğunu kontrol ettim. Farklı bir arama yapmak isterseniz, lütfen kriterleri belirtiniz.</p>"
+   
+    return final_output
+
+# ── PERFORMANS VE DEBUG FONKSİYONLARI ─────────────────────────
+def validate_system_configuration():
+    """Sistem konfigürasyonunu doğrular - RENDER 1GB OPTİMİZE"""
+    issues = []
+    
+    # API anahtarları kontrolü
+    if not OAI_KEY:
+        issues.append("❌ OpenAI API anahtarı eksik")
+    if not SB_URL:
+        issues.append("❌ Supabase URL eksik")
+    if not SB_KEY:
+        issues.append("❌ Supabase Key eksik")
+    
+    # Topics kontrolü (RENDER optimize)
+    for topic, keywords in TOPIC_KEYWORDS.items():
+        if len(keywords) < 30:  # 50'den 30'a düşürüldü
+            issues.append(f"⚠️ {topic} için az kelime: {len(keywords)}")
+    
+    # System prompts kontrolü
+    for mode in ["real-estate", "mind-coach", "finance"]:
+        if mode not in SYSTEM_PROMPTS:
+            issues.append(f"❌ {mode} için system prompt eksik")
+    
+    if issues:
+        print("🔍 Sistem Konfigürasyon Sorunları:")
+        for issue in issues:
+            print(f"  {issue}")
+    else:
+        print("✅ Sistem konfigürasyonu tamam")
+    
+    return len(issues) == 0
+
+# Başlangıçta doğrulama yap
+print("🔧 RENDER 1GB optimize sistem başlatılıyor...")
+validate_system_configuration()
+print("✅ Ask Handler RENDER optimize hazır!")
