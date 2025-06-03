@@ -145,7 +145,7 @@ TOPIC_KEYWORDS = {
         "halving", "proof of work", "proof of stake", "consensus",
         
         # Döviz ve Emtia
-        "döviz", "usd", "eur", "gbp", "jpy", "chf", "try", "parite",
+        "dolar", "kur", "para", "lira", "döviz", "usd", "eur", "gbp", "jpy", "chf", "try", "parite",
         "kur", "çapraz kur", "swap", "forward", "futures", "option",
         "altın", "gümüş", "platin", "paladyum", "petrol", "doğalgaz",
         "buğday", "mısır", "soya", "kakao", "kahve", "şeker", "pamuk",
