@@ -567,7 +567,7 @@ async def detect_topic(question: str, mode: str = None) -> str:
     
     for topic, keywords in TOPIC_KEYWORDS.items():
         # İlk 50 kelimeyi kontrol et (disk tasarrufu)
-        for keyword in keywords[:50]:
+        for keyword in keywords[:100]:
             if keyword in clean_question:
                 matches[topic] += 1
     
