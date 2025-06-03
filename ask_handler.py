@@ -903,7 +903,7 @@ def format_context_for_sibelgpt(listings: List[Dict]) -> str:
             ozellikler_parts_processed = []
             for part_raw in ozellikler_parts_raw:
                 part = part_raw.strip()
-                 part.lstrip('-').isdigit()
+                part.lstrip('-').isdigit()
                     kat_no_oz = int(part)
                     if kat_no_oz == 0:
                         ozellikler_parts_processed.append("Giriş Kat")
