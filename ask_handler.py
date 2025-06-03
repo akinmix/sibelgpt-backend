@@ -302,10 +302,12 @@ async def detect_topic(question: str, mode: str = None) -> str:
             "balkon", "oda", "salon", "banyo", "mutfak", "yapı", "inşaat", "tadilat"
         ],
         "mind-coach": [
-            "numeroloji", "astroloji", "burç", "meditasyon", "reiki", "terapi", 
-            "psikoloji", "depresyon", "anksiyete", "stres", "motivasyon", "gelişim", 
-            "spiritüel", "enerji", "şifa", "kadim", "theta", "healing", "ruh", 
-            "bilinç", "farkındalık", "arınma", "denge", "uyum", "yoga", "nefes"
+            "numeroloji", "astroloji", "astrolojik", "astrologya", "burç", "burcum", "yıldız", 
+            "gezegen", "ay", "güneş", "mars", "venüs", "aslan", "kova", "koç", "balık", 
+            "meditasyon", "reiki", "terapi", "psikoloji", "depresyon", "anksiyete", 
+            "stres", "motivasyon", "gelişim", "spiritüel", "enerji", "şifa", "kadim", 
+            "theta", "healing", "ruh", "bilinç", "farkındalık", "arınma", "denge", 
+            "uyum", "yoga", "nefes", "horoskop", "yıldızname"
         ],
         "finance": [
             "borsa", "hisse", "finans", "yatırım", "faiz", "döviz", "euro", "dolar", 
