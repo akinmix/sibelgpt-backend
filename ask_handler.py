@@ -308,12 +308,17 @@ async def detect_topic(question: str, mode: str = None) -> str:
             "stres", "motivasyon", "gelişim", "spiritüel", "enerji", "şifa", "kadim", 
             "theta", "healing", "ruh", "bilinç", "farkındalık", "arınma", "denge", 
             "uyum", "yoga", "nefes", "horoskop", "yıldızname"
+            "yaşam", "ilişki", "başarı", "başarısızlık", "korku", "fobia", "travma", 
+            "nlp", "hipnoz", "özgüven", "kendini", "yaşam", "hayat", "amaç", "hedef",
+            "duygusal", "zeka", "sosyal", "beceri", "liderlik", "iletişim"
         ],
         "finance": [
             "borsa", "hisse", "finans", "yatırım", "faiz", "döviz", "euro", "dolar", 
             "altın", "gümüş", "kripto", "bitcoin", "ethereum", "bist", "ekonomi", 
             "enflasyon", "tahvil", "bono", "portföy", "fon", "kazanç", "kâr", "zarar", 
             "analiz", "teknik", "temel", "parite", "forex", "banka", "para"
+            "defi", "nft", "reit", "gayrimenkul", "yatırım", "ortaklığı", 
+            "emeklilik", "sigorta", "vergi", "blockchain", "web3", "staking"
         ]
     }
     
