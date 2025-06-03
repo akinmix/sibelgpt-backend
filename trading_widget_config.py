@@ -14,7 +14,7 @@ class TradingWidgetConfig:
         },
         {
             "description": "USDTRY", 
-            "proName": "FOREXCOM:USDTRY"
+            "proName": "FX:USDTRY"
         },
         {
             "description": "GRAM ALTIN",
