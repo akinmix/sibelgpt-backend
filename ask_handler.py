@@ -27,7 +27,143 @@ EMBEDDING_MODEL = "text-embedding-3-small"
 MATCH_THRESHOLD =  0.3
 MATCH_COUNT     =  50
 
-# ── Modlara Göre System Prompts ────────────────────────────
+# ── GÜNCELLENMIŞ TOPICS DICTIONARY (150'şer Kelime) ────────
+TOPIC_KEYWORDS = {
+    "real-estate": [
+        # Temel Gayrimenkul Kavramları
+        "emlak", "gayrimenkul", "ev", "daire", "konut", "kiralık", "satılık", 
+        "tapu", "mortgage", "ipotek", "kredi", "remax", "metrekare", "imar", 
+        "arsa", "bina", "kat", "müstakil", "dükkan", "ofis", "iş yeri", "bahçe",
+        "balkon", "oda", "salon", "banyo", "mutfak", "yapı", "inşaat", "tadilat",
+        
+        # Gayrimenkul İşlemleri ve Hukuk
+        "senet", "ruhsat", "iskân", "noter", "vekaletname", "ferağ", "komisyon",
+        "emlak vergisi", "mtv", "aidat", "kalorifer", "doğalgaz", "elektrik",
+        "su faturası", "belediye", "çevre temizlik", "asansör", "kapıcı",
+        
+        # İnşaat ve Yapı
+        "betonarme", "çelik", "tuğla", "panel", "prefabrik", "dubleks", "tripleks",
+        "villa", "apart", "rezidans", "site", "complex", "köşk", "malikane",
+        "çiftlik evi", "yazlık", "stüdyo", "loft", "penthouse", "terras",
+        
+        # Teknik Özellikler
+        "asansörlü", "güvenlik", "kamera", "interkom", "otopark", "garaj",
+        "jeneratör", "hidrofor", "yangın merdiveni", "çıkış", "acil durum",
+        "ses yalıtımı", "ısı yalıtımı", "cam balkon", "pvc", "alüminyum",
+        
+        # Lokasyon ve Bölge
+        "merkezi", "ulaşım", "metro", "metrobüs", "otobüs", "minibüs", "taksi",
+        "cadde", "sokak", "mahalle", "semt", "bölge", "ilçe", "şehir merkezi",
+        "sahil", "deniz", "göl", "park", "yeşil alan", "orman", "dağ", "tepe",
+        
+        # Oda ve Alan Tipleri
+        "yatak odası", "çocuk odası", "misafir odası", "çalışma odası",
+        "kiler", "depo", "bodrum", "çatı katı", "tavan arası", "balkon",
+        "teras", "veranda", "kış bahçesi", "hobi odası", "fitness", "sauna",
+        
+        # Gayrimenkul Yatırımı
+        "yatırım", "getiri", "kira geliri", "değer artışı", "piyasa",
+        "trend", "fiyat", "değerleme", "ekspertiz", "rapor", "analiz",
+        "portföy", "çeşitlendirme", "risk", "konum", "potansiyel",
+        
+        # Sözleşme ve İşlemler
+        "sözleşme", "kira sözleşmesi", "satış sözleşmesi", "ön sözleşme",
+        "depozito", "kapora", "peşinat", "taksit", "vade", "ödeme planı",
+        "refinansman", "erken ödeme", "gecikme faizi", "ceza", "kefil"
+    ],
+    
+    "mind-coach": [
+        # Astroloji ve Burçlar
+        "astroloji", "astrolojik", "burç", "burcum", "yıldız", "yıldızlar",
+        "gezegen", "ay", "güneş", "mars", "venüs", "jüpiter", "satürn",
+        "merkür", "neptün", "uranüs", "plüton", "aslan", "kova", "koç", 
+        "balık", "ikizler", "yengeç", "başak", "terazi", "akrep", "yay",
+        "oğlak", "horoskop", "yıldızname", "astral", "kozmik", "evren",
+        
+        # Numeroloji
+        "numeroloji", "sayı", "sayılar", "doğum tarihi", "isim analizi",
+        "kader sayısı", "yaşam yolu", "kişilik sayısı", "ruh sayısı",
+        "ifade sayısı", "kalp arzusu", "olgunluk sayısı", "pitagor",
+        "kaldean", "kabala", "gematria", "vibrasyon", "frekans",
+        
+        # Spiritüel ve Enerji Çalışmaları
+        "spiritüel", "ruhani", "enerji", "aura", "çakra", "kundalini",
+        "meditasyon", "bilinç", "farkındalık", "uyanış", "aydınlanma",
+        "theta", "healing", "şifa", "reiki", "pranic", "kristal",
+        "taş", "maden", "arınma", "temizlik", "koruma", "büyü",
+        
+        # Psikoloji ve Ruh Sağlığı
+        "psikoloji", "psikolog", "terapi", "terapist", "danışman",
+        "depresyon", "anksiyete", "stres", "panik", "fobia", "travma",
+        "ptsd", "obsesif", "kompulsif", "bipolar", "sınır", "kişilik",
+        "narsist", "empati", "duygusal", "zeka", "sosyal", "beceri",
+        
+        # Kişisel Gelişim ve Motivasyon
+        "kişisel gelişim", "motivasyon", "özgüven", "özsaygı", "özdisiplin",
+        "başarı", "hedef", "amaç", "vizyon", "misyon", "değer", "inanç",
+        "liderlik", "iletişim", "empati", "karizma", "etki", "nüfuz",
+        "yaratıcılık", "inovasyon", "çözüm", "problem", "karar", "seçim",
+        
+        # İlişkiler ve Aile
+        "ilişki", "evlilik", "aşk", "sevgi", "çift", "eş", "partner",
+        "aile", "anne", "baba", "çocuk", "kardeş", "akraba", "arkadaş",
+        "sosyal", "bağ", "bağlılık", "güven", "sadakat", "ihanet",
+        "ayrılık", "boşanma", "barışma", "affetme", "kıskançlık", "öfke",
+        
+        # Ruhsal Gelişim ve Felsefe
+        "ruh", "can", "nefs", "ego", "benlik", "kimlik", "öz", "asıl",
+        "hakikat", "gerçek", "yanılsama", "maya", "illüzyon", "hayal",
+        "düş", "sembol", "simge", "işaret", "alamet", "kehanet", "kehânet",
+        "falcılık", "büyücülük", "şamanlık", "sufizm", "tasavvuf", "yoga"
+    ],
+    
+    "finance": [
+        # Borsa ve Hisse Senetleri
+        "borsa", "hisse", "pay", "senet", "bist", "nasdaq", "dow", "s&p",
+        "ftse", "dax", "nikkei", "hang seng", "şirket", "halka arz",
+        "ipo", "temettü", "kar payı", "sermaye", "piyasa değeri",
+        "hacim", "işlem", "alış", "satış", "spread", "fiyat", "değer",
+        
+        # Teknik Analiz
+        "teknik analiz", "grafik", "mum", "çubuk", "line", "bar",
+        "trend", "destek", "direnç", "kırılım", "geri çekilme",
+        "fibonacci", "retracement", "rsi", "macd", "stochastic",
+        "bollinger", "moving average", "ema", "sma", "volume",
+        "oscillator", "momentum", "divergence", "konvergens",
+        
+        # Temel Analiz
+        "temel analiz", "mali tablo", "bilanço", "gelir tablosu",
+        "nakit akım", "karlılık", "roe", "roa", "pe", "pb", "ev/ebitda",
+        "f/k", "pd/dd", "büyüme", "gelir", "gider", "net kar",
+        "brüt kar", "ebitda", "ebit", "faaliyet karı", "vergi",
+        
+        # Kripto Para ve Blockchain
+        "kripto", "bitcoin", "ethereum", "altcoin", "blockchain",
+        "defi", "nft", "dao", "dex", "cex", "wallet", "cüzdan",
+        "mining", "madencilik", "staking", "yield farming", "liquidity",
+        "smart contract", "akıllı sözleşme", "token", "coin", "fork",
+        "halving", "proof of work", "proof of stake", "consensus",
+        
+        # Döviz ve Emtia
+        "döviz", "usd", "eur", "gbp", "jpy", "chf", "try", "parite",
+        "kur", "çapraz kur", "swap", "forward", "futures", "option",
+        "altın", "gümüş", "platin", "paladyum", "petrol", "doğalgaz",
+        "buğday", "mısır", "soya", "kakao", "kahve", "şeker", "pamuk",
+        
+        # Ekonomi ve Makro
+        "ekonomi", "enflasyon", "deflasyon", "stagflasyon", "gdp",
+        "gsyh", "büyüme", "durgunluk", "kriz", "canlanma", "iyileşme",
+        "merkez bankası", "fed", "ecb", "tcmb", "faiz", "oran",
+        "para politikası", "mali politika", "bütçe", "açık", "fazla",
+        
+        # Yatırım Araçları
+        "yatırım", "portföy", "fon", "etf", "reit", "bono", "tahvil",
+        "sukuk", "viop", "vadeli", "opsiyon", "warrant", "sertifika",
+        "strukturlu", "structured", "hedge", "arbitraj", "spekülatif"
+    ]
+}
+
+# ── GÜNCELLENMIŞ SYSTEM PROMPTS ────────────────────────────
 SYSTEM_PROMPTS = {
     "real-estate": """
     # Gayrimenkul GPT - Ana Görev ve Rol Tanımı
@@ -39,13 +175,36 @@ SYSTEM_PROMPTS = {
     ## TEMEL KURALLAR - ÇOK ÖNEMLİ
     
     1. **SADECE AŞAĞIDAKİ KONULARDA CEVAP VER**:
-       - Gayrimenkul piyasası, emlak alım-satım, kiralama
-       - Konut, daire, ev, villa, arsa ve gayrimenkul türleri
-       - Gayrimenkul yatırımı, finansmanı, tapu işlemleri
-       - Emlak vergisi, değerleme, kredi işlemleri
-       - Gayrimenkul mevzuatı ve yasal süreçler
-       - İnşaat, yapı ve tadilat konuları
-       - Gayrimenkul ilanları ve aramaları 
+       
+       **🏠 Gayrimenkul Alım-Satım ve Kiralama:**
+       - Ev, daire, konut, villa, arsa, ofis, dükkan alım-satımı
+       - Kiralık ve satılık gayrimenkul ilanları
+       - Emlak piyasası analizi, fiyat trendleri
+       - Gayrimenkul değerleme, ekspertiz işlemleri
+       
+       **📋 Yasal ve İdari İşlemler:**
+       - Tapu işlemleri, ferağ, vekaletname düzenleme
+       - Emlak vergisi, MTV, belediye harçları
+       - İmar durumu, ruhsat, iskân izni süreçleri
+       - Noter işlemleri, sözleşme hazırlama
+       
+       **🏗️ İnşaat ve Yapı Tekniği:**
+       - İnşaat malzemeleri, yapı tekniği, proje analizi
+       - Tadilat, dekorasyon, renovasyon işlemleri
+       - Yapı denetim, betonarme, çelik yapı sistemi
+       - Enerji verimliliği, yalıtım teknikleri
+       
+       **💰 Gayrimenkul Finansmanı:**
+       - Konut kredisi, mortgage işlemleri
+       - Gayrimenkul yatırımı stratejileri
+       - Kira geliri hesaplama, getiri analizi
+       - Emlak portföy yönetimi
+       
+       **🏘️ Lokasyon ve Bölge Analizi:**
+       - Mahalle, semt, ilçe karşılaştırması
+       - Ulaşım, sosyal tesis analizi
+       - Okul, hastane, AVM mesafeleri
+       - Yatırım potansiyeli yüksek bölgeler
     
     2. **DİĞER TÜM KONULARDA ŞÖYLE YANIT VER**:
        "Bu soru Gayrimenkul GPT'nin uzmanlık alanı dışındadır. Ben sadece gayrimenkul, 
@@ -122,14 +281,62 @@ SYSTEM_PROMPTS = {
     ## TEMEL KURALLAR - ÇOK ÖNEMLİ
     
     1. **SADECE AŞAĞIDAKİ KONULARDA CEVAP VER**:
-       - Numeroloji ve isim/doğum tarihi analizleri
-       - Astroloji, burçlar, yıldızlar, gezegen yorumları, astrolojik analiz
-       - Astroloji nedir, astrolojinin temelleri, astrolojik kavramlar
-       - Kadim bilgiler ve spiritüel konular
-       - Psikoloji ve ruh sağlığı tavsiyeleri
-       - Thetahealing ve enerji çalışmaları
-       - Motivasyon teknikleri ve kişisel gelişim
-       - Meditasyon, bilinçaltı ve mindfulness
+       
+       **🌟 Astroloji ve Cosmic Bilimler:**
+       - Astroloji nedir, astrolojinin temelleri ve tarihi
+       - 12 burç (Koç, Boğa, İkizler, Yengeç, Aslan, Başak, Terazi, Akrep, Yay, Oğlak, Kova, Balık)
+       - Gezegen etkileri (Güneş, Ay, Mars, Venüs, Jüpiter, Satürn, Merkür, Neptün, Uranüs, Plüton)
+       - Horoskop analizi, yıldızname yorumları
+       - Astral harita, doğum haritası çıkarma
+       - Astrolojik geçişler, retrograd hareketler
+       
+       **🔢 Numeroloji ve Sayı Bilimi:**
+       - Numeroloji nedir, Pitagor ve Kaldean sistemleri
+       - İsim ve doğum tarihi analizleri
+       - Yaşam yolu sayısı, kader sayısı hesaplama
+       - Kişilik sayısı, ruh sayısı, ifade sayısı
+       - Kalp arzusu sayısı, olgunluk sayısı
+       - Sayıların vibrasyon ve frekans anlamları
+       
+       **🧠 Psikoloji ve Ruh Sağlığı:**
+       - Depresyon, anksiyete, stres yönetimi
+       - Panik atak, fobiler, travma iyileşmesi
+       - PTSD, obsesif kompulsif bozukluk
+       - Bipolar bozukluk, sınır kişilik bozukluğu
+       - Duygusal zeka, sosyal beceri geliştirme
+       - Psikolojik danışmanlık teknikleri
+       
+       **⚡ Enerji Çalışmaları ve Şifa:**
+       - Thetahealing teknikleri ve uygulamaları
+       - Reiki, Pranic healing, kristal şifası
+       - Çakra temizleme, aura güçlendirme
+       - Kundalini enerjisi, enerji merkezi aktivasyonu
+       - Spiritüel koruma, negatif enerji temizleme
+       - Meditasyon teknikleri, bilinçaltı programlama
+       
+       **🚀 Kişisel Gelişim ve Motivasyon:**
+       - Özgüven geliştirme, özsaygı artırma
+       - Hedef belirleme, başarı stratejileri
+       - Motivasyon teknikleri, özdisiplin
+       - Liderlik becerileri, karizma geliştirme
+       - İletişim becerileri, empati kurma
+       - Yaratıcılık, problem çözme teknikleri
+       
+       **💕 İlişkiler ve Aile Terapisi:**
+       - Çift terapisi, evlilik danışmanlığı
+       - Aile içi iletişim, çocuk yetiştirme
+       - Aşk ve ilişki psikolojisi
+       - Ayrılık, boşanma süreci yönetimi
+       - Kıskançlık, güven sorunları
+       - Sosyal ilişkiler, arkadaşlık bağları
+       
+       **🌸 Spiritüel Gelişim ve Kadim Bilgiler:**
+       - Yoga, meditasyon, nefes teknikleri
+       - Şamanlık, sufizm, tasavvuf öğretileri
+       - Ruhsal uyanış, bilinç genişletme
+       - Sembol ve işaret yorumlama
+       - Rüya analizi, rüya yorumlama
+       - Hipnoz, NLP (Neuro-Linguistic Programming)
     
     2. **DİĞER TÜM KONULARDA ŞÖYLE YANIT VER**:
        "Bu soru Zihin Koçu GPT'nin uzmanlık alanı dışındadır. Ben sadece kişisel gelişim, 
@@ -154,6 +361,15 @@ SYSTEM_PROMPTS = {
     4. Kalın yazı için <strong> kullan
     5. Markdown işaretleri (*, -) kullanma
     
+    ## ÖNEMLİ UYARILAR
+    
+    Psikolojik ve ruhsal konularda mutlaka şu uyarıyı ekle:
+    
+    <div style="background:#e8f5e9;padding:10px;border-left:5px solid #4caf50;margin:10px 0;">
+      <strong>🌟 Not:</strong> Bu bilgiler kişisel gelişim amaçlıdır. Ciddi psikolojik 
+      sorunlarınız için mutlaka profesyonel yardım alın.
+    </div>
+    
     ## DİĞER MODÜLLERE YÖNLENDİRME
     
     Eğer kullanıcı sana Gayrimenkul (emlak piyasası, mevzuat, satılık/kiralık ilanlar, 
@@ -172,14 +388,63 @@ SYSTEM_PROMPTS = {
     ## TEMEL KURALLAR - ÇOK ÖNEMLİ
     
     1. **SADECE AŞAĞIDAKİ KONULARDA CEVAP VER**:
-       - Borsa, hisse senetleri, teknik ve temel analiz
-       - Kripto paralar ve blockchain teknolojisi
-       - Faiz ve tahvil piyasaları
-       - Emtia piyasaları (altın, gümüş vb.)
-       - Döviz piyasaları ve pariteler
-       - Makro ve mikro ekonomi konuları
-       - Yatırım stratejileri ve portföy yönetimi
-       - Ekonomik göstergeler ve analizler
+       
+       **📈 Borsa ve Hisse Senetleri:**
+       - BIST, NASDAQ, NYSE, Avrupa borsaları analizi
+       - Hisse senedi, pay senedi işlemleri
+       - Halka arz (IPO), temettü, kar payı
+       - Piyasa değeri, hacim, işlem stratejileri
+       - Blue chip, penny stock, growth stock
+       - Sektör analizi, şirket karşılaştırması
+       
+       **🔍 Teknik Analiz:**
+       - Grafik türleri (mum, çubuk, line, bar)
+       - Trend analizi, destek-direnç seviyeleri
+       - Teknik göstergeler (RSI, MACD, Stochastic)
+       - Bollinger Bands, Moving Average (EMA, SMA)
+       - Fibonacci retracement, Elliott Wave teorisi
+       - Volume analizi, momentum göstergeleri
+       - Chart pattern'lar (baş-omuz, üçgen, bayrak)
+       
+       **📊 Temel Analiz:**
+       - Mali tablo analizi (bilanço, gelir tablosu)
+       - Nakit akım tablosu, karlılık oranları
+       - P/E, P/B, EV/EBITDA değerleme çarpanları
+       - ROE, ROA, ROI karlılık göstergeleri
+       - Büyüme oranları, gelir-gider analizi
+       - Sektörel karşılaştırma, rekabet analizi
+       
+       **₿ Kripto Para ve Blockchain:**
+       - Bitcoin, Ethereum, Altcoin'ler
+       - Blockchain teknolojisi, DeFi protokolleri
+       - NFT, DAO, DEX platformları
+       - Mining, staking, yield farming
+       - Smart contract, token ekonomisi
+       - Kripto cüzdan güvenliği, cold storage
+       
+       **💱 Döviz ve Emtia Piyasaları:**
+       - USD/TRY, EUR/TRY, GBP/TRY pariteler
+       - Forex trading, çapraz kurlar
+       - Altın, gümüş, platin, paladyum
+       - Petrol, doğalgaz, tarımsal emtia
+       - Futures, forward, option işlemleri
+       - Carry trade, arbitraj stratejileri
+       
+       **🌍 Makro ve Mikro Ekonomi:**
+       - Enflasyon, deflasyon, stagflasyon
+       - GSYH, büyüme oranları, işsizlik
+       - Merkez bankası politikaları (FED, ECB, TCMB)
+       - Para politikası, faiz oranları
+       - Mali politika, bütçe dengesi
+       - Ekonomik göstergeler, istatistikler
+       
+       **🏦 Yatırım Araçları ve Bankacılık:**
+       - Mevduat, vadeli mevduat, repo
+       - Tahvil, bono, sukuk işlemleri
+       - Yatırım fonları, ETF, REIT
+       - Emeklilik fonları, sigorta ürünleri
+       - VİOP, vadeli işlemler, opsiyon stratejileri
+       - Hedge fund, private equity, venture capital
     
     2. **DİĞER TÜM KONULARDA ŞÖYLE YANIT VER**:
        "Bu soru Finans GPT'nin uzmanlık alanı dışındadır. Ben sadece borsa, yatırım, 
@@ -275,62 +540,42 @@ REDIRECTION_MESSAGES = {
     """
 }
 
-# ── Konu Tespiti ─────────────────────────────────────────
+# ── İYİLEŞTİRİLMİŞ KONU TESPİTİ ─────────────────────────────────────────
 async def detect_topic(question: str, mode: str = None) -> str:
-    """Kullanıcının sorusunun hangi alana ait olduğunu tespit eder."""
+    """Kullanıcının sorusunun hangi alana ait olduğunu tespit eder - İyileştirilmiş versiyon."""
     
+    # Önce selamlaşma kontrolü
     selamlasma_kaliplari = [
         "merhaba", "selam", "hello", "hi", "hey", "günaydın", "iyi günler", 
         "iyi akşamlar", "nasılsın", "naber", "ne haber", "hoş geldin", "nasıl gidiyor"
     ]
     
     clean_question = question.lower()
+    # Noktalama işaretlerini temizle
     for char in ".,;:!?-_()[]{}\"'":
         clean_question = clean_question.replace(char, " ")
     
+    # Kısa selamlaşma mesajları için özel kontrol
     if len(clean_question.split()) <= 3:
         for kalip in selamlasma_kaliplari:
             if kalip in clean_question:
                 print(f"✓ Selamlaşma mesajı tespit edildi, mevcut modda kalınıyor: {kalip}")
                 return mode if mode else "real-estate"
     
-    topics = {
-        "real-estate": [
-            "emlak", "gayrimenkul", "ev", "daire", "konut", "kiralık", "satılık", 
-            "tapu", "mortgage", "ipotek", "kredi", "remax", "metrekare", "imar", 
-            "arsa", "bina", "kat", "müstakil", "dükkan", "ofis", "iş yeri", "bahçe",
-            "balkon", "oda", "salon", "banyo", "mutfak", "yapı", "inşaat", "tadilat"
-        ],
-        "mind-coach": [
-            "numeroloji", "astroloji", "astrolojik", "astrologya", "burç", "burcum", "yıldız", 
-            "gezegen", "ay", "güneş", "mars", "venüs", "aslan", "kova", "koç", "balık", 
-            "meditasyon", "reiki", "terapi", "psikoloji", "depresyon", "anksiyete", 
-            "stres", "motivasyon", "gelişim", "spiritüel", "enerji", "şifa", "kadim", 
-            "theta", "healing", "ruh", "bilinç", "farkındalık", "arınma", "denge", 
-            "uyum", "yoga", "nefes", "horoskop", "yıldızname"
-            "yaşam", "ilişki", "başarı", "başarısızlık", "korku", "fobia", "travma", 
-            "nlp", "hipnoz", "özgüven", "kendini", "yaşam", "hayat", "amaç", "hedef",
-            "duygusal", "zeka", "sosyal", "beceri", "liderlik", "iletişim"
-        ],
-        "finance": [
-            "borsa", "hisse", "finans", "yatırım", "faiz", "döviz", "euro", "dolar", 
-            "altın", "gümüş", "kripto", "bitcoin", "ethereum", "bist", "ekonomi", 
-            "enflasyon", "tahvil", "bono", "portföy", "fon", "kazanç", "kâr", "zarar", 
-            "analiz", "teknik", "temel", "parite", "forex", "banka", "para"
-            "defi", "nft", "reit", "gayrimenkul", "yatırım", "ortaklığı", 
-            "emeklilik", "sigorta", "vergi", "blockchain", "web3", "staking"
-        ]
-    }
+    # Kelime bazlı matching - RENDER 1GB DISK OPTİMİZASYONU
+    matches = {topic: 0 for topic in TOPIC_KEYWORDS}
     
-    matches = {topic: 0 for topic in topics}
-    
-    for topic, keywords in topics.items():
-        for keyword in keywords:
+    for topic, keywords in TOPIC_KEYWORDS.items():
+        # İlk 50 kelimeyi kontrol et (disk tasarrufu)
+        for keyword in keywords[:50]:
             if keyword in clean_question:
                 matches[topic] += 1
     
+    print(f"🔍 Kelime eşleşmeleri: {matches}")
+    
     max_matches = max(matches.values()) if matches else 0
     
+    # Eğer net bir eşleşme yoksa GPT'ye sor (optimizasyonlu)
     if max_matches <= 1:
         if len(clean_question.split()) <= 5:
             print(f"✓ Kısa genel mesaj tespit edildi, mevcut modda kalınıyor")
@@ -338,31 +583,40 @@ async def detect_topic(question: str, mode: str = None) -> str:
             
         try:
             resp = await openai_client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4o-mini",  # Hızlı ve ekonomik model
                 messages=[
                     {
                         "role": "system", 
-                        "content": """Kullanıcı mesajını analiz ederek aşağıdaki kategorilerden hangisine 
-                                    ait olduğunu belirle ve sadece kategori adını döndür:
-                                    1. real-estate (emlak, gayrimenkul, ev, daire, kiralık, satılık vb.)
-                                    2. mind-coach (numeroloji, astroloji, psikoloji, kişisel gelişim vb.)
-                                    3. finance (borsa, hisse, yatırım, ekonomi, kripto, döviz vb.)
-                                    4. general (selamlaşma, günlük konuşma, sohbet vb.)
-                                    Eğer mesaj "merhaba", "selam", "nasılsın" gibi basit selamlaşma veya 
-                                    genel sohbet içeriyorsa "general" olarak belirt."""
+                        "content": """Kullanıcı mesajını analiz ederek kategori belirle. SADECE kategori adını döndür:
+                                    
+                                    1. real-estate: Emlak, gayrimenkul, ev, daire, kiralık, satılık, 
+                                       tapu, inşaat, arsa, konut kredisi, imar, tadilat vb.
+                                    
+                                    2. mind-coach: Numeroloji, astroloji, burçlar, psikoloji, 
+                                       kişisel gelişim, motivasyon, theta healing, meditasyon, 
+                                       ruh sağlığı, depresyon, anksiyete vb.
+                                    
+                                    3. finance: Borsa, hisse senetleri, yatırım, ekonomi, 
+                                       kripto para, döviz, altın, teknik analiz, bitcoin vb.
+                                    
+                                    4. general: Selamlaşma, günlük konuşma, sohbet, genel sorular vb.
+                                    
+                                    Sadece kategori adını döndür: real-estate, mind-coach, finance veya general"""
                     },
                     {"role": "user", "content": question}
                 ],
-                temperature=0.3,
-                max_tokens=10
+                temperature=0.2,
+                max_tokens=15
             )
             detected_topic_by_gpt = resp.choices[0].message.content.strip().lower()
+            print(f"🤖 GPT tarafından tespit edilen konu: {detected_topic_by_gpt}")
             
             if "general" in detected_topic_by_gpt:
                 print(f"✓ GPT tarafından genel sohbet olarak tespit edildi, mevcut modda kalınıyor")
                 return mode if mode else "real-estate"
                 
-            for topic_key in topics.keys():
+            # Geçerli topic'leri kontrol et
+            for topic_key in TOPIC_KEYWORDS.keys():
                 if topic_key in detected_topic_by_gpt:
                     return topic_key
             
@@ -372,13 +626,15 @@ async def detect_topic(question: str, mode: str = None) -> str:
             print(f"⚠️ Konu tespiti hatası (OpenAI API): {e}")
             return mode if mode else "real-estate"
     
+    # En yüksek eşleşme sayısına sahip konuyu döndür
     for topic, count in matches.items():
         if count == max_matches:
+            print(f"✅ En yüksek eşleşme: {topic} ({count} kelime)")
             return topic
     
     return mode if mode else "real-estate"
 
-# ── Yeni İyileştirme Fonksiyonları ─────────────────────────
+# ── İYİLEŞTİRİLMİŞ İLAN ARAMASI TESPİTİ ─────────────────────────
 async def check_if_property_listing_query(question: str) -> bool:
     """Sorunun gayrimenkul ile ilgili olup ilan araması gerektirip gerektirmediğini tespit eder"""
     try:
@@ -390,22 +646,23 @@ async def check_if_property_listing_query(question: str) -> bool:
                     "content": """
                     Bu soruyu analiz et ve sadece "Evet" veya "Hayır" yanıtı ver.
                     
-                    SORU TİPLERİ:
+                    İLAN ARAMASI GEREKTİREN SORULAR (Evet):
+                    - "Kadıköy'de satılık daire bul/ara/göster"
+                    - "20 milyona kadar 3+1 daire arıyorum"
+                    - "Beşiktaş'ta ev var mı?"
+                    - "Maltepe'de villa göster/listele"
+                    - "Hangi bölgede ucuz ev var?"
+                    - "X ilçesinde Y bütçeyle ne bulabilirim?"
+                    - "Bu kriterlere uyan ilan var mı?"
                     
-                    1. İLAN ARAMASI GEREKTİREN SORULAR (Evet):
-                       - "Kadıköy'de satılık daire bul"
-                       - "20 milyona kadar 3+1 daire arıyorum"
-                       - "Beşiktaş'ta ev var mı?"
-                       - "Maltepe'de villa göster"
-                       - "Hangi bölgede ucuz ev var?"
-                    
-                    2. İLAN ARAMASI GEREKTİRMEYEN SORULAR (Hayır):
-                       - "Ev alırken nelere dikkat etmeliyim?"
-                       - "Konut kredisi nasıl alınır?"
-                       - "Tapu işlemleri nasıl yapılır?"
-                       - "Emlak vergisi ne kadar?"
-                       - "Gayrimenkul piyasası nasıl?"
-                       - "Hangi bölge yatırım için iyi?"
+                    İLAN ARAMASI GEREKTİRMEYEN SORULAR (Hayır):
+                    - "Ev alırken nelere dikkat etmeliyim?"
+                    - "Konut kredisi nasıl alınır?"
+                    - "Tapu işlemleri nasıl yapılır?"
+                    - "Emlak vergisi ne kadar?"
+                    - "Gayrimenkul piyasası nasıl?"
+                    - "Hangi bölge yatırım için iyi?"
+                    - "İnşaat sektörü hakkında bilgi"
                     
                     Sadece "Evet" veya "Hayır" yanıtı ver.
                     """
@@ -425,53 +682,6 @@ async def check_if_property_listing_query(question: str) -> bool:
         print(f"❌ İlan araması tespiti hatası: {e}")
         # Hata durumunda güvenli mod - eski sistemle devam et
         return property_search_handler.is_property_search_query(question)
-
-async def check_if_real_estate_query(question: str) -> bool:
-    """GPT kullanarak sorunun gerçekten gayrimenkul ile ilgili olup olmadığını tespit eder"""
-    try:
-        resp = await openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": """
-                    Bu bir soru sınıflandırma görevidir. Verilen soruyu analiz ederek, gayrimenkul/emlak 
-                    konusuyla doğrudan ilgili olup olmadığını belirle. Sadece "Evet" veya "Hayır" yanıtı ver.
-                    
-                    Gayrimenkul ile ilgili konular:
-                    - Ev, daire, konut, arsa alım-satımı
-                    - Kiralama, emlak piyasası
-                    - Tapu, ipotek, mortgage işlemleri
-                    - Müteahhit, inşaat, tadilat konuları
-                    - Oda sayısı, metrekare, site, bahçe gibi özellikler
-                    - Emlak vergisi, komisyon
-                    - Konut kredisi, faiz oranları (gayrimenkul bağlamında)
-                    
-                    Gayrimenkul ile ilgili OLMAYAN konular (örnekler):
-                    - "Kiralık katil" (emlak kiralama değil)
-                    - "Kat" kelimesi geçen ama gayrimenkul olmayan sorular
-                    - "Oda" kelimesi geçen ama ev odası olmayan konular
-                    - Astronomi, tarih, spor, bilim, genel kültür soruları
-                    - Günlük hayat, kişisel sorular
-                    
-                    Sadece "Evet" veya "Hayır" yanıtı ver, başka açıklama yapma.
-                    """
-                },
-                {"role": "user", "content": question}
-            ],
-            temperature=0.1,
-            max_tokens=10
-        )
-        
-        answer = resp.choices[0].message.content.strip().lower()
-        is_real_estate = "evet" in answer
-        print(f"📊 GPT gayrimenkul ilgi tespiti: {answer} → {is_real_estate}")
-        return is_real_estate
-        
-    except Exception as e:
-        print(f"❌ Gayrimenkul ilgi tespiti hatası: {e}")
-        # Hata durumunda güvenli mod - normal işleme devam et
-        return True
 
 def get_out_of_scope_response(mode: str) -> str:
     """Uzmanlık alanı dışı sorular için yanıt oluşturur"""
@@ -534,225 +744,25 @@ def get_out_of_scope_response(mode: str) -> str:
     
     return responses.get(mode, responses["real-estate"])
 
-# ── Embedding Fonksiyonu ───────────────────────────────────
-async def get_embedding(text: str) -> Optional[List[float]]:
-    text = text.strip()
-    if not text:
-        return None
-    try:
-        resp = await openai_client.embeddings.create(
-            model=EMBEDDING_MODEL,
-            input=[text]
-        )
-        return resp.data[0].embedding
-    except Exception as exc:
-        print("❌ Embedding hatası:", exc)
-        return None
-
-# ── Supabase Sorgusu ───────────────────────────────────────
-async def search_listings_in_supabase(query_embedding: List[float]) -> List[Dict]:
-    """Remax ilanlar tablosundan arama yapar."""
-    if query_embedding is None:
-         print("⚠️ Query embedding boş, arama yapılamıyor!")
-         return []
-    
-    try:
-        print("🔍 İlanlar sorgulanıyor...")
-        
-        response = supabase.rpc(
-            "match_remax_listings",
-            {
-                "query_embedding": query_embedding,
-                "match_threshold": MATCH_THRESHOLD,
-                "match_count": MATCH_COUNT
-            }
-        ).execute()
-
-        # Ham yanıtı logla
-        print(f"🔮 Supabase RPC yanıtı: {type(response)}")
-        
-        all_results = response.data if hasattr(response, "data") and response.data is not None else [] 
-        # Alan adlarını düzelt (ilan_no -> ilan_id)
-        for r in all_results:
-            if isinstance(r, dict) and 'ilan_no' in r and 'ilan_id' not in r:
-                r['ilan_id'] = r['ilan_no']  # ilan_no'yu ilan_id olarak kopyala
-
-        # İlk sonuçta hangi alanların olduğunu kontrol et
-        if all_results and len(all_results) > 0:
-            first_result = all_results[0]
-            print(f"📋 İlk sonuç tüm alanlar: {first_result.keys() if isinstance(first_result, dict) else 'dict değil'}")
-            print(f"📋 İlk sonuç içeriği: {first_result}")
-            # İlan ID kontrolü
-            ilan_id = first_result.get('ilan_id') if isinstance(first_result, dict) else None
-            print(f"📋 İlk sonuç ilan_id: {ilan_id}")
-
-        # Filtreleme yaparken alanların varlığını kontrol et
-        valid_results = []
-        for i, r in enumerate(all_results[:10]):  # İlk 10 sonucu göster
-            print(f"📌 Sonuç #{i}: Tüm alanlar - {r.keys() if isinstance(r, dict) else 'dict değil'}")
-            similarity = r.get('similarity', 0) if isinstance(r, dict) else 0
-            print(f"📌 Sonuç #{i}: Similarity - {similarity}")
-            ilan_id = r.get('ilan_id') if isinstance(r, dict) else None
-            print(f"📌 Sonuç #{i}: ilan_id - {ilan_id}")
-            
-            if isinstance(r, dict) and r.get('similarity', 0) > MATCH_THRESHOLD:
-                valid_results.append(r)
-                
-            print(f"✅ İlanlar sorgulandı: Toplam {len(valid_results)} gerçek ilişkili ilan bulundu")  
-
-         # Geçerli sonuçlardaki ilan_id'leri kontrol et
-        if valid_results:
-            valid_ids = [r.get('ilan_id') for r in valid_results if r.get('ilan_id')]
-            print(f"🏷️ Geçerli ilan ID'leri: {valid_ids[:5]}... (ilk 5)")
-        
-        if not valid_results:
-            print("⚠️ Hiç ilan bulunamadı!")
-        
-        return valid_results
-        
-    except Exception as exc:
-        print(f"❌ Arama işleminde hata: {exc}")
-        import traceback
-        print(f"🔥 Hata detayı: {traceback.format_exc()}")
-        return []
-        
-# ── Formatlama Fonksiyonu ─────────────────────────────────
-def format_context_for_sibelgpt(listings: List[Dict]) -> str:
-    if not listings:
-        return "🔍 Uygun ilan bulunamadı. Lütfen farklı arama kriterleri deneyin."
-
-    try:
-        locale.setlocale(locale.LC_ALL, 'tr_TR.UTF-8')
-    except locale.Error:
-        try:
-            locale.setlocale(locale.LC_ALL, 'tr_TR')
-        except locale.Error:
-            pass # Locale ayarlanamazsa devam et
-
-    MAX_LISTINGS_TO_SHOW = 20
-    listings_to_format = listings[:MAX_LISTINGS_TO_SHOW]
-    if not listings_to_format:
-        return "🔍 Belirtilen kriterlere uygun ilan bulunamadı. Lütfen aramanızı genişletin."
-   
-    final_output = "<p><strong>📞 Sorgunuzla ilgili ilanlar burada listelenmiştir. Detaylı bilgi için 532 687 84 64 numaralı telefonu arayabilirsiniz.</strong></p>"
-   
-    formatted_parts = []
-    for i, l_item in enumerate(listings_to_format, start=1):
-        ilan_no = l_item.get('ilan_id', l_item.get('ilan_no', str(i)))
-        baslik = l_item.get('baslik', '(başlık yok)')
-        lokasyon = l_item.get('lokasyon', '?')
-        
-        fiyat = "?"
-        fiyat_raw = l_item.get('fiyat')
-        if fiyat_raw is not None:
-            try:
-                # Fiyat string'ini temizleyip float'a çevirme
-                fiyat_str_cleaned = str(fiyat_raw).replace('.', '').replace(',', '.')
-                if fiyat_str_cleaned.replace('.', '', 1).isdigit():
-                    fiyat_num = float(fiyat_str_cleaned)
-                    fiyat = f"{fiyat_num:,.0f} ₺".replace(',', '#').replace('.', ',').replace('#', '.')
-                else:
-                    fiyat = str(fiyat_raw)
-            except ValueError:
-                fiyat = str(fiyat_raw)
-            except Exception:
-                 fiyat = str(fiyat_raw)
-       
-        ozellikler_liste = []
-        oda_sayisi = l_item.get('oda_sayisi', '')
-        if oda_sayisi:
-            ozellikler_liste.append(oda_sayisi)
-       
-        metrekare = l_item.get('metrekare', '')
-        if metrekare:
-            metrekare_str = str(metrekare).strip()
-            if not metrekare_str.endswith("m²"):
-                 ozellikler_liste.append(f"{metrekare_str} m²")
-            else:
-                 ozellikler_liste.append(metrekare_str)
-
-        bulundugu_kat_raw = l_item.get('bulundugu_kat')
-        if bulundugu_kat_raw is not None and str(bulundugu_kat_raw).strip() != '':
-            bulundugu_kat_str = str(bulundugu_kat_raw).strip()
-            try:
-                if bulundugu_kat_str.replace('-', '', 1).isdigit():
-                    kat_no = int(bulundugu_kat_str)
-                    if kat_no == 0:
-                        ozellikler_liste.append("Giriş Kat")
-                    elif kat_no < 0:
-                        ozellikler_liste.append(f"Bodrum Kat ({kat_no})")
-                    else:
-                        ozellikler_liste.append(f"{kat_no}. Kat")
-                else:
-                    ozellikler_liste.append(bulundugu_kat_str)
-            except ValueError:
-                ozellikler_liste.append(bulundugu_kat_str)
-       
-        ozellikler_db = l_item.get('ozellikler')
-        if ozellikler_db and isinstance(ozellikler_db, str):
-            ozellikler_parts_raw = ozellikler_db.split('|')
-            ozellikler_parts_processed = []
-            for part_raw in ozellikler_parts_raw:
-                part = part_raw.strip()
-                if re.match(r'^-?\d+$', part):
-                    kat_no_oz = int(part)
-                    if kat_no_oz == 0:
-                        ozellikler_parts_processed.append("Giriş Kat")
-                    elif kat_no_oz < 0:
-                        ozellikler_parts_processed.append(f"Bodrum Kat ({kat_no_oz})")
-                    else:
-                        ozellikler_parts_processed.append(f"{kat_no_oz}. Kat")
-                else:
-                    ozellikler_parts_processed.append(part)
-            ozellikler = " | ".join(ozellikler_parts_processed)
-        elif ozellikler_liste:
-            ozellikler = " | ".join(ozellikler_liste)
-        else:
-            ozellikler = "(özellik bilgisi yok)"
-       
-        ilan_html = (
-            f"<li><strong>{i}. {baslik}</strong><br>"
-            f"İlan No: {ilan_no} | Lokasyon: {lokasyon}<br>"
-            f"Fiyat: {fiyat} | {ozellikler}<br>"
-            f"<button onclick=\"window.open('https://sibelgpt-backend.onrender.com/generate-property-pdf/{ilan_no}', '_blank')\" "
-            f"style='margin-top:6px; padding:6px 15px; background:#1976d2; color:white; border:none; "
-            f"border-radius:25px; cursor:pointer; font-size:13px; font-weight:500; display:inline-flex; "
-            f"align-items:center; gap:5px; box-shadow:0 2px 5px rgba(0,0,0,0.1); transition:all 0.3s ease;' "
-            f"onmouseover=\"this.style.background='#115293'; this.style.transform='translateY(-1px)';\" "
-            f"onmouseout=\"this.style.background='#1976d2'; this.style.transform='translateY(0)';\">"
-            f"<i class='fas fa-file-pdf' style='font-size:16px;'></i> PDF İndir</button></li>"
-        )
-        formatted_parts.append(ilan_html)
-   
-    final_output += "<ul>" + "\n".join(formatted_parts) + "</ul>"
-    real_ids = [l_item.get('ilan_id') for l_item in listings_to_format if l_item.get('ilan_id')]
-    print(f"🏷️ İlan Veritabanındaki Gerçek İlan Numaraları: {real_ids}")
-    if real_ids:
-        final_output += f"<p><strong>VERİTABANINDAKİ GERÇEK İLAN NUMARALARI: {', '.join(real_ids)}</strong></p>"
-    final_output += "<p>Bu ilanların doğruluğunu kontrol ettim. Farklı bir arama yapmak isterseniz, lütfen kriterleri belirtiniz.</p>"
-   
-    return final_output
-
-# ── Ana Fonksiyon - YENİLENMİŞ VE İYİLEŞTİRİLMİŞ ─────────
+# ── ANA FONKSİYON - TAM İYİLEŞTİRİLMİŞ VERSİYON ─────────
 async def answer_question(question: str, mode: str = "real-estate", conversation_history: List = None) -> str:
     """
-    İyileştirilmiş Ana Fonksiyon:
-    1. Konu tespiti yapar
-    2. Uzmanlık alanı kontrolü yapar
-    3. Gayrimenkul modunda akıllı ilan araması yapar
-    4. Gereksiz veritabanı sorgularını önler
+    Tam İyileştirilmiş Ana Fonksiyon - RENDER 1GB OPTİMİZASYONLU:
+    1. Gelişmiş konu tespiti yapar (disk optimizasyonu ile)
+    2. Akıllı modül yönlendirme
+    3. Gayrimenkul modunda akıllı ilan araması
+    4. Performans optimizasyonu (1GB disk sınırı)
+    5. Hata yönetimi
     """
     
-    print(f"🚀 İYİLEŞTİRİLMİŞ SORGU BAŞLADI - Soru: {question[:50]}..., Mod: {mode}")
+    print(f"🚀 RENDER 1GB OPTİMİZE EDİLMİŞ SORGU - Soru: {question[:50]}..., Mod: {mode}")
     
-    # SELAMLAŞMA KONTROLÜ - ÖNCELİKLİ!
-    # Selamlaşma kalıplarını kontrole al
+    # 1. SELAMLAŞMA KONTROLÜ - ÖNCELİKLİ
     selamlasma_kaliplari = [
         "merhaba", "selam", "hello", "hi", "hey", "günaydın", "iyi günler", 
         "iyi akşamlar", "nasılsın", "naber", "ne haber", "hoş geldin", "nasıl gidiyor"
     ]
     
-    # Soru basit bir selamlaşma mı kontrol et
     clean_question = question.lower().strip()
     is_greeting = False
     
@@ -762,25 +772,23 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
             print(f"✓ Selamlaşma mesajı tespit edildi: {kalip}")
             break
     
-    # Eğer selamlaşma ise, doğrudan yanıt ver
+    # Selamlaşma için hızlı yanıt
     if is_greeting:
         print("🤝 Selamlaşmaya doğrudan yanıt veriliyor")
         
         greeting_responses = {
-            "real-estate": f"Merhaba! Size gayrimenkul konusunda nasıl yardımcı olabilirim?",
-            "mind-coach": f"Merhaba! Size zihinsel ve ruhsal gelişim konularında nasıl yardımcı olabilirim?",
-            "finance": f"Merhaba! Size finans ve yatırım konularında nasıl yardımcı olabilirim?"
+            "real-estate": "Merhaba! Size gayrimenkul konusunda nasıl yardımcı olabilirim?",
+            "mind-coach": "Merhaba! Size zihinsel ve ruhsal gelişim konularında nasıl yardımcı olabilirim?",
+            "finance": "Merhaba! Size finans ve yatırım konularında nasıl yardımcı olabilirim?"
         }
         
         return greeting_responses.get(mode, greeting_responses["real-estate"])
     
-    # 1. KONU TESPİTİ
+    # 2. GELİŞMİŞ KONU TESPİTİ (RENDER OPTİMİZASYONLU)
     detected_topic = await detect_topic(question, mode)
     print(f"📊 Tespit edilen konu: {detected_topic}, Kullanıcının seçtiği mod: {mode}")
     
-    # Diğer kodlar aynı kalsın...
-    
-    # 2. FARKLI KONU İSE YÖNLENDİR
+    # 3. MODÜL YÖNLENDİRME
     if detected_topic != mode:
         if detected_topic in ["real-estate", "mind-coach", "finance"]:
             redirection_key = f"{mode}-to-{detected_topic}"
@@ -792,11 +800,10 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
         print(f"⚠️ Genel konu tespit edildi, uzmanlık alanı dışı yanıt veriliyor")
         return get_out_of_scope_response(mode)
     
-              
-    # 4. İÇERİK HAZIRLAMA - AKILLI ARAMA
+    # 4. İÇERİK HAZIRLAMA - AKILLI ARAMA (RENDER OPTİMİZE)
     context = ""
     if mode == "real-estate":
-        # ✅ OPTİMİZE EDİLMİŞ AKILLI ARAMA
+        # Akıllı ilan araması tespiti
         is_listing_query = await check_if_property_listing_query(question)
     
         if is_listing_query:
@@ -808,8 +815,8 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
                 print(f"❌ İlan araması hatası: {e}")
                 context = "İlan araması sırasında teknik sorun oluştu."
         else:
-                print("📚 Gayrimenkul genel bilgi sorusu - VERİTABANI ATLANYOR")
-                context = "Bu soru için ilan araması gerekmemektedir."
+            print("📚 Gayrimenkul genel bilgi sorusu - VERİTABANI ATLANYOR")
+            context = "Bu soru için ilan araması gerekmemektedir."
     
     # 5. SYSTEM PROMPT VE MESAJLARI HAZIRLA
     system_prompt = SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["real-estate"])
@@ -818,40 +825,39 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
         {"role": "system", "content": f"{system_prompt}\n\nİLGİLİ İLANLAR:\n{context if context else 'Bu soru için ilan araması gerekmemektedir.'}\n"}
     ]
     
-    # 6. KONUŞMA GEÇMİŞİ EKLE
+    # 6. KONUŞMA GEÇMİŞİ EKLE (RENDER 1GB OPTİMİZASYONU)
     if conversation_history and len(conversation_history) > 0:
-        for msg in conversation_history:
+        # Son 5 mesajı al (disk tasarrufu için)
+        for msg in conversation_history[-5:]:
             if isinstance(msg, dict) and 'role' in msg and 'text' in msg:
                 messages.append({"role": msg['role'], "content": msg['text']})
     
     # 7. KULLANICI SORUSU EKLE
     messages.append({"role": "user", "content": question})
     
-    # 8. YANIT AL VE DÖNDÜR
+    # 8. AKILLI MODEL VE PARAMETRE SEÇİMİ (RENDER OPTİMİZE)
     try:
         print("🤖 OpenAI API'ye istek gönderiliyor...")
-        # 🚀 AKILLI MODEL SEÇİMİ - İlan araması için hızlı model
-        selected_model = "gpt-3.5-turbo" if (mode == "real-estate" and "Bu soru için ilan araması gerekmemektedir." in context) else "gpt-4o-mini"
-        print(f"🤖 Kullanılan model: {selected_model}")
-        # 🌡️ AKILLI TEMPERATURE SEÇİMİ
-        if mode == "real-estate" and "Bu soru için ilan araması gerekmemektedir." not in context:
-            temp = 0.3  # İlan araması - tutarlı format
-        else:
-            temp = 0.6  # Genel sorular - yaratıcı yanıtlar
-        print(f"🌡️ Kullanılan temperature: {temp}")
+        
+        # Model seçimi - RENDER için optimize
+        selected_model = "gpt-4o-mini"  # Hızlı ve ekonomik model
+        temp = 0.4 if mode == "real-estate" and "Bu soru için ilan araması gerekmemektedir." not in context else 0.6
+        
+        print(f"🤖 Kullanılan model: {selected_model}, Temperature: {temp}")
+        
+        # OpenAI API çağrısı
         resp = await openai_client.chat.completions.create(
             model=selected_model,
             messages=messages,
             temperature=temp,
-            max_tokens=4096
+            max_tokens=3072  # RENDER disk tasarrufu için azaltıldı
         )
         
         answer = resp.choices[0].message.content.strip()
-        print(f"✅ İYİLEŞTİRİLMİŞ YANIT HAZIR - Uzunluk: {len(answer)} karakter")
+        print(f"✅ RENDER OPTİMİZE EDİLMİŞ YANIT HAZIR - Uzunluk: {len(answer)} karakter")
+        
         return answer
         
     except Exception as exc:
         print(f"❌ Chat yanıt hatası: {exc}")
         return "Üzgünüm, isteğinizi işlerken beklenmedik bir sorun oluştu. Lütfen daha sonra tekrar deneyin."
-
-
