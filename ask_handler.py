@@ -45,7 +45,7 @@ SYSTEM_PROMPTS = {
        - Emlak vergisi, değerleme, kredi işlemleri
        - Gayrimenkul mevzuatı ve yasal süreçler
        - İnşaat, yapı ve tadilat konuları
-       - Gayrimenkul ilanları ve aramaları
+       - Gayrimenkul ilanları ve aramaları 
     
     2. **DİĞER TÜM KONULARDA ŞÖYLE YANIT VER**:
        "Bu soru Gayrimenkul GPT'nin uzmanlık alanı dışındadır. Ben sadece gayrimenkul, 
