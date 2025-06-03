@@ -2,7 +2,7 @@ import os
 import asyncio 
 import locale
 import re
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional 
 from openai import AsyncOpenAI
 import property_search_handler
 
