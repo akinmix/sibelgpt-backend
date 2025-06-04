@@ -578,8 +578,9 @@ async def detect_topic(question: str, mode: str = None) -> str:
     
     max_matches = max(matches.values()) if matches else 0
     
-    # Eğer net bir eşleşme yoksa GPT'ye sor (optimizasyonlu)
-    if max_matches <= 2:
+    # Her zaman GPT'ye sor (kelime eşleştirmesi sadece destek)
+    if True:  # Veya max_matches <= 10 (daha liberal)
+    
         if len(clean_question.split()) <= 5:
             print(f"✓ Kısa genel mesaj tespit edildi, mevcut modda kalınıyor")
             return mode if mode else "real-estate"
