@@ -29,51 +29,66 @@ MATCH_COUNT     =  50
 
 # ── GÜNCELLENMIŞ TOPICS DICTIONARY (150'şer Kelime) ────────
 TOPIC_KEYWORDS = {
-    "real-estate": [
-        # Temel Gayrimenkul Kavramları
-        "emlak", "gayrimenkul", "ev", "daire", "konut", "kiralık", "satılık", 
-        "tapu", "mortgage", "ipotek", "kredi", "remax", "metrekare", "imar", 
-        "arsa", "bina", "kat", "müstakil", "dükkan", "ofis", "iş yeri", "bahçe",
-        "balkon", "oda", "salon", "banyo", "mutfak", "yapı", "inşaat", "tadilat",
-        
-        # Gayrimenkul İşlemleri ve Hukuk
-        "senet", "ruhsat", "iskân", "noter", "vekaletname", "ferağ", "komisyon",
-        "emlak vergisi", "mtv", "aidat", "kalorifer", "doğalgaz", "elektrik",
-        "su faturası", "belediye", "çevre temizlik", "asansör", "kapıcı",
-        "mülkiyet", "hukuk", "hukuki", "intifa", "irtifak", "izalei", "şuyu",
-        "miras", "veraset", "mirasçı", "ortak", "ortaklık", "pay", "hisse",
-        "zilyetlik", "tasarruf", "devir", "temlik", "rehin", "teminat"
-        
-        # İnşaat ve Yapı
-        "betonarme", "çelik", "tuğla", "panel", "prefabrik", "dubleks", "tripleks",
-        "villa", "apart", "rezidans", "site", "complex", "köşk", "malikane",
-        "çiftlik evi", "yazlık", "stüdyo", "loft", "penthouse", "terras",
-        
-        # Teknik Özellikler
-        "asansörlü", "güvenlik", "kamera", "interkom", "otopark", "garaj",
-        "jeneratör", "hidrofor", "yangın merdiveni", "çıkış", "acil durum",
-        "ses yalıtımı", "ısı yalıtımı", "cam balkon", "pvc", "alüminyum",
-        
-        # Lokasyon ve Bölge
-        "merkezi", "ulaşım", "metro", "metrobüs", "otobüs", "minibüs", "taksi",
-        "cadde", "sokak", "mahalle", "semt", "bölge", "ilçe", "şehir merkezi",
-        "sahil", "deniz", "göl", "park", "yeşil alan", "orman", "dağ", "tepe",
-        
-        # Oda ve Alan Tipleri
-        "yatak odası", "çocuk odası", "misafir odası", "çalışma odası",
-        "kiler", "depo", "bodrum", "çatı katı", "tavan arası", "balkon",
-        "teras", "veranda", "kış bahçesi", "hobi odası", "fitness", "sauna",
-        
-        # Gayrimenkul Yatırımı
-        "yatırım", "getiri", "kira geliri", "değer artışı", "piyasa",
-        "trend", "fiyat", "değerleme", "ekspertiz", "rapor", "analiz",
-        "portföy", "çeşitlendirme", "risk", "konum", "potansiyel",
-        
-        # Sözleşme ve İşlemler
-        "sözleşme", "kira sözleşmesi", "satış sözleşmesi", "ön sözleşme",
-        "depozito", "kapora", "peşinat", "taksit", "vade", "ödeme planı",
-        "refinansman", "erken ödeme", "gecikme faizi", "ceza", "kefil"
-    ],
+         "real-estate": [
+    # Temel Gayrimenkul Kavramları
+    "emlak", "gayrimenkul", "ev", "daire", "konut", "kiralık", "satılık", 
+    "tapu", "mortgage", "ipotek", "kredi", "remax", "metrekare", "imar", 
+    "arsa", "bina", "kat", "müstakil", "dükkan", "ofis", "iş yeri", "bahçe",
+    "balkon", "oda", "salon", "banyo", "mutfak", "yapı", "inşaat", "tadilat",
+    "taşınmaz", "bağımsız bölüm",
+    
+    # Mülkiyet ve Hukuki Haklar
+    "mülkiyet", "hukuk", "hukuki", "intifa", "irtifak", "izalei", "şuyu",
+    "kat mülkiyeti", "kat irtifakı", "paylı mülkiyet", "elbirliği mülkiyeti",
+    "şufa hakkı", "ön alım", "ortaklığın giderilmesi", "üst hakkı",
+    "geçit hakkı", "sükna hakkı", "zilyetlik", "tasarruf", "devir", "temlik",
+    "rehin", "teminat", "fiili kullanım",
+    
+    # Miras ve Ortaklık
+    "miras", "veraset", "mirasçı", "ortak", "ortaklık", "pay", "hisse",
+    "arsa payı",
+    
+    # Tapu İşlemleri ve Belgeler
+    "senet", "ruhsat", "iskân", "iskan", "noter", "vekaletname", "ferağ", 
+    "komisyon", "haciz", "kamulaştırma", "tapuda şerh", "ipotek fekki",
+    "tapu sicil", "tapu müdürlüğü", "emlak rayiç", "belediye rayiç",
+    
+    # Vergiler ve Resmi İşlemler
+    "emlak vergisi", "mtv", "aidat", "harç", "satış bedeli", "vergi dairesi",
+    "belediye başkanlığı", "beyan", "tebligat",
+    
+    # Kentsel Dönüşüm ve Mevzuat
+    "kentsel dönüşüm", "6306", "riskli yapı", "rezerv yapı", "imar barışı",
+    "imar affı", "yapı kayıt belgesi", "iskan belgesi", "enerji kimlik belgesi",
+    
+    # Yapı ve Teknik Konular
+    "betonarme", "çelik", "tuğla", "panel", "prefabrik", "dubleks", "tripleks",
+    "villa", "apart", "rezidans", "site", "complex", "yazlık", "stüdyo", 
+    "loft", "penthouse", "terras", "bodrum", "çatı katı", "zemin etüdü",
+    "yapı ruhsatı", "oturma raporu", "iskan raporu", "proje değişikliği",
+    "yönetim planı",
+    
+    # Teknik Donanım ve Özellikler
+    "asansörlü", "güvenlik", "kamera", "interkom", "otopark", "garaj",
+    "jeneratör", "hidrofor", "yangın merdiveni", "ses yalıtımı", "ısı yalıtımı", 
+    "cam balkon", "pvc", "alüminyum", "kalorifer", "doğalgaz", "elektrik",
+    "su faturası", "belediye", "çevre temizlik", "asansör", "kapıcı",
+    
+    # Lokasyon ve Ulaşım
+    "merkezi", "ulaşım", "metro", "metrobüs", "otobüs", "taksi",
+    "cadde", "sokak", "mahalle", "semt", "bölge", "ilçe", "şehir merkezi",
+    "sahil", "deniz", "park", "yeşil alan",
+    
+    # Yatırım ve Finansal Analiz
+    "yatırım", "getiri", "kira geliri", "değer artışı", "piyasa",
+    "trend", "fiyat", "değerleme", "ekspertiz", "rapor", "analiz",
+    "portföy", "risk", "potansiyel", "konut kredisi faiz", "kira artış oranı",
+    "TEFE", "TÜFE", "endeks", "gayrimenkul yatırım ortaklığı",
+    
+    # Sözleşme ve Ödeme
+    "sözleşme", "kira sözleşmesi", "satış sözleşmesi", "ön sözleşme",
+    "depozito", "kapora", "peşinat", "taksit", "ödeme planı", "kefil"
+],
     
     "mind-coach": [
         # Astroloji ve Burçlar
