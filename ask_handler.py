@@ -40,6 +40,9 @@ TOPIC_KEYWORDS = {
         "senet", "ruhsat", "iskân", "noter", "vekaletname", "ferağ", "komisyon",
         "emlak vergisi", "mtv", "aidat", "kalorifer", "doğalgaz", "elektrik",
         "su faturası", "belediye", "çevre temizlik", "asansör", "kapıcı",
+        "mülkiyet", "hukuk", "hukuki", "intifa", "irtifak", "izalei", "şuyu",
+        "miras", "veraset", "mirasçı", "ortak", "ortaklık", "pay", "hisse",
+        "zilyetlik", "tasarruf", "devir", "temlik", "rehin", "teminat"
         
         # İnşaat ve Yapı
         "betonarme", "çelik", "tuğla", "panel", "prefabrik", "dubleks", "tripleks",
