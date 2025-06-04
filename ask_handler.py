@@ -587,11 +587,18 @@ async def detect_topic(question: str, mode: str = None) -> str:
                 messages=[
                     {
                         "role": "system", 
-                        "content": """Kullanıcı mesajını analiz ederek kategori belirle. SADECE kategori adını döndür:
+                        "content": """Sen bir yapay zeka uzmanısın. Kullanıcının sorusunu analiz et ve hangi uzmanlık alanına ait olduğunu belirle.
+                         SADECE kategori adını döndür: real-estate, mind-coach, finance, general
                                     
-                                    1. real-estate: Emlak, gayrimenkul, ev, daire, kiralık, satılık, 
-                                       tapu, inşaat, arsa, konut kredisi, imar, tadilat vb.
-                                    
+                                    1. real-estate: BÜTÜN gayrimenkul, emlak, mülkiyet, hukuk konuları dahil:
+                                       - Ev, daire, villa, arsa, ofis, dükkan alım-satımı
+                                       - Tapu, mülkiyet hakları, intifa hakkı, irtifak hakkı, izalei şuyu
+                                       - Emlak hukuku, miras hukuku, mülkiyet hukuku
+                                       - Konut kredisi, mortgage, finansman
+                                       - İnşaat, tadilat, imar, ruhsat, iskân
+                                       - Kira, kiralama, sözleşmeler
+                                       - Emlak vergisi, harçlar, yasal işlemler
+                                                
                                     2. mind-coach: Numeroloji, astroloji, burçlar, psikoloji, 
                                        kişisel gelişim, motivasyon, theta healing, meditasyon, 
                                        ruh sağlığı, depresyon, anksiyete vb.
@@ -601,7 +608,12 @@ async def detect_topic(question: str, mode: str = None) -> str:
                                     
                                     4. general: Selamlaşma, günlük konuşma, sohbet, genel sorular vb.
                                     
-                                    Sadece kategori adını döndür: real-estate, mind-coach, finance veya general"""
+                                    ÖRNEKLER:
+                                    "intifa hakkı nedir" → real-estate
+                                    "izalei şuyu nedir" → real-estate  
+                                    "mülkiyet hukuku" → real-estate
+                                    "Bitcoin" → finance
+                                    "numeroloji" → mind-coach"""
                     },
                     {"role": "user", "content": question}
                 ],
