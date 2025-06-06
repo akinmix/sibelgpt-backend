@@ -1,10 +1,8 @@
 import os
 import json
 import time
-import hashlib
 from pathlib import Path
-from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,12 +10,10 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from elevenlabs_handler import router as elevenlabs_router
 
 # Supabase import kontrolü
 try:
-    from supabase import create_client
-    from supabase.client import Client
+    from supabase import create_client, Client
     SUPABASE_AVAILABLE = True
 except ImportError:
     SUPABASE_AVAILABLE = False
@@ -26,12 +22,14 @@ except ImportError:
 load_dotenv()
 
 # Dahili modüller
+# NOT: Artık property_search_handler'a ihtiyacımız kalmayacak ama şimdilik dursun.
 from image_handler import router as image_router
 from pdf_handler import router as pdf_router
+from elevenlabs_handler import router as elevenlabs_router
 import ask_handler
 import search_handler
 
-# ---- Modeller ----
+# ---- Pydantic Modelleri ----
 class ChatRequest(BaseModel):
     question: str
     mode: str = "real-estate"
@@ -44,50 +42,47 @@ class WebSearchRequest(BaseModel):
 # ---- FastAPI Uygulaması ----
 app = FastAPI(
     title="SibelGPT Backend",
-    version="7.0.0",
-    description="SibelGPT AI Assistant Backend API - Güvenlik Güncellemesi"
+    version="8.0.0", # Versiyonu güncelleyelim
+    description="SibelGPT AI Assistant Backend API - Hız ve RAG Optimizasyonu"
 )
 
 # ---- CORS Middleware ----
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], # Production için daha spesifik bir liste kullanmak daha güvenlidir.
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---- Rate Limiting için basit kontrol ----
+# ---- Rate Limiting ----
+# Not: Bu yapı tek bir worker'da çalışır. Ölçeklenmiş ortamlar için Redis gibi
+# merkezi bir çözüm daha uygun olacaktır.
 request_counts = {}
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-    # Sadece chat endpoint'i için
-    if request.url.path == "/chat":
-        client_ip = request.client.host
-        current_time = int(time.time())
+    if "/chat" in request.url.path:
+        client_ip = request.client.host if request.client else "unknown"
+        current_minute = int(time.time()) // 60
+        key = f"{client_ip}:{current_minute}"
         
-        # IP başına dakikalık sayaç
-        key = f"{client_ip}:{current_time // 60}"
+        request_counts[key] = request_counts.get(key, 0) + 1
         
-        if key in request_counts:
-            if request_counts[key] > 30:  # Dakikada max 30 istek
-                return JSONResponse(
-                    status_code=429,
-                    content={"error": "Çok fazla istek. Lütfen biraz bekleyin."}
-                )
-            request_counts[key] += 1
-        else:
-            request_counts[key] = 1
+        if request_counts[key] > 45: # Limiti biraz artıralım
+            return JSONResponse(
+                status_code=429,
+                content={"error": "Çok fazla istek. Lütfen bir dakika bekleyin."}
+            )
             
-        # Eski kayıtları temizle
-        old_time = current_time - 120  # 2 dakika öncesi
+        # Eski kayıtları temizle (2 dakika öncesini sil)
+        old_minute = current_minute - 2
         for k in list(request_counts.keys()):
             try:
-                if int(k.split(':')[1]) < old_time // 60:
+                if int(k.split(':')[1]) < old_minute:
                     del request_counts[k]
-            except:
-                pass
+            except (ValueError, IndexError):
+                del request_counts[k] # Hatalı formatlı anahtarı sil
     
     response = await call_next(request)
     return response
@@ -96,103 +91,106 @@ async def rate_limit_middleware(request: Request, call_next):
 if os.path.exists("public"):
     app.mount("/static", StaticFiles(directory="public"), name="static")
 
-# ---- Startup Event ----
+# ---- Uygulama Başlangıç Olayı ----
 @app.on_event("startup")
 async def startup_event():
-    """Uygulama başlangıcında çalışır"""
-    print("\n=== SibelGPT Backend v7.0.0 Başlatılıyor ===")
-    
+    print("\n=== SibelGPT Backend v8.0.0 Başlatılıyor ===")
     supabase_url = os.getenv("SUPABASE_URL")
-    supabase_key = os.getenv("SUPABASE_KEY")
+    supabase_key = os.getenv("SUPABASE_KEY") # Bu bizim anon key'imizdi.
     
     if SUPABASE_AVAILABLE and supabase_url and supabase_key:
         try:
+            # state, FastAPI uygulaması boyunca paylaşılacak nesneleri tutar.
             app.state.supabase_client = create_client(supabase_url, supabase_key)
-            print("✅ Supabase istemcisi oluşturuldu")
+            print("✅ Supabase istemcisi oluşturuldu.")
         except Exception as e:
-            print(f"❌ Supabase hatası: {e}")
+            print(f"❌ Supabase istemcisi oluşturulamadı: {e}")
             app.state.supabase_client = None
     else:
+        print("⚠️ Supabase bilgileri eksik veya kütüphane yüklü değil.")
         app.state.supabase_client = None
     
     print("=== Başlatma Tamamlandı ===\n")
 
-# ---- Dependency ----
-async def get_supabase_client(request: Request) -> Optional[Client]:
-    return getattr(request.app.state, 'supabase_client', None)
-
 # ---- Router Kaydı ----
-app.include_router(image_router, prefix="", tags=["image"])
-app.include_router(pdf_router, prefix="", tags=["pdf"])
-app.include_router(elevenlabs_router, prefix="", tags=["speech"])
+app.include_router(image_router, prefix="", tags=["Image Generation"])
+app.include_router(pdf_router, prefix="", tags=["PDF Generation"])
+app.include_router(elevenlabs_router, prefix="", tags=["Text-to-Speech"])
 
-# ---- Ana Endpoint ----
-@app.get("/", tags=["meta"])
+# ---- Ana ve Sağlık Kontrolü Endpoint'leri ----
+@app.get("/", tags=["Meta"])
 async def root():
-    return {
-        "status": "ok",
-        "service": "SibelGPT Backend",
-        "version": "7.0.0"
-    }
+    return {"service": "SibelGPT Backend", "version": "8.0.0", "status": "ok"}
 
-# ---- Health Check ----
-@app.get("/health", tags=["meta"])
-async def health_check(db_client = Depends(get_supabase_client)):
-    return {
-        "status": "healthy",
-        "version": "7.0.0",
-        "supabase": db_client is not None
-    }
+@app.get("/health", tags=["Meta"])
+async def health_check():
+    return {"status": "healthy", "supabase_available": SUPABASE_AVAILABLE}
 
-# ---- Güvenli Supabase Config Endpoint ----
-@app.get("/api/config", tags=["config"])
+# ---- Güvenli Frontend Konfigürasyon Endpoint'i ----
+@app.get("/api/config", tags=["Configuration"])
 async def get_public_config():
-    """Frontend için güvenli konfigürasyon"""
-    # Backend URL'i belirle
-    backend_url = os.getenv("BACKEND_URL", "https://sibelgpt-backend.onrender.com")
-    
-    # Sadece public (anon) key'i gönder
+    """Frontend için güvenli konfigürasyon bilgilerini sağlar."""
     return {
         "supabaseUrl": os.getenv("SUPABASE_URL"),
-        "supabaseAnonKey": os.getenv("SUPABASE_KEY"),  # Bu zaten anon key
-        "backendUrl": backend_url
+        "supabaseAnonKey": os.getenv("SUPABASE_KEY"),  # Bunun anon key olduğunu teyit ettik.
+        "backendUrl": os.getenv("BACKEND_URL", "https://sibelgpt-backend.onrender.com")
     }
 
-# ---- Chat Endpoint ----
-@app.post("/chat", tags=["chat"])
-async def chat(payload: ChatRequest, db_client = Depends(get_supabase_client)):
+# ==========================================================
+# ================= CHAT ENDPOINT (GÜNCELLENDİ) ============
+# ==========================================================
+@app.post("/chat", tags=["Core AI"])
+async def chat(payload: ChatRequest):
+    """Ana sohbet ve RAG ilan arama endpoint'i."""
     try:
-        answer = await ask_handler.answer_question(
-            payload.question, 
-            payload.mode, 
-            payload.conversation_history
+        # ask_handler artık bir sözlük döndürüyor: {"reply": "...", "is_listing_response": ...}
+        response_data = await ask_handler.answer_question(
+            question=payload.question, 
+            mode=payload.mode, 
+            conversation_history=payload.conversation_history
         )
-        return {"reply": answer}
+        return response_data
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        print(f"❌ Chat Endpoint Hatası: {e}")
+        import traceback
+        traceback.print_exc()
+        # Hata durumunda da frontend'in beklediği formatta bir yanıt verelim
+        return JSONResponse(
+            status_code=500, 
+            content={
+                "reply": f"Üzgünüm, sunucuda beklenmedik bir hata oluştu. Lütfen daha sonra tekrar deneyin.",
+                "is_listing_response": False
+            }
+        )
 
-# ---- Web Araması Endpoint ----
-@app.post("/web-search", tags=["search"])
+# ---- Web Araması Endpoint'i ----
+@app.post("/web-search", tags=["Core AI"])
 async def web_search(payload: WebSearchRequest):
+    """Google üzerinden genel web araması yapar."""
     try:
         answer = await search_handler.web_search_answer(payload.question, payload.mode)
-        return {"reply": answer}
+        # Web araması her zaman standart formatta döner
+        return {"reply": answer, "is_listing_response": False}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        print(f"❌ Web Search Hatası: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "reply": "Web araması sırasında bir hata oluştu.",
+                "is_listing_response": False
+            }
+        )
 
-# ---- SABİT İSTATİSTİKLER (SQL'den alınan gerçek veriler) ----
-@app.get("/statistics/simple", tags=["statistics"])
+# ---- Dashboard ve İstatistikler ----
+@app.get("/statistics/simple", tags=["Dashboard"])
 async def get_simple_statistics():
-    """Dashboard istatistikleri - SQL'den alınan sabit veriler"""
-    
+    """Dashboard için önceden hesaplanmış (sabit) istatistikleri döndürür."""
+    # Bu veriler, ayrı bir script ile periyodik olarak güncellenip
+    # bir dosyaya veya veritabanına yazılabilir. Şimdilik sabit.
     return {
         "status": "success",
         "statistics": {
-            "genel_ozet": {
-                "toplam_ilan": 5047,
-                "ortalama_fiyat": 13051170.53,  # Tahminî değer
-                "en_cok_ilan_ilce": "Kadıköy"
-            },
+            "genel_ozet": {"toplam_ilan": 5047, "ortalama_fiyat": 13051170.53, "en_cok_ilan_ilce": "Kadıköy"},
             "ilce_dagilimi": [
                 {"ilce": "Kadıköy", "ilan_sayisi": 405, "ortalama_fiyat": 19890138.27},
                 {"ilce": "Beylikdüzü", "ilan_sayisi": 304, "ortalama_fiyat": 8759901.32},
@@ -209,47 +207,17 @@ async def get_simple_statistics():
         }
     }
 
-# ---- Dashboard HTML ----
-@app.get("/dashboard", tags=["frontend"])
+@app.get("/dashboard", include_in_schema=False)
 async def serve_dashboard():
-    dashboard_path = Path("public") / "dashboard.html"
-    
+    """Dashboard HTML sayfasını sunar."""
+    dashboard_path = Path("public/dashboard.html")
     if dashboard_path.exists():
-        return FileResponse(dashboard_path, media_type="text/html")
-    
-    return JSONResponse(status_code=404, content={"error": "Dashboard bulunamadı"})
+        return FileResponse(dashboard_path)
+    return JSONResponse(status_code=404, content={"error": "Dashboard HTML bulunamadı"})
 
-# ---- Error Handlers ----
-@app.exception_handler(404)
-async def not_found_handler(request, exc):
-    return JSONResponse(status_code=404, content={"error": "Sayfa bulunamadı"})
-
-@app.exception_handler(500)
-async def server_error_handler(request, exc):
-    return JSONResponse(status_code=500, content={"error": str(exc)})
-    
-@app.get("/test-trading-widget", tags=["test"])
-async def test_trading_widget():
-    """Trading widget konfigürasyonunu test eder"""
-    try:
-        from trading_widget_config import TradingWidgetConfig
-        
-        config = TradingWidgetConfig.get_main_tickers_config()
-        html = TradingWidgetConfig.generate_ticker_html()
-        
-        return {
-            "status": "success",
-            "message": "Trading widget config çalışıyor!",
-            "config": config,
-            "html_length": len(html)
-        }
-    except Exception as e:
-        return {
-            "status": "error", 
-            "message": f"Hata: {str(e)}"
-        }
-
-# ---- Ana Program ----
+# ---- Program Başlatma ----
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
+    # Render PORT ortam değişkenini kullanır. Lokal test için 10000.
+    port = int(os.getenv("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
