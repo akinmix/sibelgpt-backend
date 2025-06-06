@@ -16,10 +16,10 @@ except ImportError:
 # ---- Ortam Değişkenleri ve Bağlantılar ----
 OAI_KEY = os.getenv("OPENAI_API_KEY")
 SB_URL  = os.getenv("SUPABASE_URL")
-SB_ANON_KEY = os.getenv("SUPABASE_KEY") # Güvenli olduğunu teyit ettik.
+SB_ANON_KEY = os.getenv("SUPABASE_KEY") # Güvenli olduğunu teyit etmiştik.
 
 if not all([OAI_KEY, SB_URL, SB_ANON_KEY]):
-    raise RuntimeError("Eksik API anahtarı veya Supabase bağlantı bilgisi (URL ve ANON_KEY).")
+    raise RuntimeError("Eksik API anahtarı veya Supabase bağlantı bilgisi (URL ve KEY).")
 
 openai_client = AsyncOpenAI(api_key=OAI_KEY)
 supabase: Optional[Client] = None
@@ -28,15 +28,15 @@ if SUPABASE_AVAILABLE:
 
 # ---- Ayarlar ----
 EMBEDDING_MODEL = "text-embedding-3-small"
-MATCH_THRESHOLD = 0.4  # Eşiği biraz artırarak daha alakalı sonuçlar hedefliyoruz.
+MATCH_THRESHOLD = 0.4  # Daha alakalı sonuçlar için eşik
 MATCH_COUNT = 25
 
 # ==============================================================================
-# ==================== YENİ VE HIZLI ARAMA MİMARİSİ =============================
+# ==================== HIZLI VE DOĞRU ARAMA MİMARİSİ (v2) ======================
 # ==============================================================================
 
 async def get_embedding(text: str) -> Optional[List[float]]:
-    """Metin için embedding oluşturur."""
+    """Metin için OpenAI embedding'i oluşturur."""
     try:
         resp = await openai_client.embeddings.create(model=EMBEDDING_MODEL, input=[text.strip()])
         return resp.data[0].embedding
@@ -45,26 +45,26 @@ async def get_embedding(text: str) -> Optional[List[float]]:
         return None
 
 async def extract_filters_from_query(question: str) -> Dict:
-    """Sorgudan SADECE yapısal filtreleri çıkarır (Hızlı GPT-4o-mini çağrısı)."""
-    print(f"🔍 Hızlı filtre çıkarma işlemi başlatıldı: {question}")
+    """Sorgudan SADECE yapısal filtreleri çıkarır (Hızlı ve Akıllı Versiyon)."""
+    print(f"🔍 Akıllı filtre çıkarma işlemi başlatıldı: {question}")
     try:
         resp = await openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": """Sen bir emlak arama asistanısın. Kullanıcının sorgusundan SADECE şu gayrimenkul filtrelerini JSON formatında çıkar: "min_fiyat": Sayısal minimum fiyat, "max_fiyat": Sayısal maksimum fiyat, "oda_sayisi": String (ör: "2+1"), "ilce": String, "mahalle": String. Sadece bulabildiğin filtreleri ekle. Örnek: "kadıköyde 5 milyona kadar 2+1 daire" -> {"max_fiyat": 5000000, "oda_sayisi": "2+1", "ilce": "Kadıköy"}"""},
+                {"role": "system", "content": """Sen bir emlak arama asistanısın. Kullanıcının sorgusundan SADECE şu filtreleri JSON olarak çıkar: "min_fiyat", "max_fiyat", "oda_sayisi", ve "lokasyon" (TÜM ilçe/mahalle adları). 'ilce'/'mahalle' diye ayırma, sadece 'lokasyon' kullan. Örnek: "kadıköyde 5 milyona kadar 2+1 daire" -> {"max_fiyat": 5000000, "oda_sayisi": "2+1", "lokasyon": "Kadıköy"}. Örnek 2: "erenköy bostancı civarı" -> {"lokasyon": "Erenköy Bostancı"}. Sadece bulabildiklerini ekle."""},
                 {"role": "user", "content": question}
             ],
             response_format={"type": "json_object"}, temperature=0.0, max_tokens=200
         )
         filters = json.loads(resp.choices[0].message.content)
-        print(f"✅ Çıkarılan filtreler: {filters}")
+        print(f"✅ Çıkarılan akıllı filtreler: {filters}")
         return filters
     except Exception as e:
         print(f"❌ Filtre çıkarma hatası: {e}")
         return {}
 
 async def hybrid_search_listings(question: str) -> List[Dict]:
-    """Supabase'de HIZLI ve GÜÇLÜ hibrit arama yapar (Vektör + Filtre)."""
+    """Supabase'de HIZLI hibrit arama yapar (v2 - Akıllı Lokasyon)."""
     if not supabase:
         print("❌ Supabase istemcisi mevcut değil. Arama yapılamıyor.")
         return []
@@ -75,7 +75,7 @@ async def hybrid_search_listings(question: str) -> List[Dict]:
         return []
         
     try:
-        print("⚡️ Supabase'de hibrit arama yapılıyor...")
+        print("⚡️ Supabase'de v2 hibrit arama yapılıyor...")
         rpc_params = {
             "query_embedding": query_embedding,
             "match_threshold": MATCH_THRESHOLD,
@@ -83,44 +83,39 @@ async def hybrid_search_listings(question: str) -> List[Dict]:
             "p_max_fiyat": filters.get("max_fiyat"),
             "p_min_fiyat": filters.get("min_fiyat"),
             "p_oda_sayisi": filters.get("oda_sayisi"),
-            "p_ilce": filters.get("ilce"),
-            "p_mahalle": filters.get("mahalle")
+            "p_lokasyon": filters.get("lokasyon")
         }
         rpc_params = {k: v for k, v in rpc_params.items() if v is not None}
 
-        # Supabase RPC çağrısı artık async await ile çalışmalı
+        # Supabase RPC çağrısı
         response = await asyncio.to_thread(
             supabase.rpc("search_listings_hybrid", rpc_params).execute
         )
         
         listings = response.data if hasattr(response, 'data') and response.data else []
-        print(f"✅ Hibrit arama tamamlandı. {len(listings)} ilan bulundu.")
+        print(f"✅ v2 Hibrit arama tamamlandı. {len(listings)} ilan bulundu.")
         return listings
         
     except Exception as e:
         print(f"❌ Supabase RPC ('search_listings_hybrid') hatası: {e}")
         import traceback
-        print(traceback.format_exc())
+        traceback.print_exc()
         return []
 
 def format_listings_to_html(listings: List[Dict]) -> str:
-    """İlan listesini SibelGPT için şık bir HTML formatına dönüştürür."""
+    """İlan listesini şık bir HTML'e dönüştürür."""
     if not listings:
-        return "🔍 Üzgünüm, belirttiğiniz kriterlere uygun bir ilan bulamadım. Farklı kriterlerle tekrar deneyebilirsiniz."
+        return "<p>🔍 Üzgünüm, belirttiğiniz kriterlere uygun bir ilan bulamadım. Lütfen arama kriterlerinizi değiştirerek tekrar deneyin.</p>"
 
-    # Fiyat formatlama yardımcısı
-    def format_price(price_val):
+    def format_price(val):
         try:
-            # Gelen değer zaten sayısal (fiyat_numeric) veya sayısal-benzeri bir string olabilir
-            price_num = float(price_val)
-            # Türkçe formatlama için (1.234.567 TL)
-            return f"{price_num:,.0f} ₺".replace(',', 'X').replace('.', ',').replace('X', '.')
+            num = float(val)
+            return f"{num:,.0f} ₺".replace(',', 'X').replace('.', ',').replace('X', '.')
         except (ValueError, TypeError):
-            # Eğer sayıya çevrilemezse, orijinal string'i döndür
-            return str(price_val or 'N/A')
+            return str(val or 'N/A')
 
     html_parts = [
-        f"<h3 style='color: #4dabf7;'>İşte sizin için bulduğum {len(listings)} ilan:</h3>",
+        f"<h3 style='color: #4dabf7;'>İşte sorgunuza en uygun {len(listings)} ilan:</h3>",
         "<ul style='list-style-type: none; padding: 0;'>"
     ]
     
@@ -130,23 +125,15 @@ def format_listings_to_html(listings: List[Dict]) -> str:
         lokasyon = f"{ilan.get('ilce', '')}, {ilan.get('mahalle', '')}".strip(", ")
         fiyat = format_price(ilan.get('fiyat_numeric') or ilan.get('fiyat'))
         oda_sayisi = ilan.get('oda_sayisi', '')
-        metrekare = f"{ilan.get('metrekare', '')} m²" if ilan.get('metrekare') else ''
+        metrekare = f"{ilan.get('metrekare')} m²" if ilan.get('metrekare') else ''
 
-        pdf_button = (
-            f"<a href='https://sibelgpt-backend.onrender.com/generate-property-pdf/{ilan_no}' target='_blank' "
-            f"style='display: inline-block; margin-top: 8px; padding: 6px 12px; background-color: #d32f2f; color: white; text-decoration: none; border-radius: 4px; font-size: 13px;'>"
-            f"📄 PDF Görüntüle</a>"
-        )
+        pdf_button = f"<a href='https://sibelgpt-backend.onrender.com/generate-property-pdf/{ilan_no}' target='_blank' style='display: inline-block; margin-top: 8px; padding: 6px 12px; background-color: #e53935; color: white; text-decoration: none; border-radius: 4px; font-size: 13px;'>📄 PDF Görüntüle</a>"
         
         html_parts.append(f"""
-        <li style='background: rgba(30, 30, 30, 0.5); border-left: 4px solid #4dabf7; padding: 15px; margin-bottom: 12px; border-radius: 8px;'>
+        <li style='background: rgba(40, 40, 40, 0.6); border-left: 4px solid #4dabf7; padding: 15px; margin-bottom: 12px; border-radius: 8px;'>
             <strong style='font-size: 16px; color: #ffffff;'>{baslik}</strong><br>
-            <span style='font-size: 14px; color: #cccccc;'>
-                📍 {lokasyon}  |  🏠 {oda_sayisi} ({metrekare})
-            </span><br>
-            <span style='font-size: 15px; font-weight: bold; color: #4CAF50;'>
-                💰 {fiyat}
-            </span>
+            <span style='font-size: 14px; color: #cccccc;'>📍 {lokasyon}  |  🏠 {oda_sayisi} ({metrekare})</span><br>
+            <span style='font-size: 15px; font-weight: bold; color: #81c784;'>💰 {fiyat}</span>
             {pdf_button}
         </li>
         """)
@@ -156,7 +143,6 @@ def format_listings_to_html(listings: List[Dict]) -> str:
 
 async def check_if_property_listing_query(question: str) -> bool:
     """Sorunun ilan araması gerektirip gerektirmediğini tespit eder."""
-    # Bu fonksiyon eski koddan kopyalandı ve aynen kullanılıyor.
     try:
         resp = await openai_client.chat.completions.create(
             model="gpt-4o-mini",
@@ -164,18 +150,17 @@ async def check_if_property_listing_query(question: str) -> bool:
                 {"role": "system","content": """Bu soruyu analiz et ve sadece "Evet" veya "Hayır" yanıtı ver. İLAN ARAMASI GEREKTİREN SORULAR (Evet): "Kadıköy'de satılık daire bul/ara/göster", "20 milyona kadar 3+1 daire arıyorum", "Beşiktaş'ta ev var mı?", "Maltepe'de villa göster/listele". İLAN ARAMASI GEREKTİRMEYEN SORULAR (Hayır): "Ev alırken nelere dikkat etmeliyim?", "Konut kredisi nasıl alınır?", "Tapu işlemleri nasıl yapılır?", "Emlak vergisi ne kadar?". Sadece "Evet" veya "Hayır" yanıtı ver."""},
                 {"role": "user", "content": question}
             ],
-            temperature=0.1, max_tokens=10
+            temperature=0.0, max_tokens=10
         )
-        answer = resp.choices[0].message.content.strip().lower()
-        is_listing_query = "evet" in answer
-        print(f"📊 İlan araması tespiti: {answer} → {is_listing_query}")
+        is_listing_query = "evet" in resp.choices[0].message.content.strip().lower()
+        print(f"📊 İlan araması tespiti: {is_listing_query}")
         return is_listing_query
     except Exception as e:
         print(f"❌ İlan araması tespiti hatası: {e}")
         return False
 
 # ==============================================================================
-# ================= ANA SORGULAMA FONKSİYONU (YENİLENDİ) =======================
+# ================= ANA SORGULAMA FONKSİYONU (NİHAİ HAL) ======================
 # ==============================================================================
 
 async def answer_question(question: str, mode: str = "real-estate", conversation_history: List = None) -> Dict[str, Any]:
@@ -183,15 +168,13 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
     
     response_data = {"reply": "", "is_listing_response": False}
 
-    # Henüz bir modül yönlendirme veya genel bilgi sorusu mantığı eklemedik.
-    # Şimdilik sadece gayrimenkul ilan aramasına odaklanıyoruz.
-    
+    # Sadece Gayrimenkul modunda özel arama mantığı çalışır
     if mode == 'real-estate':
         is_listing_query = await check_if_property_listing_query(question)
         
         if is_listing_query:
-            print("🏠 İlan araması tespit edildi -> YENİ HIZLI HİBRİT ARAMA KULLANILIYOR!")
-            response_data["is_listing_response"] = True # Avatar için sinyal gönder
+            print("🏠 İlan araması tespit edildi -> HIZLI HİBRİT ARAMA KULLANILIYOR!")
+            response_data["is_listing_response"] = True # Avatar için sinyal
             
             try:
                 listings = await hybrid_search_listings(question)
@@ -202,11 +185,29 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
                 response_data["reply"] = "İlanları ararken bir sorunla karşılaştım. Lütfen daha sonra tekrar deneyin."
                 return response_data
 
-    # EĞER İLAN ARAMASI DEĞİLSE, BURADA ESKİ GPT YOLU DEVREYE GİRECEK
-    # Bu kısmı daha sonra ekleyebiliriz. Şimdilik basit bir mesaj döndürelim.
-    print("📚 Genel bilgi sorusu veya farklı mod. (Henüz tam entegre edilmedi).")
-    # Bu geçici bir yanıttır. İleride buraya tam GPT mantığını ekleyeceğiz.
-    # Bu örnekte, test için basitçe soruyu geri döndürelim ve bir not ekleyelim.
-    response_data["reply"] = f"Anladım, '{question}' hakkında genel bir soru sordunuz. Bu özellik şu an geliştirme aşamasındadır."
+    # EĞER İLAN ARAMASI DEĞİLSE veya FARKLI BİR MOD İSE, GENEL GPT YOLU KULLANILIR.
+    # Bu bölüm, projenizin orijinalindeki genel sohbet mantığıdır.
+    # Şimdilik basit tutuyoruz, daha sonra eski kodunuzdaki karmaşık prompt'lar buraya eklenebilir.
+    print(f"📚 Genel bilgi sorusu veya farklı mod ({mode}). Standart GPT kullanılacak.")
+    try:
+        messages = [
+            {"role": "system", "content": f"Sen SibelGPT'sin. '{mode}' modunda bir uzmansın. Kullanıcının sorusuna cevap ver."},
+        ]
+        if conversation_history:
+            messages.extend(conversation_history[-5:]) # Son 5 mesajı al
+        
+        messages.append({"role": "user", "content": question})
+
+        resp = await openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=1500
+        )
+        response_data["reply"] = resp.choices[0].message.content.strip()
+
+    except Exception as e:
+        print(f"❌ Genel GPT yanıt hatası: {e}")
+        response_data["reply"] = "Üzgünüm, bu soruya cevap verirken bir sorun oluştu."
 
     return response_data
