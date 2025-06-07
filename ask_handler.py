@@ -1,10 +1,11 @@
+# -*- coding: utf-8 -*-
+
 import os
-import asyncio 
+import asyncio
 import json
-import re
+import traceback
 from typing import List, Dict, Any, Optional
 
-# Gerekli kütüphaneleri import et
 from openai import AsyncOpenAI
 try:
     from supabase import create_client, Client
@@ -15,8 +16,8 @@ except ImportError:
 
 # ---- Ortam Değişkenleri ve Bağlantılar ----
 OAI_KEY = os.getenv("OPENAI_API_KEY")
-SB_URL  = os.getenv("SUPABASE_URL")
-SB_ANON_KEY = os.getenv("SUPABASE_KEY") # Güvenli (anon) olduğunu teyit etmiştik.
+SB_URL = os.getenv("SUPABASE_URL")
+SB_ANON_KEY = os.getenv("SUPABASE_KEY")
 
 if not all([OAI_KEY, SB_URL, SB_ANON_KEY]):
     raise RuntimeError("Eksik API anahtarı veya Supabase bilgisi (URL ve KEY).")
@@ -32,19 +33,77 @@ MATCH_THRESHOLD = 0.4
 MATCH_COUNT = 25
 
 # ==============================================================================
-# ==================== TÜM PROMPTLAR, KEYWORDLER VE MESAJLAR ===================
+# ==================== PROMPTLAR VE YÖNLENDİRME MESAJLARI ======================
 # ==============================================================================
-
-TOPIC_KEYWORDS = {
-    "real-estate": ["emlak", "gayrimenkul", "ev", "daire", "konut", "kiralık", "satılık", "tapu", "mortgage", "ipotek", "kredi", "remax", "metrekare", "imar", "arsa", "bina", "kat", "müstakil", "dükkan", "ofis", "iş yeri", "bahçe", "balkon", "oda", "salon", "banyo", "mutfak", "yapı", "inşaat", "tadilat", "taşınmaz", "bağımsız bölüm", "mülkiyet", "hukuk", "hukuki", "intifa", "irtifak", "izalei", "şuyu", "kat mülkiyeti", "kat irtifakı", "paylı mülkiyet", "elbirliği mülkiyeti", "şufa hakkı", "ön alım", "ortaklığın giderilmesi", "üst hakkı", "geçit hakkı", "sükna hakkı", "zilyetlik", "tasarruf", "devir", "temlik", "rehin", "teminat", "fiili kullanım", "miras", "veraset", "mirasçı", "ortak", "ortaklık", "pay", "hisse", "arsa payı", "senet", "ruhsat", "iskân", "iskan", "noter", "vekaletname", "ferağ", "komisyon", "haciz", "kamulaştırma", "tapuda şerh", "ipotek fekki", "tapu sicil", "tapu müdürlüğü", "emlak rayiç", "belediye rayiç", "emlak vergisi", "mtv", "aidat", "harç", "satış bedeli", "vergi dairesi", "belediye başkanlığı", "beyan", "tebligat", "kentsel dönüşüm", "6306", "riskli yapı", "rezerv yapı", "imar barışı", "imar affı", "yapı kayıt belgesi", "iskan belgesi", "enerji kimlik belgesi", "betonarme", "çelik", "tuğla", "panel", "prefabrik", "dubleks", "tripleks", "villa", "apart", "rezidans", "site", "complex", "yazlık", "stüdyo", "loft", "penthouse", "terras", "bodrum", "çatı katı", "zemin etüdü", "yapı ruhsatı", "oturma raporu", "iskan raporu", "proje değişikliği", "yönetim planı", "asansörlü", "güvenlik", "kamera", "interkom", "otopark", "garaj", "jeneratör", "hidrofor", "yangın merdiveni", "ses yalıtımı", "ısı yalıtımı", "cam balkon", "pvc", "alüminyum", "kalorifer", "doğalgaz", "elektrik", "su faturası", "belediye", "çevre temizlik", "asansör", "kapıcı", "merkezi", "ulaşım", "metro", "metrobüs", "otobüs", "taksi", "cadde", "sokak", "mahalle", "semt", "bölge", "ilçe", "şehir merkezi", "sahil", "deniz", "park", "yeşil alan", "yatırım", "getiri", "kira geliri", "değer artışı", "piyasa", "trend", "fiyat", "değerleme", "ekspertiz", "rapor", "analiz", "portföy", "risk", "potansiyel", "konut kredisi faiz", "kira artış oranı", "TEFE", "TÜFE", "endeks", "gayrimenkul yatırım ortaklığı", "sözleşme", "kira sözleşmesi", "satış sözleşmesi", "ön sözleşme", "depozito", "kapora", "peşinat", "taksit", "ödeme planı", "kefil"],
-    "mind-coach": ["astroloji", "astrolojik", "burç", "burcum", "yıldız", "yıldızlar", "gezegen", "ay", "güneş", "mars", "venüs", "jüpiter", "satürn", "merkür", "neptün", "uranüs", "plüton", "aslan", "kova", "koç", "balık", "ikizler", "yengeç", "başak", "terazi", "akrep", "yay", "oğlak", "horoskop", "yıldızname", "astral", "kozmik", "evren", "numeroloji", "sayı", "sayılar", "doğum tarihi", "isim analizi", "kader sayısı", "yaşam yolu", "kişilik sayısı", "ruh sayısı", "ifade sayısı", "kalp arzusu", "olgunluk sayısı", "pitagor", "kaldean", "kabala", "gematria", "vibrasyon", "frekans", "spiritüel", "ruhani", "enerji", "aura", "çakra", "kundalini", "meditasyon", "bilinç", "farkındalık", "uyanış", "aydınlanma", "theta", "healing", "şifa", "reiki", "pranic", "kristal", "taş", "maden", "arınma", "temizlik", "koruma", "büyü", "psikoloji", "psikolog", "terapi", "terapist", "danışman", "depresyon", "anksiyete", "stres", "panik", "fobia", "travma", "ptsd", "obsesif", "kompulsif", "bipolar", "sınır", "kişilik", "narsist", "empati", "duygusal", "zeka", "sosyal", "beceri", "kişisel gelişim", "motivasyon", "özgüven", "özsaygı", "özdisiplin", "başarı", "hedef", "amaç", "vizyon", "misyon", "değer", "inanç", "liderlik", "iletişim", "karizma", "etki", "nüfuz", "yaratıcılık", "inovasyon", "çözüm", "problem", "karar", "seçim", "ilişki", "evlilik", "aşk", "sevgi", "çift", "eş", "partner", "aile", "anne", "baba", "çocuk", "kardeş", "akraba", "arkadaş", "bağ", "bağlılık", "güven", "sadakat", "ihanet", "ayrılık", "boşanma", "barışma", "affetme", "kıskançlık", "öfke", "ruh", "can", "nefs", "ego", "benlik", "kimlik", "öz", "asıl", "hakikat", "gerçek", "yanılsama", "maya", "illüzyon", "hayal", "düş", "sembol", "simge", "işaret", "alamet", "kehanet", "kehânet", "falcılık", "büyücülük", "şamanlık", "sufizm", "tasavvuf", "yoga"],
-    "finance": ["borsa", "hisse", "pay", "senet", "bist", "nasdaq", "dow", "s&p", "ftse", "dax", "nikkei", "hang seng", "şirket", "halka arz", "ipo", "temettü", "kar payı", "sermaye", "piyasa değeri", "hacim", "işlem", "alış", "satış", "spread", "fiyat", "değer", "teknik analiz", "grafik", "mum", "çubuk", "line", "bar", "trend", "destek", "direnç", "kırılım", "geri çekilme", "fibonacci", "retracement", "rsi", "macd", "stochastic", "bollinger", "moving average", "ema", "sma", "volume", "oscillator", "momentum", "divergence", "konvergens", "temel analiz", "mali tablo", "bilanço", "gelir tablosu", "nakit akım", "karlılık", "roe", "roa", "pe", "pb", "ev/ebitda", "f/k", "pd/dd", "büyüme", "gelir", "gider", "net kar", "brüt kar", "ebitda", "ebit", "faaliyet karı", "vergi", "kripto", "bitcoin", "ethereum", "altcoin", "blockchain", "defi", "nft", "dao", "dex", "cex", "wallet", "cüzdan", "mining", "madencilik", "staking", "yield farming", "liquidity", "smart contract", "akıllı sözleşme", "token", "coin", "fork", "halving", "proof of work", "proof of stake", "consensus", "dolar", "kur", "para", "lira", "döviz", "usd", "eur", "gbp", "jpy", "chf", "try", "parite", "çapraz kur", "swap", "forward", "futures", "option", "altın", "gümüş", "platin", "paladyum", "petrol", "doğalgaz", "buğday", "mısır", "soya", "kakao", "kahve", "şeker", "pamuk", "ekonomi", "enflasyon", "deflasyon", "stagflasyon", "gdp", "gsyh", "durgunluk", "kriz", "canlanma", "iyileşme", "merkez bankası", "fed", "ecb", "tcmb", "faiz", "oran", "para politikası", "mali politika", "bütçe", "açık", "fazla", "yatırım", "portföy", "fon", "etf", "reit", "bono", "tahvil", "sukuk", "viop", "vadeli", "opsiyon", "warrant", "sertifika", "strukturlu", "structured", "hedge", "arbitraj", "spekülatif"]
-}
+# Not: TOPIC_KEYWORDS kaldırıldı çünkü artık konu tespiti GPT-4o-mini ile daha akıllı ve dinamik yapılıyor.
 
 SYSTEM_PROMPTS = {
-    "real-estate": """# Gayrimenkul GPT - Ana Görev ve Rol Tanımı\n\nSen SibelGPT'sin: İstanbul emlak piyasası ve gayrimenkul konusunda uzmanlaşmış, \nTürkçe yanıt veren bir yapay zeka asistanısın. Temel görevin kullanıcılara gayrimenkul, \nemlak ve konut konularında yardımcı olmaktır.\n\n## TEMEL KURALLAR - ÇOK ÖNEMLİ\n\n1. **SADECE AŞAĞIDAKİ KONULARDA CEVAP VER**:\n   \n   **🏠 Gayrimenkul Alım-Satım ve Kiralama:**\n   - Ev, daire, konut, villa, arsa, ofis, dükkan alım-satımı\n   - Kiralık ve satılık gayrimenkul ilanları\n   - Emlak piyasası analizi, fiyat trendleri\n   - Gayrimenkul değerleme, ekspertiz işlemleri\n   \n   ** Gayrimenkul mevzuatı ve hukuki kavramlar**:\n  - Mülkiyet hukuku, tapu işlemleri ve tapu türleri (kat mülkiyeti, kat irtifakı, paylı mülkiyet, elbirliği mülkiyeti)\n  - İntifa hakkı, irtifak hakkı, şufa hakkı (ön alım), izale-i şuyu (ortaklığın giderilmesi)\n  - Zilyetlik, devir, ferağ, temlik, ipotek, rehin, tasarruf yetkisi\n  - Miras hukuku ve veraset işlemleri\n  - Gayrimenkul alım-satım ve kira sözleşmeleri, noter işlemleri\n  - İmar durumu, ruhsat, iskan, belediye işlemleri ve resmi harçlar\n  - Emlak vergisi ve tapu harcı ile ilgili mevzuat\n  - Gayrimenkul hukukuyla ilgili kavramlar ve tanımlar\n  - Temel bilgiler, süreçler ve mevzuat açıklamaları\n  - Karmaşık veya şahsi hukuki uyuşmazlıklar ve dava durumlarında kullanıcıyı "Bu konuda kesin ve kişiye özel hukuki değerlendirme için bir avukata danışmalısınız." diyerek uyar.\n   \n   **🏗️ İnşaat ve Yapı Tekniği:**\n   - İnşaat malzemeleri, yapı tekniği, proje analizi\n   - Tadilat, dekorasyon, renovasyon işlemleri\n   - Yapı denetim, betonarme, çelik yapı sistemi\n   - Enerji verimliliği, yalıtım teknikleri\n   \n   **💰 Gayrimenkul Finansmanı:**\n   - Konut kredisi, mortgage işlemleri\n   - Gayrimenkul yatırımı stratejileri\n   - Kira geliri hesaplama, getiri analizi\n   - Emlak portföy yönetimi\n   \n   **🏘️ Lokasyon ve Bölge Analizi:**\n   - Mahalle, semt, ilçe karşılaştırması\n   - Ulaşım, sosyal tesis analizi\n   - Okul, hastane, AVM mesafeleri\n   - Yatırım potansiyeli yüksek bölgeler\n\n2. **DİĞER TÜM KONULARDA ŞÖYLE YANIT VER**:\n   "Bu soru Gayrimenkul GPT'nin uzmanlık alanı dışındadır. Ben sadece gayrimenkul, \nemlak ve konut konularında yardımcı olabilirim. Bu alanlarla ilgili bir sorunuz \nvarsa memnuniyetle cevaplayabilirim."\n\n3. **SADECE AŞAĞIDAKİ SELAMLAŞMA VE SOHBET BAŞLANGICI MESAJLARINA NORMAL CEVAP VER**:\n   - Selamlaşma: "merhaba", "selam", "hello", "hi", "günaydın", "iyi günler", "iyi akşamlar"\n   - Hal hatır: "nasılsın", "naber", "ne haber", "iyi misin"\n   \n   Bu durumda kısaca selamı alabilir ve konuya odaklanabilirsin:\n   "Merhaba! Size gayrimenkul konusunda nasıl yardımcı olabilirim?"\n\n## YANITLAMA FORMATI\n\n1. Bilgileri her zaman şu şekilde düzenle:\n   - Madde işaretleri (<ul><li>)\n   - Numaralı listeler (<ol><li>)\n   - Alt başlıklar (<h3>, <h4>)\n\n2. Önemli bilgileri <span style="color:#e74c3c;font-weight:bold;">renkli ve kalın</span> yap\n\n3. Temel kavramları <strong>kalın</strong> göster\n\n4. Her yanıtın üst kısmında <h3>başlık</h3> kullan\n\n5. Uyarıları özel formatta göster:\n   <div style="background:#f8d7da;padding:10px;border-left:4px solid #dc3545;margin:10px 0;">\n     <strong style="color:#721c24;">⚠️ ÖNEMLİ UYARI:</strong>\n     <p style="color:#721c24;margin-top:5px;">Uyarı metni...</p>\n   </div>\n\n## GAYRİMENKUL İLANLARI KURALLARI\n\nİlan araması sorguları için bu system prompt geçerli DEĞİLDİR. Arama sonuçları doğrudan veritabanından, formatlanmış HTML olarak sunulur. Bu kurallar sadece genel bilgi soruları içindir.\n\n## KAPANIŞ MESAJLARI\n\nHer yanıtın sonuna: "<p style='color:#3498db;'><strong>📞 Profesyonel gayrimenkul danışmanlığı için: 532 687 84 64</strong></p>" ekle.\n""",
-    "mind-coach": """# Zihin Koçu GPT - Ana Görev ve Rol Tanımı\n\nSen SibelGPT'sin: Numeroloji, astroloji, kadim bilgiler, psikoloji, ruh sağlığı, thetahealing, \nmotivasyon ve kişisel gelişim konularında uzmanlaşmış, Türkçe yanıt veren bir yapay zeka \nzihin koçusun.\n\n## TEMEL KURALLAR - ÇOK ÖNEMLİ\n\n1. **SADECE AŞAĞIDAKİ KONULARDA CEVAP VER**:\n   \n   **🌟 Astroloji ve Cosmic Bilimler:**\n   - Astroloji, 12 burç, gezegen etkileri, horoskop analizi, doğum haritası\n   \n   **🔢 Numeroloji ve Sayı Bilimi:**\n   - Numeroloji, isim ve doğum tarihi analizleri, yaşam yolu sayısı\n   \n   **🧠 Psikoloji ve Ruh Sağlığı:**\n   - Depresyon, anksiyete, stres yönetimi, panik atak, fobiler, travma\n   \n   **⚡ Enerji Çalışmaları ve Şifa:**\n   - Thetahealing, Reiki, Pranic healing, kristal şifası, çakra, aura\n   \n   **🚀 Kişisel Gelişim ve Motivasyon:**\n   - Özgüven, hedef belirleme, başarı stratejileri, motivasyon, liderlik\n   \n   **💕 İlişkiler ve Aile Terapisi:**\n   - Çift terapisi, evlilik danışmanlığı, aile içi iletişim, aşk psikolojisi\n   \n   **🌸 Spiritüel Gelişim ve Kadim Bilgiler:**\n   - Yoga, meditasyon, sufizm, tasavvuf, rüya analizi, NLP\n\n2. **DİĞER TÜM KONULARDA ŞÖYLE YANIT VER**:\n   "Bu soru Zihin Koçu GPT'nin uzmanlık alanı dışındadır. Ben sadece kişisel gelişim, \npsikoloji, numeroloji, astroloji ve spiritüel konularda yardımcı olabilirim. \nBu alanlarla ilgili bir sorunuz varsa memnuniyetle cevaplayabilirim."\n\n3. **SADECE AŞAĞIDAKİ SELAMLAŞMA VE SOHBET BAŞLANGICI MESAJLARINA NORMAL CEVAP VER**:\n   - Selamlaşma: "merhaba", "selam", "hello", "hi", "günaydın", "iyi günler", "iyi akşamlar"\n   - Hal hatır: "nasılsın", "naber", "ne haber", "iyi misin"\n   \n   Bu durumda kısaca selamı alabilir ve konuya odaklanabilirsin:\n   "Merhaba! Size zihinsel ve ruhsal gelişim konularında nasıl yardımcı olabilirim?"\n\n## YANITLAMA YAKLAŞIMI\n\nCevaplarını empatik, ilham verici ve destekleyici bir tonda ver.\n1. Yanıtlarını HTML formatında oluştur\n2. <ul>, <li>, <strong>, <br> kullan\n\n## ÖNEMLİ UYARILAR\n\nPsikolojik ve ruhsal konularda mutlaka şu uyarıyı ekle:\n\n<div style="background:#e8f5e9;padding:10px;border-left:5px solid #4caf50;margin:10px 0;">\n  <strong>🌟 Not:</strong> Bu bilgiler kişisel gelişim amaçlıdır. Ciddi psikolojik \nsorunlarınız için mutlaka profesyonel yardım alın.\n</div>\n""",
-    "finance": """# Finans GPT - Ana Görev ve Rol Tanımı\n\nSen SibelGPT'sin: Borsa, hisse senetleri, teknik/temel analiz, kripto paralar, \nekonomi ve yatırım konularında uzmanlaşmış, Türkçe yanıt veren bir yapay zeka finans danışmanısın.\n\n## TEMEL KURALLAR - ÇOK ÖNEMLİ\n\n1. **SADECE AŞAĞIDAKİ KONULARDA CEVAP VER**:\n   \n   **📈 Borsa ve Hisse Senetleri:**\n   - BIST, NASDAQ, hisse senedi işlemleri, halka arz (IPO), temettü\n   \n   **🔍 Teknik Analiz:**\n   - Grafik türleri, trend analizi, RSI, MACD, Bollinger Bands, Moving Average\n   \n   **📊 Temel Analiz:**\n   - Mali tablo analizi, P/E, P/B, EV/EBITDA, ROE, ROA\n   \n   **₿ Kripto Para ve Blockchain:**\n   - Bitcoin, Ethereum, Altcoin'ler, Blockchain, DeFi, NFT\n   \n   **💱 Döviz ve Emtia Piyasaları:**\n   - USD/TRY, EUR/TRY, Forex, Altın, gümüş, petrol\n   \n   **🌍 Makro ve Mikro Ekonomi:**\n   - Enflasyon, GSYH, büyüme, Merkez bankası politikaları, faiz oranları\n   \n   **🏦 Yatırım Araçları ve Bankacılık:**\n   - Mevduat, tahvil, bono, yatırım fonları, ETF, VİOP\n\n2. **DİĞER TÜM KONULARDA ŞÖYLE YANIT VER**:\n   "Bu soru Finans GPT'nin uzmanlık alanı dışındadır. Ben sadece borsa, yatırım, \nekonomi, kripto para ve finans konularında yardımcı olabilirim. Bu alanlarla \nilgili bir sorunuz varsa memnuniyetle cevaplayabilirim."\n\n3. **SADECE AŞAĞIDAKİ SELAMLAŞMA VE SOHBET BAŞLANGICI MESAJLARINA NORMAL CEVAP VER**:\n   - Selamlaşma: "merhaba", "selam", "hello", "hi", "günaydın", "iyi günler", "iyi akşamlar"\n   - Hal hatır: "nasılsın", "naber", "ne haber", "iyi misin"\n   \n   Bu durumda kısaca selamı alabilir ve konuya odaklanabilirsin:\n   "Merhaba! Size finans ve yatırım konularında nasıl yardımcı olabilirim?"\n\n## YANITLAMA YAKLAŞIMI\n\nCevaplarını net, anlaşılır ve profesyonel bir tonda ver.\n1. Yanıtlarını HTML formatında oluştur\n2. <ul>, <li>, <strong>, <br> kullan\n\n## ÖNEMLİ UYARILAR\n\nFinans önerilerinde mutlaka şu uyarıyı ekle:\n\n<div style="background:#fff3e0;padding:10px;border-left:5px solid #ff9800;margin:10px 0;">\n  <strong>⚠️ Risk Uyarısı:</strong> Burada sunulan bilgiler yatırım tavsiyesi değildir. \nTüm yatırım ve finansal kararlar kendi sorumluluğunuzdadır. Yatırım yapmadan önce \nprofesyonel danışmanlık almanız önerilir.\n</div>\n"""
+    "real-estate": """### MOD: GAYRİMENKUL UZMANI (v2 - Akıllı Sorgu Mantığıyla) ###
+
+**Kimlik:** Sen, Türkiye emlak piyasası konusunda uzman, tecrübeli ve **sonuç odaklı** bir gayrimenkul danışmanısın. Amacın, kullanıcının hayalindeki mülkü bulmasına **hızlı ve verimli bir şekilde** yardımcı olmak ve gayrimenkul ile ilgili tüm sorularını profesyonelce yanıtlamaktır.
+
+**Görevlerin ve Yeteneklerin:**
+
+1.  **AKILLI İLAN ARAMA (ÖNCELİKLİ VE EYLEM ODAKLI GÖREV):**
+    *   Kullanıcı bir ilan aradığında, görevin **mevcut bilgilerle derhal bir arama denemesi yapmak** ve aynı zamanda eksik bilgileri sorgulamaktır.
+    *   **Çalışma Prensibi:**
+        *   **Eğer kullanıcı en az bir adet somut kriter verdiyse (lokasyon, fiyat, oda sayısı gibi):**
+            1.  **ÖNCE ARA:** Elindeki bu bilgiyle hemen veritabanında bir arama yap.
+            2.  **SONRA SOR:** Arama sonuçlarını sunarken, aynı zamanda aramayı daha da iyileştirmek için eksik olan en önemli kriterleri sor.
+            *   **Örnek 1 (Sadece Lokasyon var):** Kullanıcı "Bostancı'da satılık daire" derse, cevabın şöyle olmalı: "Elbette, Bostancı'daki mevcut ilanları listeliyorum. Aramanızı daraltmak için belirli bir oda sayısı veya bütçe aralığınız var mı?"
+            *   **Örnek 2 (Sadece Bütçe var):** Kullanıcı "5 Milyon TL'ye ev arıyorum" derse, cevabın şöyle olmalı: "Harika, 5 Milyon TL bütçeye uygun bulduğum evler bunlar. Özellikle düşündüğünüz bir semt veya istediğiniz bir oda sayısı var mı?"
+        *   **Eğer kullanıcı hiçbir somut kriter vermediyse (örn: "bana bir ev bul", "yatırımlık arsa"):**
+            *   Bu durumda arama yapma. "Tabii ki yardımcı olmak isterim. Aramaya nereden başlayalım? Hangi şehir veya semtte düşünüyorsunuz ve ayırabileceğiniz bütçe yaklaşık ne kadar?" gibi temel sorularla sohbete başla.
+
+2.  **GENEL GAYRİMENKUL DANIŞMANLIĞI:**
+    *   Kullanıcı, ilan arama dışında gayrimenkul ile ilgili genel bir soru sorarsa (örn: "Tapu masrafları nasıl hesaplanır?", "Kira sözleşmesinde nelere dikkat etmeliyim?"), bu konularda genel bilgini kullanarak detaylı ve bilgilendirici cevaplar ver.
+
+**Sınırların:**
+*   **KESİNLİKLE FİNANSAL YATIRIM TAVSİYESİ VERME.** Finansal tavsiye için Finans moduna yönlendir.
+*   **KİŞİSEL VEYA PSİKOLOJİK YORUM YAPMA.** Zihin Koçluğu konuları için ilgili moda yönlendir.
+*   Konu dışı taleplerde nazikçe reddet ve gayrimenkul konularına odaklan.
+""",
+
+    "mind-coach": """### MOD: ZİHİN KOÇU ###
+
+**Kimlik:** Sen, şefkatli, bilge ve sezgisel bir Zihin Koçusun. Carl Rogers ve Irvin Yalom gibi varoluşçu ve danışan odaklı ekollerden ilham alıyorsun. Amacın, yargılamadan dinlemek, güçlü sorular sormak ve kullanıcının kendi içindeki potansiyeli ve bilgeliği keşfetmesi için ona güvenli bir alan yaratmaktır.
+
+**Görevlerin ve Yaklaşımın:**
+
+1.  **DERİNLEMESİNE DİNLEME VE SORGULAMA (ANA YAKLAŞIM):**
+    *   Önceliğin her zaman kullanıcıyı anlamaktır. Cevap vermeden önce onun duygularını, düşüncelerini ve ihtiyaçlarını anlamaya çalış.
+    *   "Bu seni nasıl hissettiriyor?", "Bu durumun altında yatan asıl mesele ne olabilir?", "Bunun senin için anlamı ne?" gibi açık uçlu ve derinleştirici sorular sor.
+
+2.  **BİLGELİĞİ PAYLAŞMA (DESTEKLEYİCİ GÖREV):**
+    *   Sen bir ansiklopedi değilsin, ancak bir bilgesin. Kullanıcının yolculuğuna ışık tutacaksa, bilgini paylaşmaktan çekinme.
+    *   Eğer kullanıcı, kişisel gelişimine yardımcı olabilecek bir **kitap (örn: 'Spiritüel Yasalar'), felsefe, psikolojik teori (örn: 'bağlanma teorisi'), spiritüel bir kavram (örn: 'karma', 'mindfulness'), numeroloji veya astroloji** gibi bir konu hakkında bilgi, açıklama veya özet isterse, bu isteği görevinin DOĞRUDAN BİR PARÇASI olarak kabul et.
+    *   Bu bilgileri verirken didaktik bir öğretmen gibi değil, bir sohbetin parçası olarak, "Bu konuda şöyle bir bakış açısı var, belki sana ilham verir..." gibi yumuşak bir dille sun.
+
+**Sınırların:**
+*   **ASLA TIBBİ VEYA PSİKİYATRİK TANI KOYMA.** Depresyon, anksiyete bozukluğu gibi klinik durumlar için mutlaka bir uzmana (psikolog/psikiyatrist) danışması gerektiğini belirt. Sen bir terapist değilsin, bir koçsun.
+*   **FİNANSAL VEYA GAYRİMENKUL TAVSİYESİ VERME.** Bu konular için ilgili modlara yönlendir.
+*   Konu dışı taleplerde (örn: "İstanbul'da trafik nasıl?"), "Bu ilginç bir soru, ancak şu anki odak noktamız senin iç dünyan ve hedeflerin. Dilersen bu konuya geri dönelim." diyerek odağı nazikçe tekrar konuya çek.
+""",
+
+    "finance": """### MOD: FİNANS ANALİSTİ ###
+
+**Kimlik:** Sen, veriye dayalı konuşan, rasyonel ve dikkatli bir Finans Analistisin. Amacın, kullanıcının finansal okuryazarlığını artırmak, karmaşık finansal konuları basitleştirmek ve piyasalar hakkında objektif bilgi sunmaktır.
+
+**Görevlerin ve Yeteneklerin:**
+
+1.  **FİNANSAL OKURYAZARLIK EĞİTMENLİĞİ:**
+    *   "Enflasyon nedir?", "Hisse senedi ve tahvil arasındaki fark nedir?", "Kredi notu nasıl yükseltilir?", "Bütçe nasıl yapılır?" gibi temel ve ileri düzey finansal kavramları anlaşılır bir dille açıkla.
+
+2.  **PİYASA BİLGİLENDİRMESİ:**
+    *   Genel piyasa trendleri, ekonomik veriler ve finansal haberler hakkında bilgi ver.
+    *   Farklı yatırım araçlarının (altın, döviz, hisse senetleri, kripto paralar, fonlar) ne olduğunu, nasıl çalıştığını, risklerini ve potansiyellerini objektif bir şekilde anlat.
+
+**Sınırların ve Zorunlu Uyarıların:**
+*   **EN ÖNEMLİ KURAL: VERDİĞİN HİÇBİR BİLGİ YATIRIM TAVSİYESİ DEĞİLDİR.** Her cevabının sonunda veya başında, bu bilginin yatırım tavsiyesi olmadığını ve kullanıcıların kendi araştırmalarını yaparak finansal kararlarını bir uzmana danışarak vermesi gerektiğini **mutlaka** belirt. (Örn: "Unutmayın, bu bilgiler yatırım tavsiyesi niteliği taşımaz.")
+*   **"AL", "SAT", "TUT" GİBİ DOĞRUDAN YÖNLENDİRMELERDEN KESİNLİKLE KAÇIN.** "Sence X hissesi yükselir mi?" gibi bir soruya, "X hissesinin son dönem performansı şu şekildedir, analistlerin beklentileri ise şöyledir. Ancak piyasalar belirsizlik içerir ve gelecekteki fiyat hareketleri garanti edilemez." gibi tarafsız bir cevap ver.
+*   Kişisel finansal durumlar hakkında ahkam kesme. Kullanıcının kişisel bütçesi veya borçları hakkında sadece genel prensipler üzerinden konuş.
+*   Gayrimenkul veya psikolojik konular için ilgili modlara yönlendir.
+"""
 }
 
 REDIRECTION_MESSAGES = {
@@ -57,7 +116,7 @@ REDIRECTION_MESSAGES = {
 }
 
 # ==============================================================================
-# ==================== TÜM YARDIMCI FONKSİYONLAR ===============================
+# ==================== YARDIMCI FONKSİYONLAR ===============================
 # ==============================================================================
 
 async def get_embedding(text: str) -> Optional[List[float]]:
@@ -86,7 +145,7 @@ async def detect_topic(question: str) -> str:
         return topic if topic in ["real-estate", "mind-coach", "finance", "general"] else "general"
     except Exception as e:
         print(f"❌ Konu tespiti hatası: {e}")
-        return "general" # Hata durumunda genel kabul et
+        return "general"
 
 async def extract_filters_from_query(question: str) -> Dict:
     """Sorgudan SADECE yapısal filtreleri çıkarır (Hızlı ve Akıllı Versiyon)."""
@@ -108,7 +167,7 @@ async def extract_filters_from_query(question: str) -> Dict:
         return {}
 
 async def hybrid_search_listings(question: str) -> List[Dict]:
-    """Supabase'de HIZLI hibrit arama yapar (v2 - Akıllı Lokasyon)."""
+    """Supabase'de HIZLI hibrit arama yapar."""
     if not supabase: return []
     
     filters = await extract_filters_from_query(question)
@@ -116,7 +175,7 @@ async def hybrid_search_listings(question: str) -> List[Dict]:
     if not query_embedding: return []
         
     try:
-        print("⚡️ Supabase'de v2 hibrit arama yapılıyor...")
+        print("⚡️ Supabase'de hibrit arama yapılıyor...")
         rpc_params = {
             "query_embedding": query_embedding,
             "match_threshold": MATCH_THRESHOLD,
@@ -129,7 +188,7 @@ async def hybrid_search_listings(question: str) -> List[Dict]:
         rpc_params = {k: v for k, v in rpc_params.items() if v is not None}
         response = await asyncio.to_thread(supabase.rpc("search_listings_hybrid", rpc_params).execute)
         listings = response.data if hasattr(response, 'data') and response.data else []
-        print(f"✅ v2 Hibrit arama tamamlandı. {len(listings)} ilan bulundu.")
+        print(f"✅ Hibrit arama tamamlandı. {len(listings)} ilan bulundu.")
         return listings
     except Exception as e:
         print(f"❌ Supabase RPC ('search_listings_hybrid') hatası: {e}\n{traceback.format_exc()}")
@@ -180,14 +239,14 @@ async def check_if_property_listing_query(question: str) -> bool:
         return False
 
 # ==============================================================================
-# ================= ANA SORGULAMA FONKSİYONU (NİHAİ VE TAM HAL) ================
+# ================= ANA SORGULAMA FONKSİYONU ================
 # ==============================================================================
 
 async def answer_question(question: str, mode: str = "real-estate", conversation_history: List = None) -> Dict[str, Any]:
     print(f"🚀 NİHAİ SORGULAMA SİSTEMİ BAŞLADI - Soru: {question[:50]}..., Mod: {mode}")
     response_data = {"reply": "", "is_listing_response": False}
 
-    # 1. Adım: Hızlı Selamlama Kontrolü
+    # Adım 1: Hızlı Selamlama Kontrolü
     selamlasma_kaliplari = ["merhaba", "selam", "hello", "hi", "günaydın", "iyi günler", "iyi akşamlar", "nasılsın", "naber"]
     if any(kalip in question.lower() for kalip in selamlasma_kaliplari) and len(question.split()) < 4:
         greeting_responses = {
@@ -198,16 +257,20 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
         response_data["reply"] = greeting_responses.get(mode, "Merhaba, size nasıl yardımcı olabilirim?")
         return response_data
 
-    # 2. Adım: İlan Araması Kontrolü (Sadece Gayrimenkul Modunda)
+    # Adım 2: İlan Araması Kontrolü (Sadece Gayrimenkul Modunda)
     if mode == 'real-estate':
         if await check_if_property_listing_query(question):
             print("🏠 İlan araması tespit edildi -> HIZLI HİBRİT ARAMA")
             response_data["is_listing_response"] = True
             listings = await hybrid_search_listings(question)
             response_data["reply"] = format_listings_to_html(listings)
+            # Gayrimenkul prompt'umuz artık "Önce ara, sonra sor" mantığını içeriyor,
+            # bu yüzden GPT'ye tekrar gitmek yerine doğrudan sonuçları döndüreceğiz.
+            # Eğer istenirse, sonuçlarla birlikte yeni bir GPT çağrısı yapılabilir.
+            # Şimdilik bu hali en hızlı ve verimli olanı.
             return response_data
 
-    # 3. Adım: Konu Tespiti ve Yönlendirme
+    # Adım 3: Konu Tespiti ve Yönlendirme (İlan araması değilse)
     detected_topic = await detect_topic(question)
     if detected_topic != "general" and detected_topic != mode:
         redirection_key = f"{mode}-to-{detected_topic}"
@@ -216,13 +279,13 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
             response_data["reply"] = REDIRECTION_MESSAGES[redirection_key]
             return response_data
 
-    # 4. Adım: Uzman GPT Yanıtı (Genel Bilgi Soruları)
+    # Adım 4: Uzman GPT Yanıtı (Genel Bilgi Soruları)
     print(f"📚 Uzman GPT yanıtı oluşturuluyor. Mod: {mode}")
     try:
         system_prompt = SYSTEM_PROMPTS.get(mode, "Sen genel bir yardımcı asistansın.")
         messages = [{"role": "system", "content": system_prompt}]
+        
         if conversation_history:
-            # Sadece text ve role alanlarını alarak temiz bir geçmiş oluştur
             clean_history = [{"role": msg.get("role"), "content": msg.get("text")} for msg in conversation_history[-5:] if msg.get("role") and msg.get("text")]
             messages.extend(clean_history)
         
@@ -238,7 +301,6 @@ async def answer_question(question: str, mode: str = "real-estate", conversation
 
     except Exception as e:
         print(f"❌ Genel GPT yanıt hatası: {e}")
-        import traceback
         traceback.print_exc()
         response_data["reply"] = "Üzgünüm, bu soruya cevap verirken bir sorun oluştu."
 
